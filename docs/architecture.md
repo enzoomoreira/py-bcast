@@ -2,13 +2,14 @@
 
 ## System Overview
 
-py_bcast interfaces with AE Broadcast through **two data channels**:
+py_bcast interfaces with AE Broadcast through **three data channels**:
 
 ```mermaid
 graph LR
     subgraph "py_bcast (this library)"
         CLIENT["client.py<br/>BroadcastClient, bdp, bdps"]
-        HIST["historical.py<br/>bdh, bdh_ohlcv, bdt"]
+        HIST["historical.py<br/>bdh, bdh_ohlcv, bdi, bdt"]
+        FUND["fundamental.py<br/>bconsensus"]
         INST["instruments.py<br/>InstrumentDB, bsearch"]
     end
 
@@ -19,10 +20,12 @@ graph LR
 
     subgraph "ContentProxy (cp.ae.com.br:44780)"
         BHN["/BaseHistoricaNumerica/"]
+        AEF["/aefundamental/"]
     end
 
     CLIENT -->|"DDE Request/Advise<br/>Topic=COT,ATIVO"| DDE
     HIST -->|"HTTP GET (xml)"| BHN
+    FUND -->|"HTTP GET (binary)"| AEF
     INST -->|"Read + XOR decode"| DB
 ```
 
@@ -31,8 +34,9 @@ graph LR
 | # | Channel | Module | Protocol | Data |
 |---|---------|--------|----------|------|
 | 1 | DDE | `client.py` | Win32 DDEML | Real-time quotes, streaming, snapshots |
-| 2 | HTTP | `historical.py` | REST/XML | Daily history, OHLCV, tick data |
-| 3 | Local file | `instruments.py` | XOR(0xAE) TSV | 623K instruments, 30+ exchanges |
+| 2 | HTTP | `historical.py` | REST/XML | Daily history, intraday OHLCV, tick data |
+| 3 | HTTP | `fundamental.py` | REST/binary | Analyst consensus |
+| 4 | Local file | `instruments.py` | XOR(0xAE) TSV | 623K instruments, 30+ exchanges |
 
 ## DDE Protocol
 
@@ -69,6 +73,7 @@ The Broadcast terminal exposes market data via Windows DDE — the same mechanis
 graph LR
     nginx["nginx :44780"]
     nginx --> BHN["/BaseHistoricaNumerica/<br/>(JBoss)"]
+    nginx --> AEF["/aefundamental/<br/>(JBoss)"]
     nginx --> AEI["/AEInstrumentos/<br/>(binary protocol)"]
     nginx --> AEC["/AEContent/<br/>(news, binary)"]
     nginx --> BCAA["/bcaa/ws/platform/<br/>(Spring Boot auth)"]
@@ -89,7 +94,9 @@ graph LR
 |----------|---------|----------|
 | `HistoricoFechamentos` | Multi-symbol daily closing | `bdh()` |
 | `HistoricoData` | Single-symbol OHLCV | `bdh_ohlcv()` |
-| `HistoricoTick` | Tick-by-tick trades | `bdt()` |
+| `HistoricoIntraday` | 2-min OHLCV bars | `bdi()` |
+| `HistoricoTick` | Tick-by-tick trades (intl) | `bdt()` |
+| `aefundamental/consenso` | Analyst consensus | `bconsensus()` |
 
 ### Query Parameters (Tags)
 
@@ -98,12 +105,15 @@ graph LR
 | 10023 | Platform | `4` (fixed) |
 | 10039 | Session | BCAA session token |
 | 305 | Symbol | Ticker (e.g., `PETR4`) |
+| 10029 | Precisao | Integer (decimal places) |
+| 10068 | Short ticker | Ticker without exchange |
+| 10074 | DataHoraInicioMinutos | `YYYYMMDDHHMM` (12 digits) |
 | 10077 | Date | `YYYYMMDD` |
 | 10113 | Symbols | Semicolon-separated |
 | 10071 | Start datetime | `YYYYMMDDHHMMSS` |
 | 10072 | End datetime | `YYYYMMDDHHMMSS` |
+| 13004 | Date/context | `YYYYMMDD` (for fundamental) |
 | TipoResposta | Response format | `xml` |
-| Precisao | Decimal places | `0`–`5` |
 | DatasTolerancia | Date list | Semicolon-separated `YYYYMMDD` |
 
 ## Instrument Database

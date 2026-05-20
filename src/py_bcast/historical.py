@@ -208,3 +208,67 @@ def bdt(
     # API returns newest first — reverse to chronological order
     ticks.reverse()
     return ticks
+
+
+def bdi(
+    ticker: str,
+    start_date: str,
+    session_token: str | None = None,
+) -> list[dict[str, str]]:
+    """
+    Get intraday OHLCV bars (2-minute candles) for a symbol.
+
+    Uses HistoricoIntraday endpoint. Works for ALL instruments (B3 + international).
+    Returns bars from start_date up to the current time.
+
+    Args:
+        ticker: Symbol (e.g., "PETR4", "VALE3", "USDBRL", "GOLD")
+        start_date: Start date as YYYYMMDD (data from this date onwards)
+        session_token: BCAA session token
+
+    Returns:
+        List of bar dicts sorted chronologically (oldest first).
+        Keys: dat, hor, open, high, low, last (close), qtt, neg,
+        total_value, open_interest, total_neg, tipo_intervalo.
+
+        tipo_intervalo values:
+            1 = Regular session
+            5 = After-hours session
+            9 = Closing auction
+
+    Example:
+        >>> bars = bdi("PETR4", "20260519")
+        >>> for bar in bars[-5:]:
+        ...     print(f"{bar['dat']} {bar['hor']} O={bar['open']} H={bar['high']} L={bar['low']} C={bar['last']}")
+    """
+    token = get_session_token(session_token)
+    s = create_http_session()
+
+    # Format: YYYYMMDDHHMM (12 digits). Server uses only the date portion;
+    # the last 4 digits (HHMM) are required but ignored.
+    tag_10074 = f"{start_date}0000"
+
+    params = base_params(token)
+    params["305"] = ticker
+    params["10074"] = tag_10074
+    params["10029"] = "4"  # Precisao (decimal places)
+
+    r = s.get(
+        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoIntraday",
+        params=params,
+        timeout=60,
+        verify=False,
+    )
+
+    root = ET.fromstring(r.text)
+    if root.findtext("STATUS") != "success":
+        msg = root.findtext("MESSAGE") or "Unknown error"
+        raise RuntimeError(f"ContentProxy error: {msg}")
+
+    bars = []
+    for tick in root.findall(".//TICK"):
+        bars.append({child.tag.lower(): (child.text or "") for child in tick})
+
+    # API returns newest first — reverse to chronological order
+    bars.reverse()
+    return bars

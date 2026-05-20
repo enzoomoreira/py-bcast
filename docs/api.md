@@ -97,6 +97,30 @@ bar = bdh_ohlcv("PETR4", "20260519")
 
 **Returns:** `dict` with keys: dat, last, settle, low, high, open, neg, qtt, total_value, open_interest, vwap, total_neg. Empty dict if no data.
 
+### `bdi(ticker, start_date)`
+
+Intraday 2-minute OHLCV bars. Works for **all instruments** (B3 + international).
+
+```python
+from py_bcast import bdi
+
+# Today's intraday bars for PETR4
+bars = bdi("PETR4", "20260520")
+for bar in bars[-3:]:
+    print(f"{bar['hor']} O={bar['open']} H={bar['high']} L={bar['low']} C={bar['last']}")
+
+# Multiple days of intraday data
+bars = bdi("USDBRL", "20260515")  # from May 15 to now
+```
+
+**Returns:** `list[{dat, hor, open, high, low, last, qtt, neg, total_value, open_interest, total_neg, tipo_intervalo}]`
+
+**Notes:**
+- Bars are 2-minute candles (server-determined granularity)
+- `tipo_intervalo`: 1=regular session, 5=after-hours, 9=closing auction
+- Can go back up to ~1.5 years (77K+ bars for B3 stocks)
+- Data is from `start_date` up to the current time
+
 ### `bdt(ticker, start, end=None)`
 
 Tick-by-tick trade data. Works for **international instruments only**.
@@ -112,6 +136,25 @@ for t in ticks:
 **Returns:** `list[{dat, hor, last, size, neg, open_interest, calendar_days, working_days}]`
 
 **Supported symbols:** USDBRL, EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, USDCNY, USDMXN, EURBRL, GBPBRL, JPYBRL, CHFBRL, AUDBRL, CADBRL, GOLD, SILVER, WTI, DAX, FTSE, VIX, DXY, US10Y, US2Y.
+
+---
+
+## Fundamental Data (HTTP)
+
+### `bconsensus(ticker)`
+
+Analyst consensus recommendations and target prices.
+
+```python
+from py_bcast import bconsensus
+
+data = bconsensus("PETR4")
+# {'buy': '3', 'hold': '2', 'sell': '0', 'total_analysts': '5',
+#  'target_low': '43.00', 'target_high': '64.00',
+#  'target_mean': '48.60', 'target_median': '45.00', 'upside_pct': '8.7350'}
+```
+
+**Returns:** `dict` with keys: buy, hold, sell, total_analysts, target_low, target_high, target_mean, target_median, upside_pct. Empty dict if no data.
 
 ---
 

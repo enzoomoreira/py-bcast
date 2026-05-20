@@ -6,9 +6,12 @@
 |----------|-------|------------|
 | `HistoricoDiario` | `Query=NONE (bh_88029)` | Requires pre-registered query via AETP protocol |
 | `HistoricoUltimosPregoes` | `Query=NONE` | Same mechanism |
-| `HistoricoIntraday` | `Data inválida` | Tag 10074 format unknown |
 | `AEInstrumentos/*` | Error 88007 | Proprietary binary protocol, not XML |
-| `AEContent/*` | Error 88007 | Same — binary protocol |
+| `AEContent/*` (News) | Error 88007 | Binary-only protocol, no XML/JSON support |
+| `aefundamental/marketcap` | No data | Returns wrong instrument or "not found" |
+| `aefundamental/indicadores` | 404 | Endpoints don't exist on server |
+| `aefundamental/demonstracao` | Backend error | GraphQL backend (AWS) unreachable |
+| `contentProxyOutput/Fundos` | 500 | Server error |
 
 ## Tick Data (bdt) Restrictions
 
@@ -29,13 +32,16 @@
 
 ## Workaround for B3 Historical
 
-Use `bdh()` instead — it works for ALL instruments including B3, but only at daily granularity:
+Use `bdh()` for daily data or `bdi()` for intraday — both work for ALL instruments:
 
 ```python
-# This works for PETR4 (daily)
+# Daily closing prices (all instruments)
 data = bdh("PETR4", "20260501", "20260520")
 
-# This does NOT work for PETR4 (tick)
+# Intraday 2-min bars (all instruments!)
+bars = bdi("PETR4", "20260519")  # works!
+
+# Tick data does NOT work for B3
 ticks = bdt("PETR4", "20260519100000", "20260519110000")  # → []
 ```
 
@@ -50,7 +56,9 @@ ticks = bdt("PETR4", "20260519100000", "20260519110000")  # → []
 | Protocol | Status | Notes |
 |----------|--------|-------|
 | DDE (Service=BC) | ✅ Fully working | Real-time + snapshot |
-| HTTP ContentProxy | ✅ Partially working | History OK, instruments/news blocked |
+| HTTP ContentProxy | ✅ Working | Daily, intraday OHLCV, tick (intl) |
+| HTTP aefundamental | ✅ Partial | Analyst consensus works; marketcap/indicadores blocked |
+| AEContent binary | ❌ Blocked | Proprietary framing, no XML/JSON support |
 | AETP TCP:8100 | ❌ Not cracked | Binary protocol, custom framing |
 | SPC .NET (AESpcNET.dll) | ❌ Dead end | Server doesn't route data to external clients |
 | RTD COM | ❌ Not available | Broadcast has no RTD server (Excel uses DDE internally) |
