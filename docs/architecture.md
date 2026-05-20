@@ -1,211 +1,140 @@
-# Arquitetura — Broadcast DDE Client
+# Architecture
 
-## Visão Geral das Camadas
+## System Overview
 
-O ecossistema Broadcast+ tem **três caminhos de dados distintos**, cada um usado por
-um componente diferente:
+py_bcast interfaces with AE Broadcast through **two data channels**:
 
-```
-                          ┌─────────────────────────────────────┐
-                          │        bcsys32.exe (Terminal)        │
-                          │                                      │
-  ┌──────────────────┐    │  ┌─────────┐    ┌─────────────────┐ │
-  │  broadcast.py    │    │  │  DDE    │    │  SPC/.NET/AETP  │ │
-  │  (este projeto)  │    │  │ Server  │    │  (interno)      │ │
-  └────────┬─────────┘    │  └────┬────┘    └────────┬────────┘ │
-           │              │       │                   │          │
-           │ [1] DDE      └───────┼───────────────────┼──────────┘
-           │ Service=BC           │                   │
-           │ Topic=COT ──────────►│          TCP:8100 │
-           │ Item=PETR4.ULT       │          (AETP)   │
-           │ ✅ IMPLEMENTADO      │                   │
-           │                      │                   │
-           │              ┌───────┴───────────────────┴──────────┐
-           │              │         Broadcast Backend Servers      │
-           │              │   wsbf.aebroadcast.com.br             │
-           │              │     :44780  Dados/BCH (HTTP)          │
-           │              │     :44783  HubFIX (SOAP/ASMX)        │
-           │              └────────────────────┬──────────────────┘
-           │                                   │
-           │                    ┌──────────────┘
-           │                    │
-  ┌────────┴─────────┐  ┌───────┴──────────────────────────────────┐
-  │  Excel + XLL     │  │  [2] HTTP ContentProxy                   │
-  │  Broadcast.      ├─►│  cp.ae.com.br:44780                      │
-  │  AddIn64.xll     │  │  Usado por =BCH() e =BCS()               │
-  └──────────────────┘  │  ✅ IMPLEMENTADO (bdh/bdh_ohlcv)         │
-                        └──────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph "py_bcast (this library)"
+        CLIENT["client.py<br/>BroadcastClient, bdp, bdps"]
+        HIST["historical.py<br/>bdh, bdh_ohlcv, bdt"]
+        INST["instruments.py<br/>InstrumentDB, bsearch"]
+    end
 
-  [3] Protocolo AETP (TCP:8100) — usado internamente pelo terminal
-      para receber todos os dados que aparecem na tela (cotações,
-      notícias, etc.). Explorado mas não decifrado.
-      ❌ NÃO IMPLEMENTADO (caminho mais complexo)
+    subgraph "bcsys32.exe (Terminal)"
+        DDE["DDE Server<br/>Service=BC"]
+        DB["aetp_17.dat<br/>(instrument DB)"]
+    end
+
+    subgraph "ContentProxy (cp.ae.com.br:44780)"
+        BHN["/BaseHistoricaNumerica/"]
+    end
+
+    CLIENT -->|"DDE Request/Advise<br/>Topic=COT,ATIVO"| DDE
+    HIST -->|"HTTP GET (xml)"| BHN
+    INST -->|"Read + XOR decode"| DB
 ```
 
-### Resumo dos Caminhos
+## Data Channels
 
-| # | Canal | Usado por | Status | Dados disponíveis |
-|---|-------|-----------|--------|-------------------|
-| 1 | DDE (BC/COT, BC/ATIVO) | Excel `=BC()` | **✅ Implementado** | Cotações tempo real, snapshot 56 campos |
-| 2 | HTTP ContentProxy `:44780` | Excel `=BCH()`, `=BCS()` | **✅ Implementado** | Histórico fechamentos, OHLCV diário |
-| 3 | AETP TCP:8100 | bcsys32 interno | **❌ Parcialmente explorado** | Tudo que o terminal mostra (notícias, etc.) |
+| # | Channel | Module | Protocol | Data |
+|---|---------|--------|----------|------|
+| 1 | DDE | `client.py` | Win32 DDEML | Real-time quotes, streaming, snapshots |
+| 2 | HTTP | `historical.py` | REST/XML | Daily history, OHLCV, tick data |
+| 3 | Local file | `instruments.py` | XOR(0xAE) TSV | 623K instruments, 30+ exchanges |
 
-## Protocolo DDE
+## DDE Protocol
 
-O terminal Broadcast expõe dados via **Windows DDE (Dynamic Data Exchange)** — o mesmo mecanismo usado pelo Excel add-in `Broadcast.AddIn64.xll`.
+The Broadcast terminal exposes market data via Windows DDE — the same mechanism used by its Excel add-in.
 
-### Endereçamento
+### Addressing
 
-- **Service**: `BC` (fixo)
-- **Topic**: `COT` (cotações em tempo real) ou `ATIVO` (snapshot)
-- **Item**: `TICKER.CAMPO` (ponto como separador)
+| Component | Value | Notes |
+|-----------|-------|-------|
+| Service | `BC` | Fixed |
+| Topic | `COT` | Real-time quotes |
+| Topic | `ATIVO` | Full snapshot (56 fields) |
+| Item | `TICKER.FIELD` | Dot separator |
 
-### Modos de Operação
+### Operating Modes
 
-| Modo | DDE Operation | Uso |
-|------|--------------|-----|
-| Request | `DdeClientTransaction(XTYP_REQUEST)` | One-shot: pega valor atual |
-| Advise | `DdeClientTransaction(XTYP_ADVSTART)` | Streaming: push em cada tick |
-| Snapshot | Request no topic ATIVO | Todos os campos de uma vez |
+| Mode | DDE Operation | py_bcast Function |
+|------|--------------|-------------------|
+| Request | `XTYP_REQUEST` | `bdp()`, `BroadcastClient.request()` |
+| Advise | `XTYP_ADVSTART` | `BroadcastClient.subscribe()` |
+| Snapshot | Request on ATIVO | `BroadcastClient.snapshot()` |
 
-### Tópicos DDE Disponíveis
+### Implementation Notes
 
-| Topic | Status | Uso |
-|-------|--------|-----|
-| COT | **Funciona** | Cotações tempo real (TICKER.CAMPO) |
-| ATIVO | **Funciona** | Snapshot completo (item = ticker) |
-| DOLAR | Conecta, sem itens | Formato de item desconhecido |
-| LIVRO | Conecta, retorna vazio | Book de ofertas (possivelmente requer assinatura) |
-| ONLINE | Conecta, NOK | Status |
+- **pywin32 `dde` module** — for one-shot Request (simple, high-level)
+- **ctypes DDEML** — for Advise/streaming (message pump + 64-bit callback)
+- On Windows x64, DDE handles (HDDEDATA, HCONV, HSZ) are 8-byte pointers → use `ctypes.c_ssize_t`, not `c_ulong`
 
-### Implementação Python
+## HTTP ContentProxy
 
-O client usa duas camadas:
+### Infrastructure
 
-1. **pywin32 `dde` module** — para Request (simples, alto nível)
-2. **ctypes DDEML** — para Advise/streaming (requer message pump e callback com tipos 64-bit corretos)
-
-Detalhe importante: em Windows x64, os handles DDE (HDDEDATA, HCONV, HSZ) são ponteiros de 8 bytes. Usar `ctypes.c_ssize_t` no callback, não `c_void_p` ou `c_ulong`.
-
-## O Que NÃO Funciona
-
-### SPC (.NET wrapper via TCP:8100)
-
-- `AESpcNET.dll` / `AESpcNETWrapper64.dll` provê interface .NET
-- Conecta a bcsys32:8100, status fica "Initialized" (nunca "SessionOnline")
-- `StartAdvise` retorna True mas **nunca entrega dados**
-- `Request` nunca chama o callback
-- Execute retorna "NOK=Falha na execução do comando (AESPS)"
-
-**Conclusão**: O SPC server em bcsys32 não roteia dados para clientes externos. Serve apenas para comunicação interna.
-
-### RTD (Real-Time Data COM)
-
-- `Bofaddin.RtdServer` (CLSID `{BF41DD5C-B719-4034-8A47-B423B4577FD3}`) — é o RTD da **Bloomberg**, não do Broadcast
-- `Bloomberg.Rtd` (CLSID `{CD6BE101-83F1-4300-887A-5ABFF8A10227}`) — Bloomberg explícito
-- O Broadcast **não tem** RTD server próprio. As fórmulas `=BC()` usam DDE internamente
-
-### TCP Direto (AETP, porta 8100)
-
-- Protocolo: magic `1a fe ce fa` + uint32 LE payload_len + checksum (XOR)
-- Server aceita conexão e envia LOGON_OK
-- Subscriptions nunca geram data push
-- Múltiplas tentativas de formato causaram crash no server
-
-### Dados Históricos (BCH/BCS) → ContentProxy HTTP
-
-- **Resolvido**: Endpoint HTTP em `cp.ae.com.br:44780` (nginx → Java backends)
-- Implementado em `broadcast.py` via funções `bdh()` e `bdh_ohlcv()`
-- Formato: `=BCH("PETR4";"ULT";"01/06/2016";"30/06/2016")`
-
-## ContentProxy HTTP API
-
-### Infraestrutura
-
-```
-nginx (port 44780)
-├── /BaseHistoricaNumerica/   → JBoss Web/3.0.0-CR2 (historical data)
-├── /AEInstrumentos/output/   → Servlet container (instruments, bolsas)
-├── /AEContent/output/        → News content
-├── /contentProxyOutput/      → Funds data
-├── /aetp/output/             → Fundamentals, funds carteira
-├── /aefundamental/           → Corporate fundamentals
-├── /ConfigFerramentas/       → Query configurations
-├── /bcaa/ws/platform/        → Spring Boot (auth service)
-└── /aeterminal/              → Apache static (services.xml, global.xml)
+```mermaid
+graph LR
+    nginx["nginx :44780"]
+    nginx --> BHN["/BaseHistoricaNumerica/<br/>(JBoss)"]
+    nginx --> AEI["/AEInstrumentos/<br/>(binary protocol)"]
+    nginx --> AEC["/AEContent/<br/>(news, binary)"]
+    nginx --> BCAA["/bcaa/ws/platform/<br/>(Spring Boot auth)"]
+    nginx --> AET["/aeterminal/<br/>(Apache static)"]
 ```
 
-### Autenticação
+### Authentication
 
-| Mecanismo | Quando usar |
-|-----------|-------------|
-| Tag `10039` na query string | **Bypass nginx** — preferido para GET |
-| Basic Auth `broad:@&Br0@dc@st` | Fallback quando 10039 não está na URL |
-| BCAA session token | Obtido via `/bcaa/ws/platform/logon` PUT |
+| Mechanism | Usage |
+|-----------|-------|
+| Tag `10039` in query string | Primary — bypasses nginx auth |
+| Basic Auth `broad:@&Br0@dc@st` | Fallback for static resources |
+| BCAA session token | Hex string obtained from terminal config |
 
-### Endpoints Funcionais
+### Working Endpoints
 
-| Endpoint | Params | Retorna |
-|----------|--------|---------|
-| `HistoricoFechamentos` | 10113=SYMs(;sep), DatasTolerancia=DATEs(;sep) | LAST, SETTLE por dia/símbolo |
-| `HistoricoData` | 305=TICKER, 10077=DATE | OHLCV completo (single day) |
+| Endpoint | Purpose | Function |
+|----------|---------|----------|
+| `HistoricoFechamentos` | Multi-symbol daily closing | `bdh()` |
+| `HistoricoData` | Single-symbol OHLCV | `bdh_ohlcv()` |
+| `HistoricoTick` | Tick-by-tick trades | `bdt()` |
 
-### Tags (parâmetros numéricos)
+### Query Parameters (Tags)
 
-| Tag | Nome | Valor/Formato |
-|-----|------|---------------|
-| 10023 | Plataforma | `4` (fixo) |
-| 10039 | Session | BCAA session token hex |
-| 305 | Symbol | Ticker (ex: `PETR4`) |
-| 10077 | Data | `YYYYMMDD` (single date) |
-| 10113 | Symbols | Tickers separados por `;` |
-| 1789 | DataInicio/Precisao | `YYYYMMDD` ou precision level |
-| 961 | DataFim (HistoricoDiario) | `YYYYMMDD` — requer query pré-registrada |
-| 10029 | DataInicio | `YYYYMMDD` |
-| TipoResposta | Response format | `xml` (somente para BaseHistoricaNumerica) |
-| Precisao | Casas decimais | `0`–`5` |
-| DatasTolerancia | Dates list | Datas separadas por `;` |
+| Tag | Name | Format |
+|-----|------|--------|
+| 10023 | Platform | `4` (fixed) |
+| 10039 | Session | BCAA session token |
+| 305 | Symbol | Ticker (e.g., `PETR4`) |
+| 10077 | Date | `YYYYMMDD` |
+| 10113 | Symbols | Semicolon-separated |
+| 10071 | Start datetime | `YYYYMMDDHHMMSS` |
+| 10072 | End datetime | `YYYYMMDDHHMMSS` |
+| TipoResposta | Response format | `xml` |
+| Precisao | Decimal places | `0`–`5` |
+| DatasTolerancia | Date list | Semicolon-separated `YYYYMMDD` |
 
-### Endpoints Bloqueados
+## Instrument Database
 
-| Endpoint | Erro | Motivo |
-|----------|------|--------|
-| `HistoricoDiario` | Query=NONE (bh_88029) | Requer query pré-registrada via AETP protocol |
-| `HistoricoUltimosPregoes` | Query=NONE | Mesmo mecanismo |
-| `AEInstrumentos/*Servlet` | 88007 | TipoResposta incompatível (não é XML) |
+The terminal maintains a local instrument master file:
 
-### services.xml
+| Property | Value |
+|----------|-------|
+| Path | `%APPDATA%\Agencia Estado\Broadcast\DataFiles\aetp_17.dat` |
+| Size | ~105 MB |
+| Encoding | XOR with key `0xAE` |
+| Format | TSV (tab-separated) |
+| Header | Tag numbers as column names |
+| Records | 623,247 instruments |
+| Exchanges | 30+ (BVMF, GTISFX, CMX, ICEEU, etc.) |
 
-Registro de 213 serviços em `http://cp.ae.com.br:44780/aeterminal/services.xml`.
-Formato:
-```xml
-<service id='13'>
-    <name>HistoricoData</name>
-    <protocol>cp</protocol>
-    <url>^(server)/BaseHistoricaNumerica/HistoricoData</url>
-    <callback>historical</callback>
-    <requiredTag>305</requiredTag>
-    <requiredTag>10023</requiredTag>
-    <requiredTag>10039</requiredTag>
-    <requiredTag>10077</requiredTag>
-    <isCached>false</isCached>
-</service>
-```
-`^(server)` = `http://cp.ae.com.br` (de global.xml)
+### Key Columns
 
-## Endpoints Descobertos
+| Tag | Content | Example |
+|-----|---------|---------|
+| 305 | Full symbol | `PETR4.BVMF` |
+| 10068 | Short ticker | `PETR4` |
+| 10045 | Name | `PETROLEO BRASILEIRO S.A. PETROBRAS, PN` |
+| 303 | ISIN | `BRPETRACNPR6` |
+| 10092 | Exchange ID | `BVMF` |
 
-| Endpoint | Porta | Uso | Status |
-|----------|-------|-----|--------|
-| localhost (bcsys32) | 8100 | SPC/AETP (não funcional para dados) | ❌ |
-| cp.ae.com.br | 44780 | ContentProxy — histórico, instrumentos | ✅ |
-| wsbf.aebroadcast.com.br | 44780 | Alias/antigo do ContentProxy | ✅ |
-| wsbf.aebroadcast.com.br | 44783 | HubFIX ASMX (risco, OMS) | ❌ |
-| xmpp.ae.com.br | 44761 | Chat (XMPP) | ❌ |
+## Data Format Conventions
 
-## Formato de Dados
-
-- Números usam **vírgula** como separador decimal (locale pt-BR): `44,60`
-- Datas em formato `dd/mm/yyyy`: `19/05/2026`
-- Horas em formato `HH:MM`: `15:19`
-- Variação em percentual com sinal: `-3,2328`
+- Numbers use **comma** as decimal separator (pt-BR locale): `44,60`
+- DDE dates: `dd/mm/yyyy` (e.g., `19/05/2026`)
+- DDE times: `HH:MM` (e.g., `15:19`)
+- HTTP dates: `YYYYMMDD`
+- Tick times: `HH:MM:SS.mmm`
+- Variation as signed percentage: `-3,2328`

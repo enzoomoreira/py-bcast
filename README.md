@@ -1,129 +1,107 @@
-# broadcast-intercept
+# py-bcast
 
-Cliente Python para dados de mercado do terminal **AE Broadcast** (Agência Estado / Broadcast+), oferecendo cotações em tempo real via DDE e dados históricos via HTTP ContentProxy.
+Python client for **AE Broadcast** (Agência Estado) market data terminal — a Bloomberg `blpapi`/`xbbg`-like interface for the Broadcast+ ecosystem.
 
-Funciona como alternativa ao Bloomberg `blpapi`/`xbbg` — conecta programaticamente ao terminal Broadcast já em execução para extrair cotações da B3 e outros mercados.
+## Features
 
-## Requisitos
+- **Real-time streaming** via DDE (bdp, subscribe, snapshot)
+- **Historical data** via HTTP (daily OHLCV, tick-by-tick)
+- **Instrument database** — search 623K+ instruments across 30+ exchanges
+- Proper Python package with `src/` layout and type annotations
+
+## Requirements
 
 - Windows 10/11
-- Python 3.12+ com `pywin32`, `requests`
-- Terminal Broadcast rodando (`bcsys32.exe` ativo)
+- Python 3.12+
+- Terminal Broadcast running (`bcsys32.exe`)
+- `BROADCAST_SESSION` env var set for historical data
+
+## Installation
 
 ```bash
-pip install pywin32 requests
+pip install -e ".[dde]"
 ```
 
-## Uso Rápido
+Or for HTTP-only usage (no pywin32 needed):
+```bash
+pip install -e .
+```
+
+## Quick Start
 
 ```python
-from broadcast import BroadcastClient, bdp, bdps, bdh, bdh_ohlcv
-
-# One-shot (estilo bdp do Bloomberg)
-price = bdp("PETR4", "ULT")        # '44,60'
-data = bdp("PETR4", ["ULT", "VAR", "MAX", "MIN", "FEC", "NOM"])
-
-# Batch (múltiplos ativos)
-result = bdps(
-    ["PETR4", "VALE3", "ITUB4", "IBOV", "USDBRL"],
-    ["ULT", "VAR"]
-)
-
-# Snapshot completo (todos os campos de uma vez)
-with BroadcastClient() as bc:
-    snap = bc.snapshot("PETR4")  # ~47 campos
-
-# Streaming em tempo real
-with BroadcastClient() as bc:
-    bc.subscribe(
-        ["PETR4", "VALE3", "IBOV"],
-        ["ULT", "VAR", "NEG"],
-        callback=lambda ticker, field, value: print(f"{ticker}.{field} = {value}")
-    )
-    bc.run(duration=60)
-
-# Dados históricos (estilo BDH do Bloomberg)
 import os
-os.environ["BROADCAST_SESSION"] = "<session_token>"
+os.environ["BROADCAST_SESSION"] = "<your_session_token>"
 
-data = bdh(["PETR4", "VALE3"], "20260501", "20260519")
-for sym, rows in data.items():
-    for row in rows:
-        print(f"{sym} {row['date']}: {row['last']}")
+from py_bcast import bdp, bdh, bdt, bsearch, BroadcastClient
 
-# OHLCV completo (single day)
-candle = bdh_ohlcv("PETR4", "20260519")
-# {'open': '45.99', 'high': '46.3', 'low': '45.59', 'last': '46.09', ...}
+# Real-time quote
+price = bdp("PETR4", "ULT")
+
+# Historical daily (works for ALL instruments)
+data = bdh("PETR4", "20260501", "20260520")
+for row in data["PETR4.BVMF"]:
+    print(row["date"], row["last"])
+
+# OHLCV single day
+bar = bdh_ohlcv("PETR4", "20260519")
+
+# Tick data (international instruments)
+ticks = bdt("USDBRL", "20260519100000", "20260519110000")
+
+# Instrument search (623K+ instruments)
+bsearch("PETR", exchange="BVMF")
+bsearch("VIX", exchange="CBOEI")
+
+# Real-time streaming
+with BroadcastClient() as bc:
+    bc.subscribe(["PETR4", "VALE3"], ["ULT", "VAR"],
+                 callback=lambda t, f, v: print(f"{t}.{f} = {v}"))
+    bc.run(duration=60)
 ```
 
-## Ativos Suportados
+## Supported Assets
 
-| Classe         | Exemplos                          | Status |
-|---------------|-----------------------------------|--------|
-| Ações B3       | PETR4, VALE3, ITUB4, BBDC4, B3SA3 | OK |
-| FIIs           | HGLG11, MXRF11                    | OK |
-| BDRs           | AAPL34, MSFT34                    | OK |
-| Índices        | IBOV, IFIX, SMLL, IDIV           | OK |
-| Câmbio         | USDBRL, EURBRL                    | OK |
-| DI Futuro      | DI1F27 (vencimentos selecionados) | Parcial |
-| Mini Dólar/Índice | WDOM25, WINM25               | N/A* |
-| Dólar/Índice Cheio | DOLFUT, INDFUT              | N/A* |
+| Class | Examples | Real-time | Daily History | Tick Data |
+|-------|----------|-----------|---------------|-----------|
+| B3 Stocks | PETR4, VALE3, ITUB4 | ✅ | ✅ | ❌ |
+| FIIs | HGLG11, MXRF11 | ✅ | ✅ | ❌ |
+| BDRs | AAPL34, MSFT34 | ✅ | ✅ | ❌ |
+| Indices | IBOV, IFIX, SMLL | ✅ | ✅ | ❌ |
+| FX | USDBRL, EURUSD, GBPUSD | ✅ | ✅ | ✅ |
+| Metals | GOLD, SILVER | ✅ | ✅ | ✅ |
+| Energy | WTI, BRENT | ✅ | ✅ | ✅ |
+| Global Indices | DAX, FTSE, VIX, DXY | ✅ | ✅ | ✅ |
+| Treasuries | US10Y, US2Y | ✅ | ✅ | ✅ |
+| DI Futures | DI1F27 | ✅ | ✅ | ❌ |
 
-\* Futuros BM&F retornam N/A — provavelmente requer assinatura específica no terminal.
-
-## Campos Principais
-
-| Campo | Descrição |
-|-------|-----------|
-| ULT   | Último preço |
-| VAR   | Variação % |
-| MAX   | Máxima do dia |
-| MIN   | Mínima do dia |
-| ABE   | Abertura |
-| FEC   | Fechamento anterior |
-| OCP   | Oferta de compra (bid) |
-| OVD   | Oferta de venda (ask) |
-| NEG   | Número de negócios |
-| QTT   | Quantidade total negociada |
-| NOM   | Nome do ativo |
-| HOR   | Hora da última cotação |
-
-Veja `docs/fields.md` para a lista completa.
-
-## Limitações
-
-- **HistoricoDiario (OHLCV range)**: Requer query pré-registrada via protocolo AETP binário. Workaround: usar `bdh()` para fechamentos em range + `bdh_ohlcv()` por dia.
-- **Book de ofertas (LIVRO)**: Tópico DDE aceita conexão mas retorna vazio.
-- **Futuros BM&F**: Maioria retorna N/A (possível restrição de assinatura).
-- **Session token**: `bdh()`/`bdh_ohlcv()` requerem token BCAA extraído do processo (expira periodicamente).
-- **Requer message pump**: O streaming (`bc.run()`) bloqueia a thread para processar mensagens Windows.
-
-## Arquitetura
-
-Veja `docs/architecture.md` para detalhes técnicos dos protocolos DDE e ContentProxy HTTP.
-
-## Estrutura do Projeto
+## Project Structure
 
 ```
-broadcast.py              # Cliente principal (DDE real-time + HTTP histórico)
-test_broadcast_client.py  # Teste de integração DDE
+src/py_bcast/
+├── __init__.py         # Public API
+├── _constants.py       # Service names, fields, URLs
+├── _dde.py             # DDEML ctypes bindings
+├── _http.py            # HTTP session factory
+├── client.py           # BroadcastClient, bdp, bdps
+├── historical.py       # bdh, bdh_ohlcv, bdt
+└── instruments.py      # InstrumentDB, bsearch
+tests/
+├── test_historical.py  # HTTP integration tests
+└── test_instruments.py # Instrument DB tests
+scripts/                # Utilities for data regeneration
 docs/
-  architecture.md        # Arquitetura completa (DDE, ContentProxy, AETP)
-  fields.md              # Referência completa de campos DDE (56 campos)
-  services.xml           # Registry original de 213 serviços HTTP
-  services_parsed.json   # services.xml parseado como JSON
-  chm_extracted/         # Documentação original do Broadcast+ (HTML)
-research/
-  contentproxy_client.py # Client HTTP standalone (referência)
-  parse_services_xml.py  # Parser de services.xml
-  parse_camposbc.py      # Parser de camposbc.tab → fields.md
-  generate_fields_doc.py # Gerador de docs/fields.md
-  dde_advise_test.py     # Teste standalone de streaming DDEML
-  dde_all_topics.py      # Mapeamento de tópicos DDE
-  dde_explore_topics.py  # Exploração profunda de tópicos/itens
-  dde_tickers.py         # Descoberta de tickers válidos
-  analyze_aetp.py        # Análise de arquivos binários AETP
-  probe_aetp_tcp.py      # Exploração do protocolo AETP TCP
-  test_bdh.py            # Teste de integração bdh/bdh_ohlcv
-  protocol_notes.md      # Notas sobre protocolos testados
+├── architecture.md     # System architecture & protocols
+├── api.md              # Full API reference
+├── instruments.md      # Instrument database details
+├── limitations.md      # Known limitations & workarounds
+└── fields.md           # DDE field reference (56 fields)
 ```
+
+## Documentation
+
+- [Architecture](docs/architecture.md) — data channels, protocols, auth
+- [API Reference](docs/api.md) — all functions with examples
+- [Instruments](docs/instruments.md) — 623K instruments, exchanges, symbols
+- [Limitations](docs/limitations.md) — what doesn't work and why
+- [Fields](docs/fields.md) — complete DDE field mapping

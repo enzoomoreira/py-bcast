@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+*.egg
 
 # Virtual environments
 .venv/
@@ -20,5 +21,6 @@ Desktop.ini
 
 # Project-specific
 uv.lock
-research/intercepted_requests.log
-docs/chm_extracted/
+docs/reference/chm/
+docs/reference/services.xml
+docs/reference/services_parsed.json
