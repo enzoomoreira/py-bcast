@@ -1,0 +1,58 @@
+"""AE binary SOH protocol parser.
+
+Protocol structure (SOH=0x01 separated records, NULL=0x00 separated fields):
+    Record 0: Header [version, ?, ?, ?]
+    Record 1: Metadata/status [count, key-value pairs...] ("0" = no metadata)
+    Record 2: Field definitions [count, tag1, tag2, ...]
+    Record 3+: Data rows [value1, value2, ...]
+    Last record: ETX [0x03]
+"""
+
+from __future__ import annotations
+
+
+def parse_binary_response(data: bytes) -> dict:
+    """
+    Parse an AE binary protocol response into fields and rows.
+
+    Returns:
+        dict with keys 'fields' (list[str]) and 'rows' (list[list[str]]).
+
+    Raises:
+        RuntimeError: If the response contains an error or is malformed.
+    """
+    records = data.split(b"\x01")
+
+    if len(records) < 3:
+        raise RuntimeError(f"aefundamental error: malformed response ({len(records)} records)")
+
+    # Record 1 = metadata/status info
+    error_fields = records[1].split(b"\x00")
+    first_field = error_fields[0].decode("latin-1") if error_fields else ""
+
+    # Check for error: if 10037 tag exists anywhere, it's an error response
+    if b"10037" in data:
+        all_fields = data.split(b"\x00")
+        msg = ""
+        for i, f in enumerate(all_fields):
+            decoded = f.decode("latin-1", errors="replace")
+            if decoded == "10037" and i + 1 < len(all_fields):
+                msg = all_fields[i + 1].decode("utf-8", errors="replace")
+                break
+        raise RuntimeError(f"aefundamental error: {msg or first_field}")
+
+    # Record 2 = field definitions
+    field_record = records[2].split(b"\x00")
+    # First element is field count, rest are tag numbers, last may be empty
+    field_tags = [f.decode("latin-1") for f in field_record[1:] if f]
+
+    # Record 3+ = data rows (before the ETX terminator record)
+    rows = []
+    for rec in records[3:]:
+        if rec == b"\x03" or rec == b"":
+            break
+        values = [v.decode("latin-1", errors="replace") for v in rec.split(b"\x00") if v]
+        if values:
+            rows.append(values)
+
+    return {"fields": field_tags, "rows": rows}

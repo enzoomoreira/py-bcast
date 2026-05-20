@@ -5,10 +5,7 @@ Sends one GET per endpoint with minimal required params, classifies the response
 
 import json
 import time
-import requests
-import urllib3
-
-urllib3.disable_warnings()
+import httpx
 
 BASE = "http://cp.ae.com.br:44780"
 SESSION = "F9bca84c7cb51fbdb4456a86c6548fb13"
@@ -28,7 +25,7 @@ def base_params():
     return {"10023": PLATFORM, "10039": SESSION, "TipoResposta": "xml"}
 
 
-def classify_response(r: requests.Response) -> dict:
+def classify_response(r: httpx.Response) -> dict:
     """Classify a response by format and content."""
     info = {
         "status": r.status_code,
@@ -779,9 +776,11 @@ ENDPOINTS = [
 
 
 def main():
-    session = requests.Session()
-    session.headers["User-Agent"] = "bcsys32/7.0"
-    session.trust_env = False
+    session = httpx.Client(
+        headers={"User-Agent": "bcsys32/7.0"},
+        verify=False,
+        trust_env=False,
+    )
 
     results = []
     total = len(ENDPOINTS)
@@ -793,9 +792,9 @@ def main():
     for i, ep in enumerate(ENDPOINTS, 1):
         name = ep["name"]
         try:
-            r = session.get(ep["url"], params=ep["params"], timeout=TIMEOUT, verify=False)
+            r = session.get(ep["url"], params=ep["params"], timeout=TIMEOUT)
             info = classify_response(r)
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             info = {"status": "TIMEOUT", "format": "—", "size": 0, "preview": "", "error": "timeout"}
         except Exception as e:
             info = {"status": "EXCEPT", "format": "—", "size": 0, "preview": str(e)[:100], "error": str(e)[:50]}

@@ -12,12 +12,9 @@ Protocol:
 - DatasTolerancia=YYYYMMDD (date for closing prices)
 - 10113=SYMBOL (ticker like PETR4, VALE3)
 """
-import requests
-import urllib3
+import httpx
 import datetime
 import xml.etree.ElementTree as ET
-
-urllib3.disable_warnings()
 
 BASE = "http://cp.ae.com.br:44780"
 
@@ -26,9 +23,11 @@ class ContentProxyClient:
     def __init__(self, session_token: str, platform: int = 4):
         self.session_token = session_token
         self.platform = str(platform)
-        self.session = requests.Session()
-        self.session.headers["User-Agent"] = "bcsys32/7.0"
-        self.session.trust_env = False
+        self.session = httpx.Client(
+            headers={"User-Agent": "bcsys32/7.0"},
+            verify=False,
+            trust_env=False,
+        )
 
     def _base_params(self):
         return {"10023": self.platform, "10039": self.session_token, "TipoResposta": "xml"}

@@ -12,8 +12,8 @@ from typing import Callable, Optional
 import win32ui
 import dde
 
-from ._constants import DDE_SERVICE, DDE_TOPIC_REALTIME, DDE_TOPIC_SNAPSHOT, SNAPSHOT_FIELDS
-from ._dde import (
+from .._core.constants import DDE_SERVICE, DDE_TOPIC_REALTIME, DDE_TOPIC_SNAPSHOT, SNAPSHOT_FIELDS
+from .._core.dde import (
     APPCMD_CLIENTONLY,
     CF_TEXT,
     CP_WINUNICODE,

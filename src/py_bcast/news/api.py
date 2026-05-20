@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from ._constants import BASE_URL
-from ._http import create_http_session
+from .._core.constants import BASE_URL
+from .._core.http import create_http_session
 
 
 # ─────────────────────────────────────────────────────────────────────────────

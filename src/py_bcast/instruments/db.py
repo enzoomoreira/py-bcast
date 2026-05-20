@@ -6,7 +6,7 @@ import os
 from collections import Counter
 from pathlib import Path
 
-from ._constants import INSTRUMENT_DB_FILENAME, INSTRUMENT_DB_RELPATH, INSTRUMENT_DB_XOR_KEY
+from .._core.constants import INSTRUMENT_DB_FILENAME, INSTRUMENT_DB_RELPATH, INSTRUMENT_DB_XOR_KEY
 
 
 class InstrumentDB:

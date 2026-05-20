@@ -93,18 +93,29 @@ with BroadcastClient() as bc:
 ```
 src/py_bcast/
 ├── __init__.py         # Public API (33 exported functions)
-├── _constants.py       # Service names, fields, URLs
-├── _dde.py             # DDEML ctypes bindings
-├── _http.py            # HTTP session factory
-├── _session.py         # Auto-discovery of session token
-├── client.py           # BroadcastClient, bdp, bdps
-├── historical.py       # bdh, bdh_ohlcv, bdi, bdt
-├── macro.py            # bmacro, bdi_cdi, breturn, bvolume, binflation
-├── fundamental.py      # bconsensus + binary protocol parser
-├── reference.py        # bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators
-├── events.py           # bcalendar, bdividends, bdy, bportfolios, bportfolio
-├── news.py             # bnews, bnews_latest, bnews_search
-└── instruments.py      # InstrumentDB, bsearch
+├── _core/              # Private infrastructure
+│   ├── session.py      # Auto-discovery of session token
+│   ├── http.py         # HTTP session factory (httpx)
+│   ├── dde.py          # DDEML ctypes bindings
+│   ├── constants.py    # Service names, fields, URLs
+│   ├── binary.py       # SOH binary protocol decoder
+│   ├── aetp.py         # Shared aetp/output helpers
+│   └── xml_helpers.py  # Shared XML helpers
+├── realtime/
+│   └── client.py       # BroadcastClient, bdp, bdps
+├── historical/
+│   ├── prices.py       # bdh, bdh_ohlcv
+│   └── intraday.py     # bdi, bdt
+├── macro/
+│   └── indicators.py   # bmacro, bdi_cdi, breturn, bvolume, binflation
+├── fundamental/
+│   ├── consensus.py    # bconsensus
+│   ├── reference.py    # bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators
+│   └── events.py       # bcalendar, bdividends, bdy, bportfolios, bportfolio
+├── news/
+│   └── api.py          # bnews, bnews_latest, bnews_search
+└── instruments/
+    └── db.py           # InstrumentDB, bsearch
 tests/
 ├── test_historical.py  # HTTP integration tests
 ├── test_intraday.py    # Intraday bars tests

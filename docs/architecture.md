@@ -7,14 +7,14 @@ py_bcast interfaces with AE Broadcast through **five data channels**:
 ```mermaid
 graph LR
     subgraph "py_bcast (this library)"
-        CLIENT["client.py<br/>BroadcastClient, bdp, bdps"]
-        HIST["historical.py<br/>bdh, bdh_ohlcv, bdi, bdt"]
-        MACRO["macro.py<br/>bmacro, bdi_cdi, breturn,<br/>bvolume, binflation"]
-        FUND["fundamental.py<br/>bconsensus"]
-        REF["reference.py<br/>bcompany, bindices, bsectors,<br/>bquote, btickers, bshares,<br/>bindicators, bindicator_meta"]
-        EVT["events.py<br/>bcalendar, bdividends, bdy,<br/>bportfolios, bportfolio"]
-        NEWS["news.py<br/>bnews, bnews_latest,<br/>bnews_search"]
-        INST["instruments.py<br/>InstrumentDB, bsearch"]
+        CLIENT["realtime/client.py<br/>BroadcastClient, bdp, bdps"]
+        HIST["historical/<br/>bdh, bdh_ohlcv, bdi, bdt"]
+        MACRO["macro/indicators.py<br/>bmacro, bdi_cdi, breturn,<br/>bvolume, binflation"]
+        FUND["fundamental/consensus.py<br/>bconsensus"]
+        REF["fundamental/reference.py<br/>bcompany, bindices, bsectors,<br/>bquote, btickers, bshares,<br/>bindicators, bindicator_meta"]
+        EVT["fundamental/events.py<br/>bcalendar, bdividends, bdy,<br/>bportfolios, bportfolio"]
+        NEWS["news/api.py<br/>bnews, bnews_latest,<br/>bnews_search"]
+        INST["instruments/db.py<br/>InstrumentDB, bsearch"]
     end
 
     subgraph "bcsys32.exe (Terminal)"
@@ -43,14 +43,14 @@ graph LR
 
 | # | Channel | Module | Protocol | Data |
 |---|---------|--------|----------|------|
-| 1 | DDE | `client.py` | Win32 DDEML | Real-time quotes, streaming, snapshots |
-| 2 | HTTP | `historical.py` | REST/XML | Daily history, intraday OHLCV, tick data |
-| 3 | HTTP | `macro.py` | REST/XML | Macro series, CDI, returns, volumes, inflation |
-| 4 | HTTP | `fundamental.py` | REST/binary SOH | Analyst consensus |
-| 5 | HTTP | `reference.py` | REST/binary SOH | Companies, indices, sectors, quotes, indicators |
-| 6 | HTTP | `events.py` | REST/binary SOH | Calendar, dividends, DY, broker portfolios |
-| 7 | HTTP | `news.py` | REST/JSON+XML | News, podcasts, multimedia (no auth) |
-| 8 | Local file | `instruments.py` | XOR(0xAE) TSV | 623K instruments, 30+ exchanges |
+| 1 | DDE | `realtime/client.py` | Win32 DDEML | Real-time quotes, streaming, snapshots |
+| 2 | HTTP | `historical/` | REST/XML | Daily history, intraday OHLCV, tick data |
+| 3 | HTTP | `macro/indicators.py` | REST/XML | Macro series, CDI, returns, volumes, inflation |
+| 4 | HTTP | `fundamental/consensus.py` | REST/binary SOH | Analyst consensus |
+| 5 | HTTP | `fundamental/reference.py` | REST/binary SOH | Companies, indices, sectors, quotes, indicators |
+| 6 | HTTP | `fundamental/events.py` | REST/binary SOH | Calendar, dividends, DY, broker portfolios |
+| 7 | HTTP | `news/api.py` | REST/JSON+XML | News, podcasts, multimedia (no auth) |
+| 8 | Local file | `instruments/db.py` | XOR(0xAE) TSV | 623K instruments, 30+ exchanges |
 
 ### Endpoint Groups (HTTP)
 

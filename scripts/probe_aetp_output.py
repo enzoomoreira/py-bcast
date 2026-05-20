@@ -1,15 +1,14 @@
 """Probe aetp/output endpoints - the largest unexplored area."""
-import requests
-import urllib3
+import httpx
 import datetime
-
-urllib3.disable_warnings()
 
 BASE = "http://cp.ae.com.br:44780"
 SESSION = "F9bca84c7cb51fbdb4456a86c6548fb13"
-s = requests.Session()
-s.headers["User-Agent"] = "bcsys32/7.0"
-s.trust_env = False
+s = httpx.Client(
+    headers={"User-Agent": "bcsys32/7.0"},
+    verify=False,
+    trust_env=False,
+)
 
 today = datetime.date.today().strftime("%Y%m%d")
 

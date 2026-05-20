@@ -1,6 +1,8 @@
 """Integration tests for bconsensus() — analyst consensus data."""
 
+import pandas as pd
 import pytest
+
 from py_bcast import bconsensus
 
 
@@ -10,9 +12,10 @@ class TestBconsensus:
     def test_petr4(self):
         """PETR4 returns consensus data."""
         data = bconsensus("PETR4")
-        assert data
-        assert "buy" in data
-        assert "target_mean" in data
+        assert isinstance(data, pd.Series)
+        assert not data.empty
+        assert "buy" in data.index
+        assert "target_mean" in data.index
 
     def test_all_fields_present(self):
         """Response includes all expected fields."""
@@ -20,12 +23,12 @@ class TestBconsensus:
         expected = {"buy", "hold", "sell", "total_analysts",
                     "target_low", "target_high", "target_mean",
                     "target_median", "upside_pct"}
-        assert expected == set(data.keys())
+        assert expected == set(data.index)
 
     def test_numeric_values(self):
-        """All values are parseable as numbers."""
+        """All values are numeric."""
         data = bconsensus("PETR4")
-        for key, val in data.items():
+        for val in data.values:
             float(val)  # Should not raise
 
     def test_analysts_add_up(self):
@@ -37,19 +40,20 @@ class TestBconsensus:
     def test_vale3(self):
         """VALE3 returns consensus."""
         data = bconsensus("VALE3")
-        assert data
+        assert not data.empty
         assert float(data["target_mean"]) > 0
 
     def test_itub4(self):
         """ITUB4 (bank stock) returns consensus."""
         data = bconsensus("ITUB4")
-        assert data
+        assert not data.empty
         assert int(data["total_analysts"]) > 0
 
     def test_nonexistent_ticker(self):
-        """Unknown ticker returns empty dict (no crash)."""
+        """Unknown ticker returns empty Series (no crash)."""
         data = bconsensus("XXXXX99")
-        assert data == {}
+        assert isinstance(data, pd.Series)
+        assert data.empty
 
     def test_target_range_valid(self):
         """target_low <= target_mean <= target_high."""

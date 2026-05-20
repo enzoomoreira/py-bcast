@@ -2,57 +2,18 @@
 
 from __future__ import annotations
 
-from ._constants import BASE_URL
-from ._http import create_http_session, get_session_token
-from .fundamental import _parse_binary_response
+import pandas as pd
 
-
-def _aetp_request(
-    path: str,
-    params: dict[str, str],
-    session_token: str | None = None,
-) -> dict:
-    """Make a request to aetp/output/* and decode binary response."""
-    token = get_session_token(session_token)
-    s = create_http_session()
-
-    params.setdefault("10023", "4")
-    params["10039"] = token
-
-    r = s.get(
-        f"{BASE_URL}/aetp/output/{path}",
-        params=params,
-        timeout=30,
-        verify=False,
-    )
-
-    return _parse_binary_response(r.content)
-
-
-def _rows_to_dicts(parsed: dict) -> list[dict[str, str]]:
-    """Convert parsed binary response to list of dicts."""
-    fields = parsed["fields"]
-    results = []
-    prev_values: list[str] = [""] * len(fields)
-
-    for row in parsed["rows"]:
-        record = {}
-        for i, tag in enumerate(fields):
-            val = row[i] if i < len(row) else ""
-            # \x02 means "same as previous row"
-            if val == "\x02":
-                val = prev_values[i]
-            record[tag] = val
-            prev_values[i] = val
-        results.append(record)
-
-    return results
+from .._core.aetp import aetp_request, rows_to_dicts
+from .._core.dates import DateLike, to_date_str
+from .._core.normalize import ensure_str
+from .._core.output import to_dataframe, to_reference_dataframe, to_series
 
 
 def bcompany(
     cvm_code: str | int | None = None,
     session_token: str | None = None,
-) -> list[dict[str, str]]:
+) -> pd.DataFrame:
     """
     Fetch company metadata from the fundamental database.
 
@@ -65,7 +26,7 @@ def bcompany(
         session_token: BCAA session token
 
     Returns:
-        List of dicts with company data.
+        DataFrame with company data.
         Full list fields: 13004 (CVM), 13003 (name), 13786 (ticker), etc.
         Detail fields: CNPJ, sector, foundation date, etc.
 
@@ -74,22 +35,22 @@ def bcompany(
         >>> petr = bcompany(9512)   # Petrobras detail
     """
     if cvm_code is None:
-        parsed = _aetp_request(
+        parsed = aetp_request(
             "fundamental/empresa/metadado", {}, session_token
         )
     else:
-        parsed = _aetp_request(
+        parsed = aetp_request(
             "fundamental/empresa",
-            {"13004": str(cvm_code)},
+            {"13004": ensure_str(cvm_code)},
             session_token,
         )
 
-    return _rows_to_dicts(parsed)
+    return to_reference_dataframe(rows_to_dicts(parsed))
 
 
 def bindices(
     session_token: str | None = None,
-) -> list[dict[str, str]]:
+) -> pd.DataFrame:
     """
     Fetch list of B3 market indices.
 
@@ -100,20 +61,19 @@ def bindices(
         session_token: BCAA session token
 
     Returns:
-        List of dicts with index information.
+        DataFrame with index information.
 
     Example:
-        >>> indices = bindices()
-        >>> for idx in indices:
-        ...     print(idx)
+        >>> df = bindices()
+        >>> df.head()
     """
-    parsed = _aetp_request("ativos/indice", {}, session_token)
-    return _rows_to_dicts(parsed)
+    parsed = aetp_request("ativos/indice", {}, session_token)
+    return to_reference_dataframe(rows_to_dicts(parsed))
 
 
 def bsectors(
     session_token: str | None = None,
-) -> list[dict[str, str]]:
+) -> pd.DataFrame:
     """
     Fetch B3 sector/subsector/segment classification.
 
@@ -123,23 +83,22 @@ def bsectors(
         session_token: BCAA session token
 
     Returns:
-        List of dicts with sector classification hierarchy.
+        DataFrame with sector classification hierarchy.
 
     Example:
-        >>> sectors = bsectors()
-        >>> for s in sectors[:5]:
-        ...     print(s)
+        >>> df = bsectors()
+        >>> df.head()
     """
-    parsed = _aetp_request(
+    parsed = aetp_request(
         "fundamental/setor", {}, session_token
     )
-    return _rows_to_dicts(parsed)
+    return to_reference_dataframe(rows_to_dicts(parsed))
 
 
 def bquote(
     ticker: str,
     session_token: str | None = None,
-) -> dict[str, str]:
+) -> pd.Series:
     """
     Fetch current quote (price, volume) for a symbol via aetp.
 
@@ -150,30 +109,30 @@ def bquote(
         session_token: BCAA session token
 
     Returns:
-        Dict with quote fields (price, volume, quantity, etc.).
-        Empty dict if not found.
+        Series with quote fields (price, volume, quantity, etc.).
+        Empty Series if not found.
 
     Example:
         >>> q = bquote("PETR4")
-        >>> print(q)
+        >>> print(q["last"])
     """
     try:
-        parsed = _aetp_request(
+        parsed = aetp_request(
             "fundamental/ativo/cotacao",
             {"10068": ticker},
             session_token,
         )
     except RuntimeError:
-        return {}
+        return pd.Series(dtype="object")
 
-    rows = _rows_to_dicts(parsed)
-    return rows[0] if rows else {}
+    rows = rows_to_dicts(parsed)
+    return to_series(rows[0]) if rows else pd.Series(dtype="object")
 
 
 def btickers(
     cvm_code: str | int,
     session_token: str | None = None,
-) -> list[dict[str, str]]:
+) -> pd.DataFrame:
     """
     Fetch all tickers (stocks/units) for a company by CVM code.
 
@@ -184,23 +143,23 @@ def btickers(
         session_token: BCAA session token
 
     Returns:
-        List of dicts with ticker information.
+        DataFrame with ticker information.
 
     Example:
-        >>> tickers = btickers(9512)  # PETR3, PETR4
+        >>> df = btickers(9512)  # PETR3, PETR4
     """
-    parsed = _aetp_request(
+    parsed = aetp_request(
         "fundamental/ativo/simbolo",
-        {"13004": str(cvm_code)},
+        {"13004": ensure_str(cvm_code)},
         session_token,
     )
-    return _rows_to_dicts(parsed)
+    return to_reference_dataframe(rows_to_dicts(parsed))
 
 
 def bshares(
     ticker: str,
     session_token: str | None = None,
-) -> dict[str, str]:
+) -> pd.Series:
     """
     Fetch shares outstanding for a ticker.
 
@@ -211,28 +170,29 @@ def bshares(
         session_token: BCAA session token
 
     Returns:
-        Dict with shares data. Empty dict if not found.
+        Series with shares data. Empty Series if not found.
 
     Example:
-        >>> data = bshares("PETR4")
+        >>> s = bshares("PETR4")
+        >>> print(s)
     """
-    parsed = _aetp_request(
+    parsed = aetp_request(
         "fundamental/ativo/quantidade",
         {"10068": ticker},
         session_token,
     )
 
-    rows = _rows_to_dicts(parsed)
-    return rows[0] if rows else {}
+    rows = rows_to_dicts(parsed)
+    return to_series(rows[0]) if rows else pd.Series(dtype="object")
 
 
 def bindicators(
     cvm_code: str | int,
     indicator_id: str | int,
-    start_date: str,
-    end_date: str,
+    start_date: DateLike,
+    end_date: DateLike,
     session_token: str | None = None,
-) -> list[dict[str, str]]:
+) -> pd.DataFrame:
     """
     Fetch daily indicator history for a company.
 
@@ -242,34 +202,34 @@ def bindicators(
     Args:
         cvm_code: CVM numeric code (e.g., 9512 for Petrobras)
         indicator_id: Indicator ID (e.g., 32 for Market Cap, 52 for Beta)
-        start_date: Start date as YYYYMMDD
-        end_date: End date as YYYYMMDD
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
         session_token: BCAA session token
 
     Returns:
-        List of dicts with daily indicator values.
+        DataFrame with DatetimeIndex and daily indicator values.
 
     Example:
-        >>> mcap = bindicators(9512, 32, "20260101", "20260519")
-        >>> for r in mcap[-3:]:
-        ...     print(r)
+        >>> df = bindicators(9512, 32, "20260101", "20260519")
+        >>> df.tail()
     """
-    parsed = _aetp_request(
+    parsed = aetp_request(
         "fundamental/indicador/historico-diario",
         {
-            "13004": str(cvm_code),
-            "13760": str(indicator_id),
-            "10057": start_date,
-            "10058": end_date,
+            "13004": ensure_str(cvm_code),
+            "13760": ensure_str(indicator_id),
+            "10057": to_date_str(start_date),
+            "10058": to_date_str(end_date),
         },
         session_token,
     )
-    return _rows_to_dicts(parsed)
+    rows = rows_to_dicts(parsed)
+    return to_dataframe(rows)
 
 
 def bindicator_meta(
     session_token: str | None = None,
-) -> list[dict[str, str]]:
+) -> pd.DataFrame:
     """
     Fetch metadata for all available fundamental indicators.
 
@@ -280,12 +240,11 @@ def bindicator_meta(
         session_token: BCAA session token
 
     Returns:
-        List of dicts with indicator metadata.
+        DataFrame with indicator metadata.
 
     Example:
-        >>> meta = bindicator_meta()
-        >>> for m in meta[:5]:
-        ...     print(m)
+        >>> df = bindicator_meta()
+        >>> df.head()
     """
-    parsed = _aetp_request("fundamental/indicador/metadado", {}, session_token)
-    return _rows_to_dicts(parsed)
+    parsed = aetp_request("fundamental/indicador/metadado", {}, session_token)
+    return to_reference_dataframe(rows_to_dicts(parsed))

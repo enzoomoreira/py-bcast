@@ -97,9 +97,9 @@ def scan_process_memory(pid: int) -> list[str]:
 
 def validate_token(token: str) -> bool:
     """Test if a token is a valid BCAA session by making a lightweight HTTP call."""
-    import requests
+    import httpx
     try:
-        r = requests.get(
+        r = httpx.get(
             "http://cp.ae.com.br:44780/BaseHistoricaNumerica/HistoricoFechamentos",
             params={"10023": "4", "10039": token, "10113": "PETR4", "DatasTolerancia": "20260519", "TipoResposta": "xml"},
             headers={"User-Agent": "bcsys32/7.0"},

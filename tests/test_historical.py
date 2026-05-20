@@ -1,5 +1,7 @@
 """Integration tests for historical data functions."""
 
+import pandas as pd
+
 from py_bcast import bdh, bdh_ohlcv, bdt
 
 
@@ -7,11 +9,11 @@ class TestBdh:
     def test_single_ticker(self):
         data = bdh("PETR4", "20260512", "20260519")
         assert "PETR4.BVMF" in data
-        rows = data["PETR4.BVMF"]
-        assert len(rows) >= 1
-        assert "date" in rows[0]
-        assert "last" in rows[0]
-        assert rows[0]["last"]  # non-empty price
+        df = data["PETR4.BVMF"]
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) >= 1
+        assert "last" in df.columns
+        assert pd.notna(df["last"].iloc[0])
 
     def test_multiple_tickers(self):
         data = bdh(["PETR4", "VALE3"], "20260515", "20260519")
@@ -24,9 +26,11 @@ class TestBdh:
 
     def test_sorted_chronologically(self):
         data = bdh("PETR4", "20260501", "20260519")
-        rows = data.get("PETR4.BVMF", [])
-        dates = [r["date"] for r in rows]
-        assert dates == sorted(dates)
+        df = data.get("PETR4.BVMF", pd.DataFrame())
+        if not df.empty:
+            # Drop NaT (tolerance rows with no actual date) before checking order
+            valid = df[df.index.notna()]
+            assert valid.index.is_monotonic_increasing
 
     def test_empty_range(self):
         data = bdh("PETR4", "20260518", "20260510")  # end < start
@@ -36,36 +40,40 @@ class TestBdh:
 class TestBdhOhlcv:
     def test_single_date(self):
         data = bdh_ohlcv("PETR4", "20260519")
-        assert data
-        assert "last" in data
-        assert "high" in data
-        assert "low" in data
-        assert "open" in data
+        assert isinstance(data, pd.Series)
+        assert not data.empty
+        assert "last" in data.index
+        assert "high" in data.index
+        assert "low" in data.index
+        assert "open" in data.index
 
     def test_no_data_returns_empty(self):
         # Weekend date
         data = bdh_ohlcv("PETR4", "20260517")
-        assert data == {} or data.get("last") == ""
+        assert isinstance(data, pd.Series)
+        assert data.empty or data.get("last") == ""
 
 
 class TestBdt:
     def test_usdbrl_ticks(self):
-        ticks = bdt("USDBRL", "20260519100000", "20260519101000")
-        assert len(ticks) >= 1
-        assert "hor" in ticks[0]
-        assert "last" in ticks[0]
+        df = bdt("USDBRL", "20260519100000", "20260519101000")
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) >= 1
+        assert "last" in df.columns
 
     def test_chronological_order(self):
-        ticks = bdt("USDBRL", "20260519100000", "20260519110000")
-        if len(ticks) >= 2:
-            assert ticks[0]["hor"] <= ticks[-1]["hor"]
+        df = bdt("USDBRL", "20260519100000", "20260519110000")
+        if len(df) >= 2:
+            valid = df[df.index.notna()]
+            assert valid.index.is_monotonic_increasing
 
     def test_bvmf_returns_empty(self):
         # B3 ticks blocked by query registration
-        ticks = bdt("PETR4", "20260519100000", "20260519101000")
-        assert ticks == []
+        df = bdt("PETR4", "20260519100000", "20260519101000")
+        assert isinstance(df, pd.DataFrame)
+        assert df.empty
 
     def test_default_end_time(self):
         # Should default to start + 1 hour
-        ticks = bdt("USDBRL", "20260519100000")
-        assert isinstance(ticks, list)
+        df = bdt("USDBRL", "20260519100000")
+        assert isinstance(df, pd.DataFrame)
