@@ -2,13 +2,18 @@
 py_bcast — Python client for AE Broadcast market data.
 
 A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
-- Real-time streaming via DDE (bdp, bdps, subscribe)
+- Real-time streaming via DDE (bdp, bdps)
 - Historical data via HTTP (bdh, bdh_ohlcv, bdt, bdi)
-- Fundamental data (bconsensus)
+- Macroeconomic series (bmacro, bdi_cdi, breturn, bvolume, binflation)
+- Fundamental data (bconsensus, bindicators, bcompany)
+- Corporate events (bcalendar, bdividends, bdy)
+- Reference data (bindices, bsectors, bquote, btickers, bshares)
+- Broker portfolios (bportfolios, bportfolio)
+- News and multimedia (bnews, bnews_latest, bnews_search)
 - Instrument database search (bsearch, InstrumentDB)
 
 Quick Start:
-    from py_bcast import bdp, bdh, bdi, bdt, bconsensus, bsearch
+    from py_bcast import bdp, bdh, bdi, bmacro, bconsensus, bsearch
 
     # Real-time quote (requires bcsys32.exe running)
     price = bdp("PETR4", "ULT")
@@ -19,11 +24,20 @@ Quick Start:
     # Intraday 2-min bars (ALL instruments!)
     bars = bdi("PETR4", "20260519")
 
-    # Tick data (international instruments)
-    ticks = bdt("USDBRL", "20260519100000", "20260519110000")
+    # Macroeconomic series (FX, indices, rates)
+    fx = bmacro("USDBRL", "20260101", "20260520")
 
     # Analyst consensus
     consensus = bconsensus("PETR4")
+
+    # Dividends history
+    from py_bcast import bdividends
+    divs = bdividends(9512, "PETR4")
+
+    # News articles (no auth required!)
+    from py_bcast import bnews, bnews_latest
+    article = bnews(56134402)
+    latest = bnews_latest(5)
 
     # Search 600K+ instruments
     bsearch("PETR", exchange="BVMF")
@@ -33,6 +47,14 @@ from .client import BroadcastClient, bdp, bdps
 from .historical import bdh, bdh_ohlcv, bdi, bdt
 from .fundamental import bconsensus
 from .instruments import InstrumentDB, bsearch
+from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
+from .reference import (
+    bcompany, bindices, bsectors, bquote, btickers, bshares,
+    bindicators, bindicator_meta,
+)
+from .events import bcalendar, bdividends, bdy, bportfolios, bportfolio
+from .news import bnews, bnews_latest, bnews_search, MULTIMEDIA_CATEGORIES
+from ._session import discover_session_token
 
 __all__ = [
     "BroadcastClient",
@@ -45,6 +67,33 @@ __all__ = [
     "bconsensus",
     "InstrumentDB",
     "bsearch",
+    # Macro / Fixed Income
+    "bmacro",
+    "bdi_cdi",
+    "breturn",
+    "bvolume",
+    "binflation",
+    # Reference Data
+    "bcompany",
+    "bindices",
+    "bsectors",
+    "bquote",
+    "btickers",
+    "bshares",
+    "bindicators",
+    "bindicator_meta",
+    # Events / Dividends / Portfolios
+    "bcalendar",
+    "bdividends",
+    "bdy",
+    "bportfolios",
+    "bportfolio",
+    # News / Multimedia
+    "bnews",
+    "bnews_latest",
+    "bnews_search",
+    "MULTIMEDIA_CATEGORIES",
+    "discover_session_token",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

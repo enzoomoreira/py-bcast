@@ -158,6 +158,306 @@ data = bconsensus("PETR4")
 
 ---
 
+## Macroeconomic & Fixed Income (HTTP)
+
+### `bmacro(ticker, start_date, end_date)`
+
+Macroeconomic/index historical series — FX, indices, commodities, rates, AETAXAS indicators.
+
+```python
+from py_bcast import bmacro
+
+# FX history
+rows = bmacro("USDBRL", "20260101", "20260520")
+for r in rows[-3:]:
+    print(r["dat"], r["last"])
+
+# Inflation index (AETAXAS)
+rows = bmacro("AEIPCA", "20250101", "20260520")
+
+# Commodities
+rows = bmacro("GOLD", "20200101", "20260520")
+```
+
+**Supported symbols:** USDBRL, EURUSD, IBOV, SPX, DAX, GOLD, WTI, DI1F27, AEIPCA, AEIGPM, AECTIP, AEB052, AEB200, AEFS10, and many more.
+
+**Returns:** `list[dict]` sorted chronologically. Keys vary but typically: dat, last, open, high, low, settle, var, neg, qtt.
+
+### `bdi_cdi(start_date, end_date)`
+
+Accumulated CDI (DI-CETIP) series. Data available since 1986.
+
+```python
+from py_bcast import bdi_cdi
+
+rows = bdi_cdi("20260101", "20260520")
+print(rows[-1]["dat"], rows[-1]["last"])  # accumulated %
+```
+
+**Returns:** `list[{dat, last, var, ...}]` sorted chronologically.
+
+### `breturn(ticker, start_date, end_date)`
+
+Adjusted daily returns for a symbol.
+
+```python
+from py_bcast import breturn
+
+rows = breturn("PETR4", "20260101", "20260520")
+```
+
+**Returns:** `list[{dat, last}]` sorted chronologically.
+
+### `bvolume(tickers)`
+
+Average volume statistics (1m/2m/3m/6m averages).
+
+```python
+from py_bcast import bvolume
+
+data = bvolume(["PETR4", "VALE3"])
+print(data["PETR4.BVMF"])
+```
+
+**Returns:** `dict[symbol, dict]` with volume statistics per ticker.
+
+### `binflation()`
+
+Snapshot of inflation indices with monthly and accumulated periods.
+
+```python
+from py_bcast import binflation
+
+indices = binflation()  # ~17 indices (IPCA, IGP-M, INPC, etc.)
+for idx in indices:
+    print(idx)
+```
+
+**Returns:** `list[dict]` with monthly values and accumulated 3m/6m/12m/year.
+
+---
+
+## Reference Data (HTTP — aetp/output binary)
+
+### `bcompany(cvm_code=None)`
+
+Company metadata. Without argument returns all ~1020 companies; with CVM code returns detail.
+
+```python
+from py_bcast import bcompany
+
+companies = bcompany()         # all companies (1020)
+petr = bcompany(9512)          # Petrobras detail
+```
+
+**CVM codes:** PETR=9512, VALE=4170, ITUB=19348, BBDC=906.
+
+### `bindices()`
+
+List of B3 market indices (~37: IBOV, IBRX, SMLL, IDIV, etc.).
+
+```python
+from py_bcast import bindices
+
+indices = bindices()  # [{'14085': 'AGFS'}, {'14085': 'BDRX'}, ...]
+```
+
+### `bsectors()`
+
+B3 sector/subsector/segment classification (~38 sectors).
+
+```python
+from py_bcast import bsectors
+
+sectors = bsectors()
+```
+
+### `bquote(ticker)`
+
+Current quote (price, volume) for a symbol via aetp.
+
+```python
+from py_bcast import bquote
+
+q = bquote("PETR4")
+# {'13004': '9512', '10068': 'PETR4', '13909': '46.09', ...}
+```
+
+### `btickers(cvm_code)`
+
+All tickers (stocks/units) for a company by CVM code.
+
+```python
+from py_bcast import btickers
+
+tickers = btickers(9512)  # [{'10068': 'PETR3', ...}, {'10068': 'PETR4', ...}]
+```
+
+### `bshares(ticker)`
+
+Shares outstanding for a ticker.
+
+```python
+from py_bcast import bshares
+
+data = bshares("PETR4")
+```
+
+### `bindicators(cvm_code, indicator_id, start_date, end_date)`
+
+Daily fundamental indicator history. Known IDs: 32=Market Cap, 52=Beta.
+
+```python
+from py_bcast import bindicators
+
+mcap = bindicators(9512, 32, "20260101", "20260520")  # Market Cap daily
+beta = bindicators(9512, 52, "20260101", "20260520")  # Beta daily
+```
+
+### `bindicator_meta()`
+
+Metadata for all ~80 available fundamental indicators.
+
+```python
+from py_bcast import bindicator_meta
+
+meta = bindicator_meta()
+```
+
+---
+
+## Corporate Events & Dividends (HTTP — aetp/output binary)
+
+### `bcalendar(start_date, end_date)`
+
+Corporate events calendar (dividends, JCP, splits, AGMs, etc.).
+
+```python
+from py_bcast import bcalendar
+
+events = bcalendar("20260101", "20260520")  # ~1600+ events
+```
+
+### `bdividends(cvm_code, ticker)`
+
+Dividend/JCP payment history for a company.
+
+```python
+from py_bcast import bdividends
+
+divs = bdividends(9512, "PETR4")
+for d in divs:
+    print(d)
+```
+
+### `bdy(cvm_code, ticker, start_date, end_date)`
+
+Dividend yield historical series.
+
+```python
+from py_bcast import bdy
+
+dy = bdy(9512, "PETR4", "20250101", "20260520")
+```
+
+### `bportfolios()`
+
+List of brokers that publish model portfolios.
+
+```python
+from py_bcast import bportfolios
+
+brokers = bportfolios()  # [{'10087': '27', '10044': 'PADRÃO'}, ...]
+```
+
+### `bportfolio(broker_id)`
+
+Latest recommended portfolio from a specific broker.
+
+```python
+from py_bcast import bportfolio
+
+holdings = bportfolio(27)
+```
+
+---
+
+## News & Multimedia (HTTP — CentralMultimidia)
+
+No authentication required. Access all Broadcast news (AE-News, Dow Jones, Press Releases, Trading News, podcasts, etc.) via sequential numeric IDs.
+
+### `bnews(news_id)`
+
+Fetch a single news article by its numeric ID.
+
+```python
+from py_bcast import bnews
+
+article = bnews(56134402)
+print(article["title"])    # "Fique de Olho: Azzas contrata Itaú BBA..."
+print(article["content"])  # HTML body text
+print(article["files"])    # [{"filename": "...", "extension": "mp4", "url": "..."}]
+```
+
+**Returns:** `dict` with keys: title, content, files. Empty dict if ID doesn't exist.
+
+**Notes:**
+- IDs are sequential integers (currently ~56M range)
+- Covers ALL content types: text news, Dow Jones newswires, press releases, podcasts, multimedia
+- Content is HTML (may contain `<br/>`, `<PRE>`, `<span>` tags)
+- Files list contains attached media (mp4, png) with direct download URLs
+
+### `bnews_latest(count=10)`
+
+Fetch the most recent news articles.
+
+```python
+from py_bcast import bnews_latest
+
+for article in bnews_latest(5):
+    print(f"[{article['id']}] {article['title'][:60]}")
+```
+
+**Returns:** `list[dict]` with keys: id, title, content, files. Most recent first. Max 100.
+
+**Notes:**
+- Uses binary search to find the current ID ceiling, then scans backwards
+- First call may take a few seconds (binary search); subsequent IDs are sequential
+
+### `bnews_search(category, days_ago=60, limit=20)`
+
+List multimedia/podcast content from a specific category.
+
+```python
+from py_bcast import bnews_search, MULTIMEDIA_CATEGORIES
+
+# List available categories
+for cat_id, name in MULTIMEDIA_CATEGORIES.items():
+    print(f"{cat_id}: {name}")
+
+# Get recent podcasts
+items = bnews_search(748)  # 748 = Podcast
+for item in items:
+    print(f"[{item['id']}] {item['date']} {item['title']}")
+
+# Get full content for a listed item
+article = bnews(items[0]["id"])
+for f in article["files"]:
+    if f["extension"] == "mp4":
+        print(f"Audio: {f['url']}")
+```
+
+**Parameters:**
+- `category` — Category ID (see `MULTIMEDIA_CATEGORIES` dict)
+- `days_ago` — How far back to look (default 60)
+- `limit` — Max results (default 20)
+
+**Returns:** `list[dict]` with keys: id, title, date, time.
+
+**Available categories:** Comentário Financeiro (567), Comentário Agrícola (566), Podcast (748), Comentário Político (848), Cabeça de Gestor (849), E-Investidor-Mídia (857), Capital Insights (1133), Crédito Privado 360 (1160).
+
+---
+
 ## Instrument Database
 
 ### `bsearch(query, exchange=None, max_results=20)`
@@ -197,7 +497,9 @@ db.exchanges          # {"PR": 189985, "BVMF": 138181, ...}
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `BROADCAST_SESSION` | For HTTP functions | BCAA session token (hex string) |
+| `BROADCAST_SESSION` | For HTTP functions (except news) | BCAA session token (hex string) |
+
+> **Note:** News functions (`bnews`, `bnews_latest`, `bnews_search`) do NOT require a session token.
 
 ## Error Handling
 

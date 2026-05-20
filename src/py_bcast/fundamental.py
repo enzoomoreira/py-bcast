@@ -12,19 +12,24 @@ def _parse_binary_response(data: bytes) -> dict:
 
     Protocol structure (SOH=0x01 separated records, NULL=0x00 separated fields):
         Record 0: Header [version, ?, ?, ?]
-        Record 1: Error code ["0" = success]
+        Record 1: Metadata/status [count, key-value pairs...] ("0" = no metadata)
         Record 2: Field definitions [count, tag1, tag2, ...]
         Record 3+: Data rows [value1, value2, ...]
         Last record: ETX [0x03]
     """
     records = data.split(b"\x01")
 
-    # Record 1 = error info
-    error_fields = records[1].split(b"\x00")
-    error_code = error_fields[0].decode("latin-1") if error_fields else ""
+    if len(records) < 3:
+        raise RuntimeError(f"aefundamental error: malformed response ({len(records)} records)")
 
-    if error_code != "0":
-        # Error response — extract message from tag 10037
+    # Record 1 = metadata/status info
+    # First field is metadata count (0=none, N=N key-value pairs follow).
+    # A true error has tag 10037 present in the raw data.
+    error_fields = records[1].split(b"\x00")
+    first_field = error_fields[0].decode("latin-1") if error_fields else ""
+
+    # Check for error: if 10037 tag exists anywhere, it's an error response
+    if b"10037" in data:
         all_fields = data.split(b"\x00")
         msg = ""
         for i, f in enumerate(all_fields):
@@ -32,7 +37,7 @@ def _parse_binary_response(data: bytes) -> dict:
             if decoded == "10037" and i + 1 < len(all_fields):
                 msg = all_fields[i + 1].decode("utf-8", errors="replace")
                 break
-        raise RuntimeError(f"aefundamental error: {msg or error_code}")
+        raise RuntimeError(f"aefundamental error: {msg or first_field}")
 
     # Record 2 = field definitions
     field_record = records[2].split(b"\x00")
