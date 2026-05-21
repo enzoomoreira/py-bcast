@@ -58,7 +58,11 @@ def content_proxy_get(
     if root.findtext("STATUS") != "success":
         msg = root.findtext("MESSAGE") or "Unknown error"
         logger.error("ContentProxy error on %s: %s", endpoint, msg)
-        raise ContentProxyError(f"ContentProxy error: {msg}")
+        raise ContentProxyError(
+            f"ContentProxy error on {endpoint}: {msg}",
+            endpoint=endpoint,
+            server_message=msg,
+        )
 
     # Store in cache
     cache_set(endpoint, merged, root, get_settings().cache_ttl)

@@ -12,8 +12,8 @@ from typing import Callable, Optional
 import win32ui
 import dde
 
-from .._core.constants import DDE_SERVICE, DDE_TOPIC_REALTIME, DDE_TOPIC_SNAPSHOT, SNAPSHOT_FIELDS
-from .._core.exceptions import DDEError
+from .._core.constants import DDE_SERVICE, DDE_TOPIC_REALTIME, DDE_TOPIC_SNAPSHOT, SNAPSHOT_FIELDS, DMLERR_NAMES
+from .._core.exceptions import DDEError, DDEAdviseError
 from .._core.logging import get_logger
 from .._core.dde import (
     APPCMD_CLIENTONLY,
@@ -165,7 +165,8 @@ class BroadcastClient:
         tickers: str | list[str],
         fields: str | list[str],
         callback: SubscriptionCallback,
-    ):
+        skip_unavailable: bool = False,
+    ) -> list[DDEAdviseError]:
         """
         Subscribe to real-time streaming updates.
 
@@ -173,6 +174,16 @@ class BroadcastClient:
             tickers: Single ticker or list of tickers
             fields: Single field or list of fields
             callback: Function called with (ticker, field, value) on each update
+            skip_unavailable: If True, advise failures (e.g. invalid tickers)
+                are collected and returned instead of raising. If False (default),
+                the first failure raises immediately.
+
+        Returns:
+            List of DDEAdviseError for items that could not be subscribed
+            (empty when all succeed or when skip_unavailable=False).
+
+        Raises:
+            DDEAdviseError: When an advise transaction fails and skip_unavailable=False.
         """
         if isinstance(tickers, str):
             tickers = [tickers]
@@ -182,6 +193,7 @@ class BroadcastClient:
         if not self._streaming:
             self._init_streaming()
 
+        skipped: list[DDEAdviseError] = []
         for ticker in tickers:
             for fld in fields:
                 item = f"{ticker}.{fld}"
@@ -194,7 +206,21 @@ class BroadcastClient:
                 DdeFreeStringHandle(self._inst_id.value, h_item)
                 if not result:
                     err = DdeGetLastError(self._inst_id.value)
-                    raise DDEError(f"Advise failed for {item} (error={err})")
+                    del self._subscriptions[item]
+                    err_name = DMLERR_NAMES.get(err, f"0x{err:04X}")
+                    exc = DDEAdviseError(
+                        f"Advise failed for {item} (error={err}, {err_name})",
+                        item=item,
+                        ticker=ticker,
+                        field=fld,
+                        error_code=err,
+                    )
+                    if skip_unavailable:
+                        skipped.append(exc)
+                        logger.warning("Advise skipped: %s (error=%d, %s)", item, err, err_name)
+                    else:
+                        raise exc
+        return skipped
 
     def unsubscribe(self, tickers: str | list[str], fields: str | list[str]):
         """Stop streaming for specified tickers/fields."""

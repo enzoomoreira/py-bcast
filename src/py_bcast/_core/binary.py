@@ -30,7 +30,10 @@ def parse_binary_response(data: bytes) -> dict:
 
     if len(records) < 3:
         logger.error("Malformed binary response: only %d records", len(records))
-        raise ProtocolError(f"aefundamental error: malformed response ({len(records)} records)")
+        raise ProtocolError(
+            f"aefundamental error: malformed response ({len(records)} records)",
+            record_count=len(records),
+        )
 
     # Record 1 = metadata/status info
     error_fields = records[1].split(b"\x00")
@@ -46,7 +49,10 @@ def parse_binary_response(data: bytes) -> dict:
                 msg = all_fields[i + 1].decode("utf-8", errors="replace")
                 break
         logger.error("Binary protocol error: %s", msg or first_field)
-        raise ProtocolError(f"aefundamental error: {msg or first_field}")
+        raise ProtocolError(
+            f"aefundamental error: {msg or first_field}",
+            error_tag=msg or first_field,
+        )
 
     # Record 2 = field definitions
     field_record = records[2].split(b"\x00")

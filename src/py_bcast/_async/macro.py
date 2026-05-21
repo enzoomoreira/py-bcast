@@ -95,7 +95,11 @@ async def abvolume(
     root = ET.fromstring(r.text)
     if root.findtext("STATUS") != "success":
         msg = root.findtext("MESSAGE") or "Unknown error"
-        raise ContentProxyError(f"ContentProxy error: {msg}")
+        raise ContentProxyError(
+            f"ContentProxy error on VolumesMedios: {msg}",
+            endpoint="BaseHistoricaNumerica/VolumesMedios",
+            server_message=msg,
+        )
 
     rows = []
     for tick in root.findall(".//TICK"):

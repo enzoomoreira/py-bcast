@@ -165,7 +165,11 @@ def bvolume(
     if root.findtext("STATUS") != "success":
         msg = root.findtext("MESSAGE") or "Unknown error"
         logger.error("bvolume ContentProxy error: %s", msg)
-        raise ContentProxyError(f"ContentProxy error: {msg}")
+        raise ContentProxyError(
+            f"ContentProxy error on VolumesMedios: {msg}",
+            endpoint="BaseHistoricaNumerica/VolumesMedios",
+            server_message=msg,
+        )
 
     rows = []
     for tick in root.findall(".//TICK"):

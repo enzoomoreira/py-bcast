@@ -59,7 +59,11 @@ async def abdh(
         root = ET.fromstring(r.text)
         if root.findtext("STATUS") != "success":
             msg = root.findtext("MESSAGE") or "Unknown error"
-            raise ContentProxyError(f"ContentProxy error: {msg}")
+            raise ContentProxyError(
+                f"ContentProxy error on HistoricoFechamentos: {msg}",
+                endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
+                server_message=msg,
+            )
 
         for tick in root.findall(".//TICK"):
             sym = tick.findtext("SYMBOL") or ""

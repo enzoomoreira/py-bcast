@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Optional
 
@@ -11,6 +12,16 @@ from .._core.logging import get_logger
 from .._core.retry import http_retry
 
 logger = get_logger(__name__)
+
+
+def _decode_json(r) -> dict:
+    """Decode JSON from response, handling latin-1 encoded bodies."""
+    try:
+        return r.json()
+    except (UnicodeDecodeError, ValueError):
+        # Server sometimes returns latin-1/cp1252 without declaring charset
+        text = r.content.decode("latin-1")
+        return json.loads(text)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,7 +77,7 @@ def bnews(news_id: int | str) -> dict:
     logger.debug("bnews: fetching content ID %s", news_id)
     r = _news_fetch_content(s, news_id)
     r.raise_for_status()
-    data = r.json().get("d")
+    data = _decode_json(r).get("d")
     if not data or not data.get("Title"):
         return {}
 
@@ -202,22 +213,26 @@ def _news_search_fetch(s, category: int, days_ago: int, limit: int):
 def _find_latest_id() -> Optional[int]:
     """Binary search for the latest valid news ID."""
     s = get_http_client()
-    # Start from a known-good ID and search upward
-    lo, hi = 56_000_000, 58_000_000
+    # Start from a known-good ID and search upward (narrow range for speed)
+    lo, hi = 56_100_000, 56_500_000
 
     # Verify lo is valid
     r = _news_fetch_content(s, lo)
     if r.status_code != 200:
         return None
-    data = r.json().get("d")
+    data = _decode_json(r).get("d")
     if not data or not data.get("Title"):
         return None
 
     while hi - lo > 1:
         mid = (lo + hi) // 2
-        r = _news_fetch_content(s, mid)
+        try:
+            r = _news_fetch_content(s, mid)
+        except Exception:
+            hi = mid
+            continue
         if r.status_code == 200:
-            d = r.json().get("d")
+            d = _decode_json(r).get("d")
             if d and d.get("Title"):
                 lo = mid
             else:

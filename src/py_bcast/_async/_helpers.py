@@ -46,7 +46,11 @@ async def async_content_proxy_get(
     root = ET.fromstring(r.text)
     if root.findtext("STATUS") != "success":
         msg = root.findtext("MESSAGE") or "Unknown error"
-        raise ContentProxyError(f"ContentProxy error: {msg}")
+        raise ContentProxyError(
+            f"ContentProxy error on {endpoint}: {msg}",
+            endpoint=endpoint,
+            server_message=msg,
+        )
 
     cache_set(endpoint, merged, root, get_settings().cache_ttl)
     return root

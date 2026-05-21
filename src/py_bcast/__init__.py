@@ -66,8 +66,10 @@ from ._core.exceptions import (
     ContentProxyError,
     ProtocolError,
     DDEError,
+    DDEAdviseError,
     ValidationError,
 )
+from ._core.constants import DMLERR_ADVACKTIMEOUT, DMLERR_NAMES
 from ._core.logging import configure_logging
 from ._core.config import configure, get_settings, Settings
 from ._core.cache import invalidate as cache_invalidate
@@ -117,7 +119,11 @@ __all__ = [
     "ContentProxyError",
     "ProtocolError",
     "DDEError",
+    "DDEAdviseError",
     "ValidationError",
+    # DDE constants
+    "DMLERR_ADVACKTIMEOUT",
+    "DMLERR_NAMES",
     # Logging
     "configure_logging",
     # Configuration

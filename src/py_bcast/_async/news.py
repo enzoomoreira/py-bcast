@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Optional
 
 from .._core.constants import BASE_URL
@@ -16,6 +17,15 @@ _CONTENT_PATH = "/CentralMultimidia/Default.aspx/GetVideoContent"
 _HANDLER_PATH = "/CentralMultimidia/Handlers/MultimediaCenterHandler.ashx"
 
 
+def _decode_json(r) -> dict:
+    """Decode JSON from response, handling latin-1 encoded bodies."""
+    try:
+        return r.json()
+    except (UnicodeDecodeError, ValueError):
+        text = r.content.decode("latin-1")
+        return json.loads(text)
+
+
 async def abnews(news_id: int | str) -> dict:
     """Async version of ``bnews``. Fetch a single news article."""
     s = get_async_http_client()
@@ -27,7 +37,7 @@ async def abnews(news_id: int | str) -> dict:
         timeout=10,
     )
     r.raise_for_status()
-    data = r.json().get("d")
+    data = _decode_json(r).get("d")
     if not data or not data.get("Title"):
         return {}
 
@@ -114,7 +124,7 @@ async def abnews_search(category: int, days_ago: int = 60, limit: int = 20) -> l
 async def _async_find_latest_id() -> Optional[int]:
     """Async binary search for the latest valid news ID."""
     s = get_async_http_client()
-    lo, hi = 56_000_000, 58_000_000
+    lo, hi = 56_100_000, 56_500_000
 
     await rate_limit_async()
     r = await s.post(
@@ -125,21 +135,25 @@ async def _async_find_latest_id() -> Optional[int]:
     )
     if r.status_code != 200:
         return None
-    data = r.json().get("d")
+    data = _decode_json(r).get("d")
     if not data or not data.get("Title"):
         return None
 
     while hi - lo > 1:
         mid = (lo + hi) // 2
         await rate_limit_async()
-        r = await s.post(
-            f"{BASE_URL}{_CONTENT_PATH}",
-            json={"videoId": str(mid)},
-            headers={"Content-Type": "application/json"},
-            timeout=5,
-        )
+        try:
+            r = await s.post(
+                f"{BASE_URL}{_CONTENT_PATH}",
+                json={"videoId": str(mid)},
+                headers={"Content-Type": "application/json"},
+                timeout=5,
+            )
+        except Exception:
+            hi = mid
+            continue
         if r.status_code == 200:
-            d = r.json().get("d")
+            d = _decode_json(r).get("d")
             if d and d.get("Title"):
                 lo = mid
             else:

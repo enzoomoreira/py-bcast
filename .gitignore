@@ -24,3 +24,6 @@ uv.lock
 docs/reference/chm/
 docs/reference/services.xml
 docs/reference/services_parsed.json
+
+# Temp files
+temp/

@@ -8,6 +8,28 @@ DDE_SERVICE = "BC"
 DDE_TOPIC_REALTIME = "COT"
 DDE_TOPIC_SNAPSHOT = "ATIVO"
 
+# DDEML error codes (from ddeml.h)
+DMLERR_ADVACKTIMEOUT = 0x4009      # 16393 — server didn't ACK the advise
+DMLERR_NO_CONV_ESTABLISHED = 0x400A  # 16394 — no conversation found
+DMLERR_NOTPROCESSED = 0x4009       # alias (same value as ADVACKTIMEOUT)
+DMLERR_BUSY = 0x4001               # server busy
+DMLERR_DATAACKTIMEOUT = 0x4002     # data ack timeout
+DMLERR_EXECACKTIMEOUT = 0x4005     # execute ack timeout
+DMLERR_POKEACKTIMEOUT = 0x400B     # poke ack timeout
+DMLERR_SERVER_DIED = 0x400E        # server terminated
+DMLERR_UNADVACKTIMEOUT = 0x4010    # unadvise ack timeout
+
+DMLERR_NAMES: dict[int, str] = {
+    0x4001: "DMLERR_BUSY",
+    0x4002: "DMLERR_DATAACKTIMEOUT",
+    0x4005: "DMLERR_EXECACKTIMEOUT",
+    0x4009: "DMLERR_ADVACKTIMEOUT",
+    0x400A: "DMLERR_NO_CONV_ESTABLISHED",
+    0x400B: "DMLERR_POKEACKTIMEOUT",
+    0x400E: "DMLERR_SERVER_DIED",
+    0x4010: "DMLERR_UNADVACKTIMEOUT",
+}
+
 FIELDS_REALTIME = [
     "ATIVO", "ULT", "HOR", "VAR", "MAX", "MIN", "ABE", "FEC",
     "OCP", "OVD", "NEG", "QUL", "MED", "VTT", "QTT", "DAT",

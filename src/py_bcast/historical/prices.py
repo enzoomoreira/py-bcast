@@ -68,11 +68,22 @@ def bdh(
         logger.debug("bdh: fetching %d dates for %s", len(chunk_dates), tickers)
         r = _bdh_fetch(s, params)
 
-        root = ET.fromstring(r.text)
+        try:
+            root = ET.fromstring(r.text)
+        except ET.ParseError as exc:
+            logger.error("bdh: XML parse error: %s", exc)
+            raise ContentProxyError(
+                f"bdh: malformed XML response: {exc}",
+                endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
+            ) from exc
         if root.findtext("STATUS") != "success":
             msg = root.findtext("MESSAGE") or "Unknown error"
             logger.error("bdh ContentProxy error: %s", msg)
-            raise ContentProxyError(f"ContentProxy error: {msg}")
+            raise ContentProxyError(
+                f"ContentProxy error on HistoricoFechamentos: {msg}",
+                endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
+                server_message=msg,
+            )
 
         for tick in root.findall(".//TICK"):
             sym = tick.findtext("SYMBOL") or ""
@@ -144,7 +155,14 @@ def bdh_ohlcv(
     logger.debug("bdh_ohlcv: %s on %s", ticker, date_str)
     r = _bdh_ohlcv_fetch(s, params)
 
-    root = ET.fromstring(r.text)
+    try:
+        root = ET.fromstring(r.text)
+    except ET.ParseError as exc:
+        logger.error("bdh_ohlcv: XML parse error: %s", exc)
+        raise ContentProxyError(
+            f"bdh_ohlcv: malformed XML response: {exc}",
+            endpoint="BaseHistoricaNumerica/HistoricoData",
+        ) from exc
     if root.findtext("STATUS") != "success":
         return pd.Series(dtype="object")
 

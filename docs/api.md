@@ -42,6 +42,13 @@ with BroadcastClient() as bc:
     bc.subscribe(["PETR4", "VALE3"], ["ULT", "VAR"],
                  callback=lambda t, f, v: print(f"{t}.{f} = {v}"))
     bc.run(duration=60)
+
+    # Skip invalid tickers instead of raising
+    from py_bcast import DDEAdviseError
+    errors = bc.subscribe(["PETR4", "INVALID999"], ["ULT"],
+                          callback=my_callback, skip_unavailable=True)
+    if errors:
+        print(f"Could not subscribe: {[e.item for e in errors]}")
 ```
 
 **Methods:**
@@ -52,7 +59,7 @@ with BroadcastClient() as bc:
 | `disconnect()` | Clean up connections |
 | `request(ticker, fields)` | One-shot value request |
 | `snapshot(ticker)` | Full 56-field snapshot |
-| `subscribe(tickers, fields, callback)` | Start streaming |
+| `subscribe(tickers, fields, callback, skip_unavailable=False)` | Start streaming; returns `list[DDEAdviseError]` for failed items |
 | `unsubscribe(tickers, fields)` | Stop specific streams |
 | `unsubscribe_all()` | Stop all streams |
 | `run(duration=None)` | Blocking message pump |
@@ -618,16 +625,39 @@ All exceptions inherit from `PyBcastError`.
 | `ContentProxyError` | ContentProxy HTTP endpoint returned an error status |
 | `ProtocolError` | Binary SOH response is malformed or contains an error |
 | `DDEError` | DDE connection failed or request timed out |
+| `DDEAdviseError` | DDE advise (subscription) failed for a specific item (subclass of `DDEError`) |
 | `ValidationError` | Input parameter validation failed (also a `ValueError`) |
 | `FileNotFoundError` | Instrument database not found (`bcsys32` never ran) |
 
+**Structured exception attributes:**
+
+`ContentProxyError` exposes:
+- `.endpoint` — API path that failed (e.g. `"BaseHistoricaNumerica/HistoricoFechamentos"`)
+- `.server_message` — raw `<MESSAGE>` text from the XML response
+- `.status_code` — HTTP status code, if available
+
+`ProtocolError` exposes:
+- `.error_tag` — error message extracted from tag 10037 in the binary response
+- `.record_count` — number of records found when the response was malformed
+
+`DDEAdviseError` exposes:
+- `.item` — full DDE item string (e.g. `"EMBR3.ULT"`)
+- `.ticker` / `.field` — parsed portions of `.item`
+- `.error_code` — DDEML error code; look up name with `DMLERR_NAMES[e.error_code]`
+
 ```python
-from py_bcast import ContentProxyError, SessionError
+from py_bcast import ContentProxyError, SessionError, DDEAdviseError, DMLERR_NAMES
 
 try:
     data = bdh("PETR4", "20260501", "20260520")
 except SessionError:
     print("Set BROADCAST_SESSION env var")
 except ContentProxyError as e:
-    print(f"Server error: {e}")
+    print(f"Server error on {e.endpoint}: {e.server_message}")
+
+# Inspect DDE advise failures
+try:
+    bc.subscribe(["PETR4"], ["ULT"], callback=cb)
+except DDEAdviseError as e:
+    print(f"{e.item} failed: {DMLERR_NAMES.get(e.error_code, hex(e.error_code))}")
 ```
