@@ -6,7 +6,7 @@ import re
 from typing import Optional
 
 from .._core.constants import BASE_URL
-from .._core.http import create_http_session
+from .._core.http import get_http_client
 from .._core.logging import get_logger
 from .._core.retry import http_retry
 
@@ -62,7 +62,7 @@ def bnews(news_id: int | str) -> dict:
     >>> print(article["title"])
     'Fique de Olho: Azzas contrata Itaú BBA ...'
     """
-    s = create_http_session()
+    s = get_http_client()
     logger.debug("bnews: fetching content ID %s", news_id)
     r = _news_fetch_content(s, news_id)
     r.raise_for_status()
@@ -151,7 +151,7 @@ def bnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dic
     >>> for item in items[:3]:
     ...     print(f"[{item['id']}] {item['date']} {item['title'][:50]}")
     """
-    s = create_http_session()
+    s = get_http_client()
     logger.debug("bnews_search: category=%d days_ago=%d", category, days_ago)
     r = _news_search_fetch(s, category, days_ago, limit)
     r.raise_for_status()
@@ -201,7 +201,7 @@ def _news_search_fetch(s, category: int, days_ago: int, limit: int):
 
 def _find_latest_id() -> Optional[int]:
     """Binary search for the latest valid news ID."""
-    s = create_http_session()
+    s = get_http_client()
     # Start from a known-good ID and search upward
     lo, hi = 56_000_000, 58_000_000
 

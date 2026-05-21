@@ -9,7 +9,7 @@ import pandas as pd
 from .._core.constants import BASE_URL
 from .._core.dates import DateLike, to_date_str
 from .._core.exceptions import ContentProxyError
-from .._core.http import base_params, create_http_session, get_session_token
+from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.normalize import ensure_list
 from .._core.output import to_dataframe, to_reference_dataframe
@@ -152,7 +152,7 @@ def bvolume(
         >>> df.loc["PETR4.BVMF"]
     """
     token = get_session_token(session_token)
-    s = create_http_session()
+    s = get_http_client()
     tickers = ensure_list(tickers)
 
     params = base_params(token)

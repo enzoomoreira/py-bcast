@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+from .cache import cache_get, cache_set
+from .config import get_settings
 from .constants import BASE_URL
 from .exceptions import ContentProxyError
-from .http import base_params, create_http_session, get_session_token
+from .http import base_params, get_http_client, get_session_token
 from .logging import get_logger
+from .ratelimit import rate_limit
 from .retry import http_retry
 
 logger = get_logger(__name__)
@@ -37,12 +40,18 @@ def content_proxy_get(
         ContentProxyError: If the response STATUS is not 'success'.
     """
     token = get_session_token(session_token)
-    s = create_http_session()
+    s = get_http_client()
 
     merged = base_params(token)
     merged.update(params)
 
+    # Check cache
+    cached = cache_get(endpoint, merged)
+    if cached is not None:
+        return cached
+
     logger.debug("ContentProxy GET %s params=%s", endpoint, params)
+    rate_limit()
     r = _content_proxy_fetch(s, endpoint, merged, timeout)
 
     root = ET.fromstring(r.text)
@@ -50,6 +59,9 @@ def content_proxy_get(
         msg = root.findtext("MESSAGE") or "Unknown error"
         logger.error("ContentProxy error on %s: %s", endpoint, msg)
         raise ContentProxyError(f"ContentProxy error: {msg}")
+
+    # Store in cache
+    cache_set(endpoint, merged, root, get_settings().cache_ttl)
 
     return root
 

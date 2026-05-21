@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from .cache import cache_get, cache_set
+from .config import get_settings
 from .constants import BASE_URL
-from .http import create_http_session, get_session_token
+from .http import get_http_client, get_session_token
 from .binary import parse_binary_response
 from .logging import get_logger
+from .ratelimit import rate_limit
 from .retry import http_retry
 
 logger = get_logger(__name__)
@@ -18,15 +21,27 @@ def aetp_request(
 ) -> dict:
     """Make a request to aetp/output/* and decode binary response."""
     token = get_session_token(session_token)
-    s = create_http_session()
+    s = get_http_client()
 
     params.setdefault("10023", "4")
     params["10039"] = token
 
+    # Check cache (key excludes token)
+    cache_key_endpoint = f"aetp/{path}"
+    cached = cache_get(cache_key_endpoint, params)
+    if cached is not None:
+        return cached
+
     logger.debug("AETP request: %s params=%s", path, {k: v for k, v in params.items() if k != "10039"})
+    rate_limit()
     r = _aetp_fetch(s, path, params)
 
-    return parse_binary_response(r.content)
+    result = parse_binary_response(r.content)
+
+    # Store in cache
+    cache_set(cache_key_endpoint, params, result, get_settings().cache_ttl)
+
+    return result
 
 
 @http_retry

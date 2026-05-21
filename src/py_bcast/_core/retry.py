@@ -15,13 +15,10 @@ from tenacity import (
     before_sleep_log,
 )
 
+from py_bcast._core.config import get_settings
 from py_bcast._core.logging import get_logger
 
 logger = get_logger(__name__)
-
-_MAX_ATTEMPTS = 3
-_WAIT_MIN = 1  # seconds
-_WAIT_MAX = 4  # seconds
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -33,13 +30,25 @@ def _is_retryable(exc: BaseException) -> bool:
     return False
 
 
-http_retry = retry(
-    retry=retry_if_exception(_is_retryable),
-    stop=stop_after_attempt(_MAX_ATTEMPTS),
-    wait=wait_exponential(multiplier=1, min=_WAIT_MIN, max=_WAIT_MAX),
-    before_sleep=before_sleep_log(logger, log_level=20),  # INFO
-    reraise=True,
-)
+def _make_retry():
+    """Build the retry decorator reading current settings."""
+    settings = get_settings()
+    return retry(
+        retry=retry_if_exception(_is_retryable),
+        stop=stop_after_attempt(settings.max_retries),
+        wait=wait_exponential(
+            multiplier=1,
+            min=settings.retry_wait_min,
+            max=settings.retry_wait_max,
+        ),
+        before_sleep=before_sleep_log(logger, log_level=20),  # INFO
+        reraise=True,
+    )
+
+
+# Default instance — reads settings at import time.
+# Functions decorated with this get the settings active at decoration time.
+http_retry = _make_retry()
 """Decorator: retries on httpx timeout/network errors and HTTP 5xx.
 
 Usage::

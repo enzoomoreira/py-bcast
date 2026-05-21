@@ -458,6 +458,113 @@ for f in article["files"]:
 
 ---
 
+## Configuration
+
+### `configure(**kwargs)`
+
+Adjust library-wide settings at runtime. All keyword arguments correspond to fields on `Settings`.
+
+```python
+from py_bcast import configure
+
+configure(
+    timeout=60,              # HTTP request timeout in seconds (default 30)
+    max_retries=5,           # Tenacity retry attempts (default 3)
+    cache_enabled=True,      # Enable response caching (default True)
+    cache_backend="memory",  # "memory" | "disk" (default "memory")
+    cache_ttl=600,           # Default TTL in seconds (default 300)
+    cache_ttl_realtime=5,    # TTL for real-time quotes (default 5)
+    rate_limit_calls=10,     # Max requests per period (default 20)
+    rate_limit_period=1.0,   # Period in seconds (default 1.0)
+)
+```
+
+### `get_settings()` / `Settings`
+
+Inspect current settings.
+
+```python
+from py_bcast import get_settings
+
+s = get_settings()
+print(s.timeout, s.cache_enabled, s.cache_backend)
+```
+
+### `cache_invalidate(key=None)`
+
+Clear cached responses. Without arguments clears the entire cache.
+
+```python
+from py_bcast import cache_invalidate
+
+cache_invalidate()                          # clear all
+cache_invalidate("bdh:PETR4:...")           # clear specific key
+```
+
+---
+
+## Async API
+
+All HTTP data functions have async equivalents in the `py_bcast._async` namespace, prefixed with `a` (e.g. `abdh`, `abmacro`). They share the same connection pool, cache, and rate limiter as the sync API.
+
+```python
+import asyncio
+from py_bcast._async import abdh, abmacro, abconsensus, abnews_latest
+
+async def main():
+    # Historical prices
+    data = await abdh(["PETR4", "VALE3"], "20260501", "20260520")
+
+    # Macro series
+    fx = await abmacro("USDBRL", "20260101", "20260520")
+
+    # Analyst consensus
+    c = await abconsensus("PETR4")
+
+    # Parallel fetch (asyncio.gather)
+    data, fx, c = await asyncio.gather(
+        abdh("PETR4", "20260501", "20260520"),
+        abmacro("USDBRL", "20260101", "20260520"),
+        abconsensus("PETR4"),
+    )
+
+asyncio.run(main())
+```
+
+Alternatively via the namespace:
+
+```python
+from py_bcast import async_api
+
+data = asyncio.run(async_api.abdh("PETR4", "20260501", "20260520"))
+```
+
+**Available async functions:**
+
+| Async | Sync equivalent | Module |
+|-------|----------------|--------|
+| `abdh` | `bdh` | `_async.historical` |
+| `abdh_ohlcv` | `bdh_ohlcv` | `_async.historical` |
+| `abdi` | `bdi` | `_async.historical` |
+| `abdt` | `bdt` | `_async.historical` |
+| `abmacro` | `bmacro` | `_async.macro` |
+| `abdi_cdi` | `bdi_cdi` | `_async.macro` |
+| `abreturn` | `breturn` | `_async.macro` |
+| `abvolume` | `bvolume` | `_async.macro` |
+| `abinflation` | `binflation` | `_async.macro` |
+| `abconsensus` | `bconsensus` | `_async.fundamental` |
+| `abcompany` | `bcompany` | `_async.fundamental` |
+| `abquote` | `bquote` | `_async.fundamental` |
+| `abtickers` | `btickers` | `_async.fundamental` |
+| `abshares` | `bshares` | `_async.fundamental` |
+| `abnews` | `bnews` | `_async.news` |
+| `abnews_latest` | `bnews_latest` | `_async.news` |
+| `abnews_search` | `bnews_search` | `_async.news` |
+
+> **Note:** `abnews_latest` uses `asyncio.gather` internally for parallel article fetches, which is significantly faster than the sequential sync version.
+
+---
+
 ## Instrument Database
 
 ### `bsearch(query, exchange=None, max_results=20)`
@@ -503,7 +610,24 @@ db.exchanges          # {"PR": 189985, "BVMF": 138181, ...}
 
 ## Error Handling
 
-- `ValueError` — missing session token
-- `RuntimeError` — ContentProxy returned error status
-- `FileNotFoundError` — instrument database not found (bcsys32 never ran)
-- `ConnectionError` — HTTP endpoint unreachable
+All exceptions inherit from `PyBcastError`.
+
+| Exception | Raised when |
+|-----------|-------------|
+| `SessionError` | Session token is missing or invalid |
+| `ContentProxyError` | ContentProxy HTTP endpoint returned an error status |
+| `ProtocolError` | Binary SOH response is malformed or contains an error |
+| `DDEError` | DDE connection failed or request timed out |
+| `ValidationError` | Input parameter validation failed (also a `ValueError`) |
+| `FileNotFoundError` | Instrument database not found (`bcsys32` never ran) |
+
+```python
+from py_bcast import ContentProxyError, SessionError
+
+try:
+    data = bdh("PETR4", "20260501", "20260520")
+except SessionError:
+    print("Set BROADCAST_SESSION env var")
+except ContentProxyError as e:
+    print(f"Server error: {e}")
+```

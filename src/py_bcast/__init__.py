@@ -69,6 +69,9 @@ from ._core.exceptions import (
     ValidationError,
 )
 from ._core.logging import configure_logging
+from ._core.config import configure, get_settings, Settings
+from ._core.cache import invalidate as cache_invalidate
+from . import _async as async_api
 
 __all__ = [
     "BroadcastClient",
@@ -117,6 +120,13 @@ __all__ = [
     "ValidationError",
     # Logging
     "configure_logging",
+    # Configuration
+    "configure",
+    "get_settings",
+    "Settings",
+    "cache_invalidate",
+    # Async API namespace
+    "async_api",
 ]
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

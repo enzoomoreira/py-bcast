@@ -9,7 +9,7 @@ import pandas as pd
 from .._core.constants import BASE_URL
 from .._core.dates import DateLike, business_days, default_end_date, to_date_str
 from .._core.exceptions import ContentProxyError
-from .._core.http import base_params, create_http_session, get_session_token
+from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.normalize import ensure_list
 from .._core.output import to_dataframe, to_series
@@ -54,7 +54,7 @@ def bdh(
     if not dates:
         return {}
 
-    s = create_http_session()
+    s = get_http_client()
     results: dict[str, list[dict[str, str]]] = {}
 
     # Fetch in chunks of 250 dates (URL length limit)
@@ -133,7 +133,7 @@ def bdh_ohlcv(
         >>> print(s["close"], s["high"])
     """
     token = get_session_token(session_token)
-    s = create_http_session()
+    s = get_http_client()
     date_str = to_date_str(date)
 
     params = base_params(token)

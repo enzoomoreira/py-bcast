@@ -12,7 +12,10 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 - **Reference data** — 1020 companies, 37 indices, 38 sectors, real-time quotes
 - **News & multimedia** — full-text articles, Dow Jones wires, podcasts (no auth needed)
 - **Instrument database** — search 623K+ instruments across 30+ exchanges
-- Proper Python package with `src/` layout and type annotations
+- **Async API** — `async_api` namespace with async versions of all HTTP data functions
+- **Caching** — in-memory (default) and disk-based (diskcache) response cache with configurable TTL
+- **Rate limiting** — token-bucket limiter and connection pooling to protect the server
+- Proper Python package with `src/` layout, type annotations, Pydantic validation, and structured logging
 
 ## Requirements
 
@@ -92,15 +95,27 @@ with BroadcastClient() as bc:
 
 ```
 src/py_bcast/
-├── __init__.py         # Public API (33 exported functions)
+├── __init__.py         # Public API (~40 exported symbols + async_api namespace)
 ├── _core/              # Private infrastructure
+│   ├── config.py       # Settings dataclass + configure()
+│   ├── exceptions.py   # Exception hierarchy (PyBcastError, SessionError, …)
+│   ├── logging.py      # Logger factory (get_logger, configure_logging)
 │   ├── session.py      # Auto-discovery of session token
-│   ├── http.py         # HTTP session factory (httpx)
+│   ├── http.py         # Singleton HTTP client pool (sync + async, httpx)
+│   ├── cache.py        # Response cache (memory + diskcache backends)
+│   ├── ratelimit.py    # Token-bucket rate limiter
+│   ├── retry.py        # Tenacity retry decorator
+│   ├── validation.py   # Pydantic validation types + @validate_params
 │   ├── dde.py          # DDEML ctypes bindings
 │   ├── constants.py    # Service names, fields, URLs
 │   ├── binary.py       # SOH binary protocol decoder
 │   ├── aetp.py         # Shared aetp/output helpers
 │   └── xml_helpers.py  # Shared XML helpers
+├── _async/             # Async API (async versions of all HTTP data functions)
+│   ├── historical.py   # abdh, abdh_ohlcv, abdi, abdt
+│   ├── macro.py        # abmacro, abdi_cdi, abreturn, abvolume, abinflation
+│   ├── fundamental.py  # abconsensus, abcompany, abquote, abtickers, abshares
+│   └── news.py         # abnews, abnews_latest, abnews_search
 ├── realtime/
 │   └── client.py       # BroadcastClient, bdp, bdps
 ├── historical/

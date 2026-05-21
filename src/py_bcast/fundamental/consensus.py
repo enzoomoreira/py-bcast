@@ -8,7 +8,7 @@ import pandas as pd
 
 from .._core.constants import BASE_URL
 from .._core.exceptions import ProtocolError
-from .._core.http import create_http_session, get_session_token
+from .._core.http import get_http_client, get_session_token
 from .._core.binary import parse_binary_response
 from .._core.logging import get_logger
 from .._core.output import to_series
@@ -57,7 +57,7 @@ def bconsensus(
         >>> print(f"Buy: {s['buy']}, Target: {s['target_mean']}")
     """
     token = get_session_token(session_token)
-    s = create_http_session()
+    s = get_http_client()
 
     today = datetime.date.today().strftime("%Y%m%d")
 

@@ -107,7 +107,7 @@ graph LR
     nginx --> CMM["/CentralMultimidia/<br/>(ASP.NET, no auth)"]
     nginx --> CPO["/contentProxyOutput/<br/>(Tomcat, 500s)"]
     nginx --> IT["/IntegracaoTabelas/<br/>(XML)"]
-    nginx --> BCAA["/bcaa/ws/platform/<br/>(Spring Boot auth)"]
+    nginx --> BCAA["bcaa/ws/platform/<br/>(Spring Boot auth)"]
 ```
 
 ### Authentication
@@ -214,7 +214,20 @@ The terminal maintains a local instrument master file:
 | 303 | ISIN | `BRPETRACNPR6` |
 | 10092 | Exchange ID | `BVMF` |
 
-## Data Format Conventions
+## Library Infrastructure
+
+The `_core/` subpackage provides internal cross-cutting infrastructure consumed by all domain modules.
+
+| Module | Purpose |
+|--------|---------|
+| `config.py` | `Settings` dataclass with all tunable parameters. `configure(**kwargs)` updates at runtime; `get_settings()` returns the singleton. |
+| `exceptions.py` | Typed exception hierarchy: `PyBcastError` → `SessionError`, `ContentProxyError`, `ProtocolError`, `DDEError`, `ValidationError`. |
+| `logging.py` | `get_logger(name)` factory; NullHandler by default so the library never emits logs unless the app configures them. |
+| `http.py` | Singleton `httpx.Client` and `httpx.AsyncClient` with keep-alive connection pooling. Replaces per-request `requests.Session` creation. |
+| `cache.py` | Two-backend response cache. `"memory"` uses a thread-safe TTL dict; `"disk"` uses `diskcache`. Cache keys exclude the session token (tag `10039`). |
+| `ratelimit.py` | Token-bucket rate limiter. `rate_limit()` (sync) and `rate_limit_async()` (async) enforce `settings.rate_limit_calls` per `settings.rate_limit_period` second. |
+| `retry.py` | `@http_retry` decorator via Tenacity. Retries on HTTP 5xx and connection errors with exponential backoff. Settings read from `config.py`. |
+| `validation.py` | Pydantic-based input types (`Ticker`, `DateParam`, `CvmCode`, …) and `@validate_params` decorator that wraps `validate_call` and maps Pydantic errors to `ValidationError`. |
 
 - Numbers use **comma** as decimal separator (pt-BR locale): `44,60`
 - DDE dates: `dd/mm/yyyy` (e.g., `19/05/2026`)
