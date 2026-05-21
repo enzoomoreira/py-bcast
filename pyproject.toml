@@ -9,11 +9,11 @@ dependencies = [
     "httpx>=0.28.1",
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
+    "pywin32>=306",
     "tenacity>=9.1.4",
 ]
 
 [project.optional-dependencies]
-dde = ["pywin32>=306"]
 dev = ["pytest>=7.0"]
 
 [build-system]

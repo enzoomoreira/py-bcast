@@ -32,7 +32,7 @@ Quick Start:
 
     # Dividends history
     from py_bcast import bdividends
-    divs = bdividends(9512, "PETR4")
+    divs = bdividends("PETR4")
 
     # News articles (no auth required!)
     from py_bcast import bnews, bnews_latest
@@ -43,12 +43,7 @@ Quick Start:
     bsearch("PETR", exchange="BVMF")
 """
 
-try:
-    from .realtime import BroadcastClient, bdp, bdps
-except ImportError:  # win32ui/dde not available outside Windows DDE env
-    BroadcastClient = None  # type: ignore[assignment, misc]
-    bdp = None  # type: ignore[assignment]
-    bdps = None  # type: ignore[assignment]
+from .realtime import BroadcastClient, bdp, bdps
 from .historical import bdh, bdh_ohlcv, bdi, bdt
 from .fundamental import (
     bconsensus,
