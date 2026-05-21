@@ -59,7 +59,8 @@ from .fundamental import (
 from .instruments import InstrumentDB, bsearch
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
 from .news import bnews, bnews_latest, bnews_search, MULTIMEDIA_CATEGORIES
-from ._core.session import discover_session_token
+from ._core.session import discover_session_token, clear_token_cache
+from ._core.resolve import resolve_cvm, resolve_indicator
 from ._core.exceptions import (
     PyBcastError,
     SessionError,
@@ -113,6 +114,9 @@ __all__ = [
     "bnews_search",
     "MULTIMEDIA_CATEGORIES",
     "discover_session_token",
+    "clear_token_cache",
+    "resolve_cvm",
+    "resolve_indicator",
     # Exceptions
     "PyBcastError",
     "SessionError",

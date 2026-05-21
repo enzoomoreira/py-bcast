@@ -10,6 +10,7 @@ from .._core.exceptions import ProtocolError
 from .._core.logging import get_logger
 from .._core.normalize import ensure_str
 from .._core.output import to_reference_dataframe, to_series
+from .._core.resolve import resolve_cvm
 from .._core.validation import CvmCode, Ticker, validate_params
 from ._helpers import async_aetp_request
 
@@ -98,15 +99,18 @@ async def abquote(
     return to_series(rows[0]) if rows else pd.Series(dtype="object")
 
 
-@validate_params
 async def abtickers(
-    cvm_code: CvmCode,
+    ticker_or_cvm: str | int,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """Async version of ``btickers``."""
+    """Async version of ``btickers``. Accepts ticker or CVM code."""
+    if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
+        cvm_code = int(ticker_or_cvm)
+    else:
+        cvm_code = resolve_cvm(str(ticker_or_cvm), session_token)
     parsed = await async_aetp_request(
         "fundamental/ativo/simbolo",
-        {"13004": ensure_str(cvm_code)},
+        {"13004": str(cvm_code)},
         session_token,
     )
     return to_reference_dataframe(rows_to_dicts(parsed))

@@ -18,15 +18,15 @@ class TestBcalendar:
 
 class TestBdividends:
     def test_petrobras(self):
-        # CVM 9512 = Petrobras
-        df = bdividends(9512, "PETR4")
+        # Ticker-only (auto-resolves CVM)
+        df = bdividends("PETR4")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
 
 
 class TestBdy:
     def test_petrobras_dy(self):
-        df = bdy(9512, "PETR4", "20250101", "20260519")
+        df = bdy("PETR4", "20250101", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
 

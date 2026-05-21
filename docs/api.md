@@ -288,15 +288,16 @@ q = bquote("PETR4")
 print(q["close"], q["volume"])  # 46.09, 1500000
 ```
 
-### `btickers(cvm_code)`
+### `btickers(ticker_or_cvm)`
 
-All tickers (stocks/units) for a company by CVM code.
+All tickers (stocks/units) for a company. Accepts a ticker string (CVM auto-resolved) or a CVM code directly.
 
 ```python
 from py_bcast import btickers
 
-df = btickers(9512)
-print(df[["ticker", "type"]])  # PETR3, PETR4
+df = btickers("PETR4")  # auto-resolves CVM
+df = btickers(9512)     # direct CVM code — same result
+print(df["ticker"].tolist())  # ['PETR3', 'PETR4']
 ```
 
 ### `bshares(ticker)`
@@ -309,16 +310,25 @@ from py_bcast import bshares
 data = bshares("PETR4")
 ```
 
-### `bindicators(cvm_code, indicator_id, start_date, end_date)`
+### `bindicators(ticker_or_cvm, indicator, start_date, end_date)`
 
-Daily fundamental indicator history. Known IDs: 32=Market Cap, 52=Beta.
+Daily fundamental indicator history.
+
+Accepts a **ticker string or CVM code** and an **indicator name or numeric ID**. Use `bindicator_meta()` to discover all available indicators.
 
 ```python
 from py_bcast import bindicators
 
-mcap = bindicators(9512, 32, "20260101", "20260520")  # Market Cap daily
-beta = bindicators(9512, 52, "20260101", "20260520")  # Beta daily
+# By ticker + indicator name (recommended)
+ebitda = bindicators("PETR4", "EBITDA", "20260101", "20260520")
+beta   = bindicators("PETR4", "Beta AE", "20260101", "20260520")
+roe    = bindicators("VALE3", "ROE", "20260101", "20260520")
+
+# By CVM code + numeric ID (still works)
+mcap   = bindicators(9512, 32, "20260101", "20260520")
 ```
+
+**Indicator name matching:** case-insensitive, accent-insensitive. Exact match preferred over prefix/contains. Raises `ValidationError` if ambiguous.
 
 ### `bindicator_meta()`
 
@@ -344,26 +354,26 @@ from py_bcast import bcalendar
 events = bcalendar("20260101", "20260520")  # ~1600+ events
 ```
 
-### `bdividends(cvm_code, ticker)`
+### `bdividends(ticker, cvm_code=None)`
 
-Dividend/JCP payment history for a company.
+Dividend/JCP payment history for a company. CVM code is auto-resolved from the ticker if not provided.
 
 ```python
 from py_bcast import bdividends
 
-divs = bdividends(9512, "PETR4")
-for d in divs:
-    print(d)
+divs = bdividends("PETR4")           # ticker-only (recommended)
+divs = bdividends("PETR4", 9512)     # explicit CVM — skips resolution
 ```
 
-### `bdy(cvm_code, ticker, start_date, end_date)`
+### `bdy(ticker, start_date, end_date, cvm_code=None)`
 
-Dividend yield historical series.
+Dividend yield historical series. CVM code is auto-resolved from the ticker if not provided.
 
 ```python
 from py_bcast import bdy
 
-dy = bdy(9512, "PETR4", "20250101", "20260520")
+dy = bdy("PETR4", "20250101", "20260520")           # ticker-only (recommended)
+dy = bdy("PETR4", "20250101", "20260520", cvm_code=9512)  # explicit CVM
 ```
 
 ### `bportfolios()`
@@ -465,6 +475,52 @@ for f in article["files"]:
 
 ---
 
+## Utilities
+
+### `resolve_cvm(ticker)`
+
+Resolve a B3 ticker to its CVM company code. Results are cached for the process lifetime.
+
+```python
+from py_bcast import resolve_cvm
+
+cvm = resolve_cvm("PETR4")  # 9512
+cvm = resolve_cvm("VALE3")  # 4170
+
+# Useful when you need the CVM code for other purposes
+from py_bcast import bcompany
+detail = bcompany(resolve_cvm("ITUB4"))
+```
+
+Raises `ValidationError` if the ticker cannot be resolved.
+
+### `resolve_indicator(name_or_id)`
+
+Resolve an indicator name to its numeric ID. Accepts exact names, prefixes, or substrings (case/accent insensitive).
+
+```python
+from py_bcast import resolve_indicator
+
+resolve_indicator("EBITDA")          # 11
+resolve_indicator("roe")             # 24  (case-insensitive)
+resolve_indicator("Beta AE")         # 52
+resolve_indicator(32)                # 32  (passthrough for ints)
+```
+
+Raises `ValidationError` if the name is ambiguous or not found. Use `bindicator_meta()` to list all available indicators.
+
+### `clear_token_cache()`
+
+Force re-discovery of the session token on the next API call. Useful when the Broadcast terminal is restarted and the cached token becomes stale.
+
+```python
+from py_bcast import clear_token_cache
+
+clear_token_cache()  # next call will re-scan bcsys32.exe memory
+```
+
+---
+
 ## Configuration
 
 ### `configure(**kwargs)`
@@ -562,7 +618,7 @@ data = asyncio.run(async_api.abdh("PETR4", "20260501", "20260520"))
 | `abconsensus` | `bconsensus` | `_async.fundamental` |
 | `abcompany` | `bcompany` | `_async.fundamental` |
 | `abquote` | `bquote` | `_async.fundamental` |
-| `abtickers` | `btickers` | `_async.fundamental` |
+| `abtickers` | `btickers` | `_async.fundamental` | accepts ticker or CVM code |
 | `abshares` | `bshares` | `_async.fundamental` |
 | `abnews` | `bnews` | `_async.news` |
 | `abnews_latest` | `bnews_latest` | `_async.news` |
@@ -611,7 +667,9 @@ db.exchanges          # {"PR": 189985, "BVMF": 138181, ...}
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `BROADCAST_SESSION` | For HTTP functions (except news) | BCAA session token (hex string) |
+| `BROADCAST_SESSION` | For HTTP functions (except news) | BCAA session token (hex string). If not set, auto-discovered from running `bcsys32.exe` process memory (one-time cost ~5s; result is cached for the process lifetime). |
+
+> **Tip:** Set `BROADCAST_SESSION` in your shell profile or `.env` to eliminate the startup cost entirely.
 
 > **Note:** News functions (`bnews`, `bnews_latest`, `bnews_search`) do NOT require a session token.
 
@@ -639,6 +697,8 @@ All exceptions inherit from `PyBcastError`.
 `ProtocolError` exposes:
 - `.error_tag` — error message extracted from tag 10037 in the binary response
 - `.record_count` — number of records found when the response was malformed
+
+Both exceptions append an English **hint** to their `str()` output when the server message matches a known pattern (e.g. `"Não foram encontrados registros..."` → `"No records found for the given criteria"`).
 
 `DDEAdviseError` exposes:
 - `.item` — full DDE item string (e.g. `"EMBR3.ULT"`)

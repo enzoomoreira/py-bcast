@@ -26,18 +26,23 @@ class TestGetSessionToken:
     def test_auto_discovery_when_no_env(self, monkeypatch):
         """Falls back to auto-discovery when no env var set."""
         monkeypatch.delenv("BROADCAST_SESSION", raising=False)
+        import py_bcast._core.session as _sess
+        monkeypatch.setattr(_sess, "_cached_token", None)
         with patch("py_bcast._core.session.discover_session_token", return_value="AUTO_DISCOVERED"):
             token = get_session_token()
             assert token == "AUTO_DISCOVERED"
 
     def test_auto_discovery_error_propagates(self, monkeypatch):
-        """RuntimeError from discovery propagates to caller."""
+        """SessionError from discovery propagates to caller."""
         monkeypatch.delenv("BROADCAST_SESSION", raising=False)
+        # Clear the cached token so discovery is attempted
+        import py_bcast._core.session as _sess
+        monkeypatch.setattr(_sess, "_cached_token", None)
         with patch(
             "py_bcast._core.session.discover_session_token",
-            side_effect=RuntimeError("not running"),
+            side_effect=SessionError("not running"),
         ):
-            with pytest.raises(RuntimeError, match="not running"):
+            with pytest.raises(SessionError, match="not running"):
                 get_session_token()
 
 

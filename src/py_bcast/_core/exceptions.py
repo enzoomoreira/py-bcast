@@ -2,6 +2,30 @@
 
 from __future__ import annotations
 
+# Known server error messages → actionable English hints
+_ERROR_HINTS: dict[str, str] = {
+    "0": "Server returned empty response — check parameters or date range",
+    "não foram encontrados registros": "No records found for the given criteria",
+    "registro não encontrado": "No records found for the given criteria",
+    "sessão inválida": "Session token expired — call clear_token_cache() and retry",
+    "token expirado": "Session token expired — call clear_token_cache() and retry",
+    "erro interno": "Internal server error — retry later",
+    "parâmetro inválido": "Invalid parameter sent to endpoint",
+    "ativo não encontrado": "Ticker/asset not found in the database",
+    "empresa não encontrada": "Company not found — verify CVM code",
+}
+
+
+def _get_hint(message: str | None) -> str | None:
+    """Look up an actionable hint for a server error message."""
+    if not message:
+        return None
+    lower = message.strip().lower()
+    for key, hint in _ERROR_HINTS.items():
+        if key in lower or lower == key:
+            return hint
+    return None
+
 
 class PyBcastError(Exception):
     """Base exception for all py_bcast errors."""
@@ -33,6 +57,15 @@ class ContentProxyError(PyBcastError):
         self.status_code = status_code
         super().__init__(message)
 
+    def __str__(self) -> str:
+        parts = [super().__str__()]
+        hint = _get_hint(self.server_message)
+        if hint:
+            parts.append(f"Hint: {hint}")
+        if self.endpoint:
+            parts.append(f"Endpoint: {self.endpoint}")
+        return " | ".join(p for p in parts if p)
+
 
 class ProtocolError(PyBcastError):
     """Binary SOH protocol parsing failure (malformed response).
@@ -52,6 +85,13 @@ class ProtocolError(PyBcastError):
         self.error_tag = error_tag
         self.record_count = record_count
         super().__init__(message)
+
+    def __str__(self) -> str:
+        parts = [super().__str__()]
+        hint = _get_hint(self.error_tag)
+        if hint:
+            parts.append(f"Hint: {hint}")
+        return " | ".join(p for p in parts if p)
 
 
 class DDEError(PyBcastError):

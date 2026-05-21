@@ -177,6 +177,16 @@ INDICATOR_META_FIELDS: dict[str, str] = {
     "13770": "available_since",
     "13771": "unit",
     "13774": "description",
+    # Additional metadata flags
+    "13791": "is_percentage",
+    "13792": "is_per_share",
+    "13785": "normalization",
+    "13769": "has_chart",
+    "13822": "has_ranking",
+    "13823": "has_comparison",
+    "13772": "long_description",
+    "13773": "calculation_notes",
+    "13870": "unit_type",
 }
 
 # bcalendar(start, end)
@@ -234,4 +244,17 @@ PORTFOLIO_FIELDS: dict[str, str] = {
     "13025": "sector",
     "13991": "subsector",
     "13982": "segment",
+    # Stock classification (B3 sector of the held ticker)
+    "13965": "stock_sector_id",
+    "13956": "stock_subsector_id",
+    "13895": "stock_segment_id",
+    "13732": "stock_classification",
+    # Recommended stock fields
+    "12063": "rec_company",
+    "13798": "rec_sector_id",
+    "13702": "rec_sector",
+    "13799": "rec_subsector_id",
+    "13703": "rec_subsector",
+    "13800": "rec_segment_id",
+    "13704": "rec_segment",
 }

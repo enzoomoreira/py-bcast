@@ -22,6 +22,9 @@ from .logging import get_logger
 
 logger = get_logger(__name__)
 
+# Cached token (survives for the process lifetime)
+_cached_token: str | None = None
+
 # Windows API constants
 PROCESS_VM_READ = 0x0010
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -185,7 +188,7 @@ def discover_session_token() -> str:
 
 
 def get_session_token(session_token: str | None = None) -> str:
-    """Resolve session token: explicit > env var > auto-discovery.
+    """Resolve session token: explicit > env var > cached > auto-discovery.
 
     Args:
         session_token: Explicit token (highest priority).
@@ -194,8 +197,10 @@ def get_session_token(session_token: str | None = None) -> str:
         Valid BCAA session token.
 
     Raises:
-        RuntimeError: If auto-discovery fails and no token provided.
+        SessionError: If auto-discovery fails and no token provided.
     """
+    global _cached_token
+
     # 1. Explicit argument
     if session_token:
         return session_token
@@ -205,5 +210,16 @@ def get_session_token(session_token: str | None = None) -> str:
     if env_token:
         return env_token
 
-    # 3. Auto-discover from running terminal
-    return discover_session_token()
+    # 3. Previously discovered token
+    if _cached_token:
+        return _cached_token
+
+    # 4. Auto-discover from running terminal (expensive ~5s)
+    _cached_token = discover_session_token()
+    return _cached_token
+
+
+def clear_token_cache() -> None:
+    """Clear the cached session token, forcing re-discovery on next call."""
+    global _cached_token
+    _cached_token = None

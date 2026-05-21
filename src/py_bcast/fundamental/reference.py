@@ -21,6 +21,7 @@ from .._core.exceptions import ProtocolError
 from .._core.logging import get_logger
 from .._core.normalize import ensure_str
 from .._core.output import to_dataframe, to_reference_dataframe, to_series
+from .._core.resolve import resolve_cvm, resolve_indicator
 from .._core.validation import CvmCode, DateParam, Ticker, validate_params
 
 logger = get_logger(__name__)
@@ -147,27 +148,33 @@ def bquote(
 
 
 def btickers(
-    cvm_code: str | int,
+    ticker_or_cvm: str | int,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch all tickers (stocks/units) for a company by CVM code.
+    Fetch all tickers (stocks/units) for a company.
 
+    Accepts either a CVM code (int) or a ticker string (auto-resolves CVM).
     Uses aetp/output/fundamental/AtivoSimbolo.
 
     Args:
-        cvm_code: CVM numeric code (e.g., 9512 for Petrobras)
+        ticker_or_cvm: CVM numeric code (int, e.g. 9512) or ticker (str, e.g. "PETR4").
         session_token: BCAA session token
 
     Returns:
         DataFrame with ticker information.
 
     Example:
-        >>> df = btickers(9512)  # PETR3, PETR4
+        >>> df = btickers("PETR4")  # resolves CVM, returns PETR3+PETR4
+        >>> df = btickers(9512)     # direct CVM code
     """
+    if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
+        cvm_code = int(ticker_or_cvm)
+    else:
+        cvm_code = resolve_cvm(str(ticker_or_cvm), session_token)
     parsed = aetp_request(
         "fundamental/ativo/simbolo",
-        {"13004": ensure_str(cvm_code)},
+        {"13004": str(cvm_code)},
         session_token,
     )
     return to_reference_dataframe(rows_to_dicts(parsed), rename=TICKER_FIELDS)
@@ -204,8 +211,8 @@ def bshares(
 
 
 def bindicators(
-    cvm_code: str | int,
-    indicator_id: str | int,
+    ticker_or_cvm: str | int,
+    indicator: str | int,
     start_date: DateLike,
     end_date: DateLike,
     session_token: str | None = None,
@@ -214,11 +221,13 @@ def bindicators(
     Fetch daily indicator history for a company.
 
     Uses aetp/output/fundamental/IndicadorHistoricoDiario.
-    Known indicator IDs: 32 = Market Cap, 52 = Beta.
+
+    Accepts ticker strings (auto-resolves CVM) or CVM codes directly.
+    Accepts indicator names (e.g. "EBITDA", "ROE") or numeric IDs.
 
     Args:
-        cvm_code: CVM numeric code (e.g., 9512 for Petrobras)
-        indicator_id: Indicator ID (e.g., 32 for Market Cap, 52 for Beta)
+        ticker_or_cvm: Ticker (str, e.g. "PETR4") or CVM code (int, e.g. 9512).
+        indicator: Indicator name (str, e.g. "EBITDA") or ID (int, e.g. 11).
         start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
         end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
         session_token: BCAA session token
@@ -227,14 +236,23 @@ def bindicators(
         DataFrame with DatetimeIndex and daily indicator values.
 
     Example:
+        >>> df = bindicators("PETR4", "EBITDA", "20260101", "20260519")
         >>> df = bindicators(9512, 32, "20260101", "20260519")
-        >>> df.tail()
     """
+    # Resolve ticker → CVM
+    if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
+        cvm_code = int(ticker_or_cvm)
+    else:
+        cvm_code = resolve_cvm(str(ticker_or_cvm), session_token)
+
+    # Resolve indicator name → ID
+    indicator_id = resolve_indicator(indicator, session_token)
+
     parsed = aetp_request(
         "fundamental/indicador/historico-diario",
         {
-            "13004": ensure_str(cvm_code),
-            "13760": ensure_str(indicator_id),
+            "13004": str(cvm_code),
+            "13760": str(indicator_id),
             "10057": to_date_str(start_date),
             "10058": to_date_str(end_date),
         },

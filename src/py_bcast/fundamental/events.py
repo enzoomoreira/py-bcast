@@ -15,6 +15,7 @@ from .._core.columns import (
 from .._core.dates import DateLike, to_date_str
 from .._core.normalize import ensure_str
 from .._core.output import to_dataframe, to_reference_dataframe
+from .._core.resolve import resolve_cvm
 from .._core.validation import CvmCode, DateParam, Ticker, validate_params
 
 
@@ -51,10 +52,9 @@ def bcalendar(
     return to_reference_dataframe(rows_to_dicts(parsed), rename=CALENDAR_FIELDS)
 
 
-@validate_params
 def bdividends(
-    cvm_code: CvmCode,
-    ticker: Ticker,
+    ticker: str,
+    cvm_code: str | int | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -63,17 +63,22 @@ def bdividends(
     Uses aetp/output/fundamental/EmpresaEventosJcpDividendos.
 
     Args:
-        cvm_code: CVM numeric code (e.g., 9512 for Petrobras)
-        ticker: Ticker symbol (e.g., "PETR4")
+        ticker: Ticker symbol (e.g., "PETR4"). Used directly and also
+            to resolve cvm_code if not provided.
+        cvm_code: CVM numeric code (e.g., 9512). If None, resolved
+            automatically from the ticker.
         session_token: BCAA session token
 
     Returns:
         DataFrame with dividend events (date, type, value per share, etc.).
 
     Example:
-        >>> df = bdividends(9512, "PETR4")
+        >>> df = bdividends("PETR4")
         >>> df.tail()
     """
+    ticker = ticker.strip().upper()
+    if cvm_code is None:
+        cvm_code = resolve_cvm(ticker, session_token)
     parsed = aetp_request(
         "fundamental/empresa/eventos/jcp-dividendos",
         {"13004": ensure_str(cvm_code), "10068": ticker},
@@ -82,12 +87,11 @@ def bdividends(
     return to_reference_dataframe(rows_to_dicts(parsed), rename=DIVIDEND_FIELDS)
 
 
-@validate_params
 def bdy(
-    cvm_code: CvmCode,
-    ticker: Ticker,
-    start_date: DateParam,
-    end_date: DateParam,
+    ticker: str,
+    start_date: DateLike,
+    end_date: DateLike,
+    cvm_code: str | int | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -96,19 +100,24 @@ def bdy(
     Uses aetp/output/fundamental/EmpresaEventosDy.
 
     Args:
-        cvm_code: CVM numeric code (e.g., 9512 for Petrobras)
-        ticker: Ticker symbol (e.g., "PETR4")
+        ticker: Ticker symbol (e.g., "PETR4"). Used directly and also
+            to resolve cvm_code if not provided.
         start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
         end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
+        cvm_code: CVM numeric code (e.g., 9512). If None, resolved
+            automatically from the ticker.
         session_token: BCAA session token
 
     Returns:
         DataFrame with DatetimeIndex and DY values over time.
 
     Example:
-        >>> df = bdy(9512, "PETR4", "20250101", "20260519")
+        >>> df = bdy("PETR4", "20250101", "20260519")
         >>> df.tail()
     """
+    ticker = ticker.strip().upper()
+    if cvm_code is None:
+        cvm_code = resolve_cvm(ticker, session_token)
     parsed = aetp_request(
         "fundamental/empresa/eventos/dividend-yield",
         {
