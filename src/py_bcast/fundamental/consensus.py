@@ -7,9 +7,15 @@ import datetime
 import pandas as pd
 
 from .._core.constants import BASE_URL
+from .._core.exceptions import ProtocolError
 from .._core.http import create_http_session, get_session_token
 from .._core.binary import parse_binary_response
+from .._core.logging import get_logger
 from .._core.output import to_series
+from .._core.retry import http_retry
+from .._core.validation import Ticker, validate_params
+
+logger = get_logger(__name__)
 
 
 # Consenso field tag mapping
@@ -26,8 +32,9 @@ _CONSENSO_FIELDS = {
 }
 
 
+@validate_params
 def bconsensus(
-    ticker: str,
+    ticker: Ticker,
     session_token: str | None = None,
 ) -> pd.Series:
     """
@@ -54,20 +61,13 @@ def bconsensus(
 
     today = datetime.date.today().strftime("%Y%m%d")
 
-    r = s.get(
-        f"{BASE_URL}/aefundamental/{ticker}/consenso",
-        params={
-            "10023": "4",
-            "10039": token,
-            "10068": ticker,
-            "13004": today,
-        },
-        timeout=15,
-    )
+    logger.debug("bconsensus: fetching consensus for %s", ticker)
+    r = _consensus_fetch(s, ticker, token, today)
 
     try:
         parsed = parse_binary_response(r.content)
-    except RuntimeError:
+    except ProtocolError:
+        logger.warning("bconsensus: no data for %s", ticker)
         return pd.Series(dtype="object")
 
     if not parsed["rows"]:
@@ -81,4 +81,19 @@ def bconsensus(
             name = _CONSENSO_FIELDS.get(tag, tag)
             result[name] = row[i]
 
-    return to_series(result)
+    return to_series(result, rename=None)
+
+
+@http_retry
+def _consensus_fetch(s, ticker: str, token: str, today: str):
+    """Isolated HTTP call for retry."""
+    return s.get(
+        f"{BASE_URL}/aefundamental/{ticker}/consenso",
+        params={
+            "10023": "4",
+            "10039": token,
+            "10068": ticker,
+            "13004": today,
+        },
+        timeout=15,
+    )

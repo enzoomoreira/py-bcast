@@ -8,13 +8,15 @@ import pandas as pd
 
 from .._core.dates import DateLike, to_date_str, to_datetime_str
 from .._core.output import to_dataframe
+from .._core.validation import DateParam, DateTimeParam, Ticker, validate_params
 from .._core.xml_helpers import content_proxy_get, parse_ticks
 
 
+@validate_params
 def bdt(
-    ticker: str,
-    start: DateLike,
-    end: DateLike | None = None,
+    ticker: Ticker,
+    start: DateTimeParam,
+    end: DateTimeParam | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -35,11 +37,11 @@ def bdt(
 
     Returns:
         DataFrame with DatetimeIndex (from dat+hor) and numeric columns:
-        last, size, neg, open_interest, calendar_days, working_days.
+        close, size, trades, open_interest, calendar_days, working_days.
 
     Example:
         >>> df = bdt("USDBRL", "20260519100000", "20260519103000")
-        >>> df["last"].plot()
+        >>> df["close"].plot()
     """
     start_str = to_datetime_str(start)
 
@@ -62,9 +64,10 @@ def bdt(
     return to_dataframe(ticks, date_col="dat", time_col="hor")
 
 
+@validate_params
 def bdi(
-    ticker: str,
-    start_date: DateLike,
+    ticker: Ticker,
+    start_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -80,17 +83,17 @@ def bdi(
 
     Returns:
         DataFrame with DatetimeIndex (from dat+hor) and numeric columns:
-        open, high, low, last (close), qtt, neg, total_value,
-        open_interest, total_neg, tipo_intervalo.
+        open, high, low, close, volume, trades, turnover,
+        open_interest, cum_trades, session_type.
 
-        tipo_intervalo values:
+        session_type values:
             1 = Regular session
             5 = After-hours session
             9 = Closing auction
 
     Example:
         >>> df = bdi("PETR4", "20260519")
-        >>> df[["open", "high", "low", "last"]].tail()
+        >>> df[["open", "high", "low", "close"]].tail()
     """
     date_str = to_date_str(start_date)
     # Format: YYYYMMDDHHMM (12 digits). Server uses only the date portion;

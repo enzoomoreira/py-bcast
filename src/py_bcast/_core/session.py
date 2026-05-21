@@ -17,6 +17,11 @@ import sys
 if sys.platform != "win32":
     raise ImportError("Session discovery requires Windows")
 
+from .exceptions import SessionError
+from .logging import get_logger
+
+logger = get_logger(__name__)
+
 # Windows API constants
 PROCESS_VM_READ = 0x0010
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -133,9 +138,11 @@ def _validate_token(token: str) -> bool:
             timeout=5,
             verify=False,
         )
-        # A valid token returns success; invalid returns auth error
-        return "<STATUS>success</STATUS>" in r.text
-    except Exception:
+        valid = "<STATUS>success</STATUS>" in r.text
+        logger.debug("Token validation %s: %s", "passed" if valid else "failed", token[:8] + "...")
+        return valid
+    except Exception as exc:
+        logger.warning("Token validation request failed: %s", exc)
         return False
 
 
@@ -153,23 +160,25 @@ def discover_session_token() -> str:
     """
     pid = _find_bcsys32_pid()
     if pid is None:
-        raise RuntimeError(
+        raise SessionError(
             "Broadcast terminal (bcsys32.exe) is not running. "
             "Start the terminal and try again."
         )
 
     candidates = _scan_process_memory(pid)
     if not candidates:
-        raise RuntimeError(
+        raise SessionError(
             f"Could not read session token from bcsys32.exe (PID {pid}). "
             "The process may require elevated privileges."
         )
 
+    logger.info("Found %d token candidates, validating...", len(candidates))
     for token in candidates:
         if _validate_token(token):
+            logger.info("Valid session token discovered.")
             return token
 
-    raise RuntimeError(
+    raise SessionError(
         f"Found {len(candidates)} token candidates in bcsys32.exe memory "
         "but none validated successfully. The session may have expired."
     )

@@ -60,6 +60,15 @@ from .instruments import InstrumentDB, bsearch
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
 from .news import bnews, bnews_latest, bnews_search, MULTIMEDIA_CATEGORIES
 from ._core.session import discover_session_token
+from ._core.exceptions import (
+    PyBcastError,
+    SessionError,
+    ContentProxyError,
+    ProtocolError,
+    DDEError,
+    ValidationError,
+)
+from ._core.logging import configure_logging
 
 __all__ = [
     "BroadcastClient",
@@ -99,6 +108,15 @@ __all__ = [
     "bnews_search",
     "MULTIMEDIA_CATEGORIES",
     "discover_session_token",
+    # Exceptions
+    "PyBcastError",
+    "SessionError",
+    "ContentProxyError",
+    "ProtocolError",
+    "DDEError",
+    "ValidationError",
+    # Logging
+    "configure_logging",
 ]
 
 __version__ = "0.4.0"

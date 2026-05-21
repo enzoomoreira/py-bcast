@@ -45,8 +45,8 @@ price = bdp("PETR4", "ULT")
 
 # Historical daily (works for ALL instruments)
 data = bdh("PETR4", "20260501", "20260520")
-for row in data["PETR4.BVMF"]:
-    print(row["date"], row["last"])
+df = data["PETR4.BVMF"]   # DataFrame with DatetimeIndex
+print(df["close"].tail())
 
 # Intraday 2-min bars (ALL instruments)
 bars = bdi("PETR4", "20260520")

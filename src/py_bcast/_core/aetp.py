@@ -5,6 +5,10 @@ from __future__ import annotations
 from .constants import BASE_URL
 from .http import create_http_session, get_session_token
 from .binary import parse_binary_response
+from .logging import get_logger
+from .retry import http_retry
+
+logger = get_logger(__name__)
 
 
 def aetp_request(
@@ -19,13 +23,20 @@ def aetp_request(
     params.setdefault("10023", "4")
     params["10039"] = token
 
-    r = s.get(
+    logger.debug("AETP request: %s params=%s", path, {k: v for k, v in params.items() if k != "10039"})
+    r = _aetp_fetch(s, path, params)
+
+    return parse_binary_response(r.content)
+
+
+@http_retry
+def _aetp_fetch(s, path: str, params: dict):
+    """Isolated HTTP call for retry decoration."""
+    return s.get(
         f"{BASE_URL}/aetp/output/{path}",
         params=params,
         timeout=30,
     )
-
-    return parse_binary_response(r.content)
 
 
 def rows_to_dicts(parsed: dict) -> list[dict[str, str]]:

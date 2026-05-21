@@ -5,7 +5,12 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 
 from .constants import BASE_URL
+from .exceptions import ContentProxyError
 from .http import base_params, create_http_session, get_session_token
+from .logging import get_logger
+from .retry import http_retry
+
+logger = get_logger(__name__)
 
 
 def content_proxy_get(
@@ -29,7 +34,7 @@ def content_proxy_get(
         Parsed XML root element.
 
     Raises:
-        RuntimeError: If the response STATUS is not 'success'.
+        ContentProxyError: If the response STATUS is not 'success'.
     """
     token = get_session_token(session_token)
     s = create_http_session()
@@ -37,18 +42,26 @@ def content_proxy_get(
     merged = base_params(token)
     merged.update(params)
 
-    r = s.get(
-        f"{BASE_URL}/{endpoint}",
-        params=merged,
-        timeout=timeout,
-    )
+    logger.debug("ContentProxy GET %s params=%s", endpoint, params)
+    r = _content_proxy_fetch(s, endpoint, merged, timeout)
 
     root = ET.fromstring(r.text)
     if root.findtext("STATUS") != "success":
         msg = root.findtext("MESSAGE") or "Unknown error"
-        raise RuntimeError(f"ContentProxy error: {msg}")
+        logger.error("ContentProxy error on %s: %s", endpoint, msg)
+        raise ContentProxyError(f"ContentProxy error: {msg}")
 
     return root
+
+
+@http_retry
+def _content_proxy_fetch(s, endpoint: str, params: dict, timeout: int):
+    """Isolated HTTP call for retry decoration."""
+    return s.get(
+        f"{BASE_URL}/{endpoint}",
+        params=params,
+        timeout=timeout,
+    )
 
 
 def parse_ticks(root: ET.Element, sort_by: str = "") -> list[dict[str, str]]:

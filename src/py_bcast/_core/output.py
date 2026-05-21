@@ -8,22 +8,58 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .columns import CONTENT_PROXY_RENAME
+
+
+def _apply_rename(df: pd.DataFrame, rename: dict[str, str | None] | None) -> pd.DataFrame:
+    """Rename and drop columns based on a mapping.
+
+    Keys mapping to None are dropped. Keys mapping to a string are renamed.
+    Columns not in the mapping pass through unchanged.
+    """
+    if rename is None:
+        return df
+    drop_cols = [col for col in df.columns if rename.get(col) is None and col in rename]
+    if drop_cols:
+        df = df.drop(columns=drop_cols)
+    name_map = {k: v for k, v in rename.items() if v is not None and k in df.columns}
+    if name_map:
+        df = df.rename(columns=name_map)
+    return df
+
+
+def _apply_rename_series(s: pd.Series, rename: dict[str, str | None] | None) -> pd.Series:
+    """Rename and drop index entries based on a mapping."""
+    if rename is None:
+        return s
+    drop_keys = [k for k in s.index if rename.get(k) is None and k in rename]
+    if drop_keys:
+        s = s.drop(labels=drop_keys)
+    name_map = {k: v for k, v in rename.items() if v is not None and k in s.index}
+    if name_map:
+        s = s.rename(index=name_map)
+    return s
+
 
 def to_dataframe(
     rows: list[dict[str, str]],
     date_col: str = "dat",
     time_col: str | None = None,
+    rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
 ) -> pd.DataFrame:
     """Convert a list of row dicts into a DataFrame with DatetimeIndex.
 
     Parses the date column (and optionally time column) into a DatetimeIndex,
-    and coerces all remaining columns to numeric where possible.
+    coerces all remaining columns to numeric where possible, and renames
+    columns according to the rename mapping.
 
     Args:
         rows: List of dicts from API response.
         date_col: Name of the date column (default "dat", format YYYYMMDD).
         time_col: If set, name of the time column (e.g. "hor") to combine
                   with date_col for intraday DatetimeIndex.
+        rename: Column rename mapping. Keys → None are dropped; keys → str
+                are renamed. Default: CONTENT_PROXY_RENAME. Pass None to skip.
 
     Returns:
         DataFrame with DatetimeIndex and numeric columns.
@@ -64,7 +100,7 @@ def to_dataframe(
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df[col])
 
-    return df
+    return _apply_rename(df, rename)
 
 
 def to_multi_dataframe(
@@ -86,11 +122,16 @@ def to_multi_dataframe(
     }
 
 
-def to_series(record: dict[str, str]) -> pd.Series:
+def to_series(
+    record: dict[str, str],
+    rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
+) -> pd.Series:
     """Convert a single-record dict to a pandas Series with numeric coercion.
 
     Args:
         record: Dict of field_name -> string value.
+        rename: Rename mapping (same semantics as to_dataframe).
+                Default: CONTENT_PROXY_RENAME. Pass None to skip.
 
     Returns:
         Series with values coerced to numeric where possible.
@@ -100,16 +141,22 @@ def to_series(record: dict[str, str]) -> pd.Series:
         return pd.Series(dtype="object")
     s = pd.Series(record)
     # Try numeric coercion per-element
-    return s.apply(pd.to_numeric, errors="coerce").fillna(s)
+    s = s.apply(pd.to_numeric, errors="coerce").fillna(s)
+    return _apply_rename_series(s, rename)
 
 
-def to_reference_dataframe(rows: list[dict[str, str]]) -> pd.DataFrame:
+def to_reference_dataframe(
+    rows: list[dict[str, str]],
+    rename: dict[str, str | None] | None = None,
+) -> pd.DataFrame:
     """Convert reference/event data to a DataFrame without DatetimeIndex.
 
     Uses RangeIndex (default). Coerces numeric columns where possible.
 
     Args:
         rows: List of dicts from API response.
+        rename: Rename mapping. Default: None (no rename — AETP endpoints
+                pass their own per-endpoint map).
 
     Returns:
         DataFrame with RangeIndex and numeric columns where applicable.
@@ -123,4 +170,4 @@ def to_reference_dataframe(rows: list[dict[str, str]]) -> pd.DataFrame:
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df[col])
 
-    return df
+    return _apply_rename(df, rename)

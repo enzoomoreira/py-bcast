@@ -5,14 +5,23 @@ from __future__ import annotations
 import pandas as pd
 
 from .._core.aetp import aetp_request, rows_to_dicts
+from .._core.columns import (
+    CALENDAR_FIELDS,
+    DIVIDEND_FIELDS,
+    DY_FIELDS,
+    PORTFOLIO_FIELDS,
+    PORTFOLIO_LIST_FIELDS,
+)
 from .._core.dates import DateLike, to_date_str
 from .._core.normalize import ensure_str
 from .._core.output import to_dataframe, to_reference_dataframe
+from .._core.validation import CvmCode, DateParam, Ticker, validate_params
 
 
+@validate_params
 def bcalendar(
-    start_date: DateLike,
-    end_date: DateLike,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -39,12 +48,13 @@ def bcalendar(
         {"10057": to_date_str(start_date), "10058": to_date_str(end_date)},
         session_token,
     )
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=CALENDAR_FIELDS)
 
 
+@validate_params
 def bdividends(
-    cvm_code: str | int,
-    ticker: str,
+    cvm_code: CvmCode,
+    ticker: Ticker,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -69,14 +79,15 @@ def bdividends(
         {"13004": ensure_str(cvm_code), "10068": ticker},
         session_token,
     )
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=DIVIDEND_FIELDS)
 
 
+@validate_params
 def bdy(
-    cvm_code: str | int,
-    ticker: str,
-    start_date: DateLike,
-    end_date: DateLike,
+    cvm_code: CvmCode,
+    ticker: Ticker,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -110,7 +121,7 @@ def bdy(
         session_token,
     )
     rows = rows_to_dicts(parsed)
-    return to_dataframe(rows)
+    return to_dataframe(rows, rename=DY_FIELDS)
 
 
 def bportfolios(
@@ -135,11 +146,12 @@ def bportfolios(
     parsed = aetp_request(
         "fundamental/empresa/carteira-recomendada/corretoras", {}, session_token
     )
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=PORTFOLIO_LIST_FIELDS)
 
 
+@validate_params
 def bportfolio(
-    broker_id: str | int,
+    broker_id: CvmCode,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -163,4 +175,4 @@ def bportfolio(
         {"10087": ensure_str(broker_id)},
         session_token,
     )
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=PORTFOLIO_FIELDS)

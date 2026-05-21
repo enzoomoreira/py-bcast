@@ -74,14 +74,14 @@ from py_bcast import bdh
 
 # Single ticker
 data = bdh("PETR4", "20260501", "20260520")
-for row in data["PETR4.BVMF"]:
-    print(row["date"], row["last"])  # "20260502" "36.50"
+df = data["PETR4.BVMF"]   # DataFrame with DatetimeIndex
+print(df["close"])          # closing price series
 
 # Multiple tickers
 data = bdh(["PETR4", "VALE3", "USDBRL"], "20260515", "20260520")
 ```
 
-**Returns:** `dict[symbol, list[{date, last, settle, settle_rate, yield, dattol}]]`
+**Returns:** `dict[symbol, DataFrame]` — each DataFrame has a DatetimeIndex and columns: `close`, `settle`, `settle_rate`, `yield`.
 
 ### `bdh_ohlcv(ticker, date)`
 
@@ -91,11 +91,11 @@ Full OHLCV for a single ticker on a single date.
 from py_bcast import bdh_ohlcv
 
 bar = bdh_ohlcv("PETR4", "20260519")
-# {'dat': '20260519', 'last': '46.09', 'high': '46.3',
-#  'low': '45.59', 'open': '45.99', 'neg': '68632', ...}
+print(bar["close"], bar["high"], bar["low"], bar["open"])
+print(bar["trades"], bar["volume"], bar["turnover"])
 ```
 
-**Returns:** `dict` with keys: dat, last, settle, low, high, open, neg, qtt, total_value, open_interest, vwap, total_neg. Empty dict if no data.
+**Returns:** `Series` with index: `close`, `settle`, `settle_rate`, `low`, `high`, `open`, `trades`, `volume`, `turnover`, `open_interest`, `vwap`, `cum_trades`. Empty Series if no data.
 
 ### `bdi(ticker, start_date)`
 
@@ -105,19 +105,18 @@ Intraday 2-minute OHLCV bars. Works for **all instruments** (B3 + international)
 from py_bcast import bdi
 
 # Today's intraday bars for PETR4
-bars = bdi("PETR4", "20260520")
-for bar in bars[-3:]:
-    print(f"{bar['hor']} O={bar['open']} H={bar['high']} L={bar['low']} C={bar['last']}")
+df = bdi("PETR4", "20260520")   # DataFrame with DatetimeIndex
+print(df[["open", "high", "low", "close", "volume", "trades"]].tail())
 
 # Multiple days of intraday data
-bars = bdi("USDBRL", "20260515")  # from May 15 to now
+df = bdi("USDBRL", "20260515")  # from May 15 to now
 ```
 
-**Returns:** `list[{dat, hor, open, high, low, last, qtt, neg, total_value, open_interest, total_neg, tipo_intervalo}]`
+**Returns:** `DataFrame` with DatetimeIndex and columns: `open`, `high`, `low`, `close`, `volume`, `trades`, `turnover`, `open_interest`, `cum_trades`, `session_type`.
 
 **Notes:**
 - Bars are 2-minute candles (server-determined granularity)
-- `tipo_intervalo`: 1=regular session, 5=after-hours, 9=closing auction
+- `session_type`: 1=regular session, 5=after-hours, 9=closing auction
 - Can go back up to ~1.5 years (77K+ bars for B3 stocks)
 - Data is from `start_date` up to the current time
 
@@ -128,12 +127,11 @@ Tick-by-tick trade data. Works for **international instruments only**.
 ```python
 from py_bcast import bdt
 
-ticks = bdt("USDBRL", "20260519100000", "20260519110000")
-for t in ticks:
-    print(f"{t['hor']} {t['last']}")  # "10:01:28.632 4.9948"
+df = bdt("USDBRL", "20260519100000", "20260519110000")
+print(df["close"])  # tick prices with DatetimeIndex
 ```
 
-**Returns:** `list[{dat, hor, last, size, neg, open_interest, calendar_days, working_days}]`
+**Returns:** `DataFrame` with DatetimeIndex and columns: `close`, `size`, `trades`, `open_interest`, `calendar_days`, `working_days`.
 
 **Supported symbols:** USDBRL, EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, USDCNY, USDMXN, EURBRL, GBPBRL, JPYBRL, CHFBRL, AUDBRL, CADBRL, GOLD, SILVER, WTI, DAX, FTSE, VIX, DXY, US10Y, US2Y.
 
@@ -168,20 +166,19 @@ Macroeconomic/index historical series — FX, indices, commodities, rates, AETAX
 from py_bcast import bmacro
 
 # FX history
-rows = bmacro("USDBRL", "20260101", "20260520")
-for r in rows[-3:]:
-    print(r["dat"], r["last"])
+df = bmacro("USDBRL", "20260101", "20260520")
+print(df["close"].tail())
 
 # Inflation index (AETAXAS)
-rows = bmacro("AEIPCA", "20250101", "20260520")
+df = bmacro("AEIPCA", "20250101", "20260520")
 
 # Commodities
-rows = bmacro("GOLD", "20200101", "20260520")
+df = bmacro("GOLD", "20200101", "20260520")
 ```
 
 **Supported symbols:** USDBRL, EURUSD, IBOV, SPX, DAX, GOLD, WTI, DI1F27, AEIPCA, AEIGPM, AECTIP, AEB052, AEB200, AEFS10, and many more.
 
-**Returns:** `list[dict]` sorted chronologically. Keys vary but typically: dat, last, open, high, low, settle, var, neg, qtt.
+**Returns:** `DataFrame` with DatetimeIndex sorted chronologically. Columns vary but typically include: `close`, `open`, `high`, `low`, `settle`, `change_pct`, `trades`, `volume`.
 
 ### `bdi_cdi(start_date, end_date)`
 
@@ -190,11 +187,11 @@ Accumulated CDI (DI-CETIP) series. Data available since 1986.
 ```python
 from py_bcast import bdi_cdi
 
-rows = bdi_cdi("20260101", "20260520")
-print(rows[-1]["dat"], rows[-1]["last"])  # accumulated %
+df = bdi_cdi("20260101", "20260520")
+print(df["close"].iloc[-1])  # accumulated %
 ```
 
-**Returns:** `list[{dat, last, var, ...}]` sorted chronologically.
+**Returns:** `DataFrame` with DatetimeIndex sorted chronologically. Columns: `close`, `change_pct`, `accumulated`.
 
 ### `breturn(ticker, start_date, end_date)`
 
@@ -203,10 +200,11 @@ Adjusted daily returns for a symbol.
 ```python
 from py_bcast import breturn
 
-rows = breturn("PETR4", "20260101", "20260520")
+df = breturn("PETR4", "20260101", "20260520")
+print(df["close"].tail())
 ```
 
-**Returns:** `list[{dat, last}]` sorted chronologically.
+**Returns:** `DataFrame` with DatetimeIndex sorted chronologically. Columns: `close`.
 
 ### `bvolume(tickers)`
 
@@ -215,11 +213,11 @@ Average volume statistics (1m/2m/3m/6m averages).
 ```python
 from py_bcast import bvolume
 
-data = bvolume(["PETR4", "VALE3"])
-print(data["PETR4.BVMF"])
+df = bvolume(["PETR4", "VALE3"])
+print(df[["avg_volume", "avg_turnover", "avg_trades", "months"]])
 ```
 
-**Returns:** `dict[symbol, dict]` with volume statistics per ticker.
+**Returns:** `DataFrame` indexed by symbol with columns: `avg_volume`, `avg_turnover`, `avg_trades`, `months`.
 
 ### `binflation()`
 
@@ -228,12 +226,11 @@ Snapshot of inflation indices with monthly and accumulated periods.
 ```python
 from py_bcast import binflation
 
-indices = binflation()  # ~17 indices (IPCA, IGP-M, INPC, etc.)
-for idx in indices:
-    print(idx)
+df = binflation()  # ~17 indices (IPCA, IGP-M, INPC, etc.)
+print(df[["close", "return_3m", "return_6m", "return_12m", "return_ytd"]])
 ```
 
-**Returns:** `list[dict]` with monthly values and accumulated 3m/6m/12m/year.
+**Returns:** `DataFrame` with columns: `close`, `return_3m`, `return_6m`, `return_12m`, `return_ytd`.
 
 ---
 
@@ -259,7 +256,8 @@ List of B3 market indices (~37: IBOV, IBRX, SMLL, IDIV, etc.).
 ```python
 from py_bcast import bindices
 
-indices = bindices()  # [{'14085': 'AGFS'}, {'14085': 'BDRX'}, ...]
+df = bindices()
+print(df[["ticker", "name"]])
 ```
 
 ### `bsectors()`
@@ -280,7 +278,7 @@ Current quote (price, volume) for a symbol via aetp.
 from py_bcast import bquote
 
 q = bquote("PETR4")
-# {'13004': '9512', '10068': 'PETR4', '13909': '46.09', ...}
+print(q["close"], q["volume"])  # 46.09, 1500000
 ```
 
 ### `btickers(cvm_code)`
@@ -290,7 +288,8 @@ All tickers (stocks/units) for a company by CVM code.
 ```python
 from py_bcast import btickers
 
-tickers = btickers(9512)  # [{'10068': 'PETR3', ...}, {'10068': 'PETR4', ...}]
+df = btickers(9512)
+print(df[["ticker", "type"]])  # PETR3, PETR4
 ```
 
 ### `bshares(ticker)`
@@ -367,7 +366,8 @@ List of brokers that publish model portfolios.
 ```python
 from py_bcast import bportfolios
 
-brokers = bportfolios()  # [{'10087': '27', '10044': 'PADRÃO'}, ...]
+brokers = bportfolios()
+print(brokers[["broker_id", "name"]])
 ```
 
 ### `bportfolio(broker_id)`

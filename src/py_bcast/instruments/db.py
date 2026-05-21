@@ -7,6 +7,9 @@ from collections import Counter
 from pathlib import Path
 
 from .._core.constants import INSTRUMENT_DB_FILENAME, INSTRUMENT_DB_RELPATH, INSTRUMENT_DB_XOR_KEY
+from .._core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class InstrumentDB:
@@ -45,6 +48,7 @@ class InstrumentDB:
         aetp_path = data_dir / INSTRUMENT_DB_FILENAME
 
         if not aetp_path.exists():
+            logger.error("Instrument database not found: %s", aetp_path)
             raise FileNotFoundError(
                 f"Instrument database not found: {aetp_path}\n"
                 "Ensure Broadcast terminal (bcsys32.exe) has been run at least once."
@@ -90,6 +94,7 @@ class InstrumentDB:
             })
 
         self._loaded = True
+        logger.info("Instrument database loaded: %d instruments", len(self._instruments))
 
     def search(
         self,

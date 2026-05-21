@@ -23,7 +23,7 @@ class TestBdi:
         today = datetime.date.today().strftime("%Y%m%d")
         df = bdi("PETR4", today)
         assert len(df) > 0
-        expected_cols = {"open", "high", "low", "last", "qtt", "neg"}
+        expected_cols = {"open", "high", "low", "close", "volume", "trades"}
         assert expected_cols.issubset(df.columns)
 
     def test_chronological_order(self):
@@ -47,7 +47,7 @@ class TestBdi:
         df = bdi("USDBRL", today)
         assert len(df) > 0
         # FX has decimal precision
-        assert "last" in df.columns
+        assert "close" in df.columns
 
     def test_international_gold(self):
         """GOLD intraday works."""
@@ -55,21 +55,21 @@ class TestBdi:
         df = bdi("GOLD", today)
         assert len(df) > 0
 
-    def test_tipo_intervalo(self):
-        """Bars include tipo_intervalo field."""
+    def test_session_type(self):
+        """Bars include session_type field."""
         today = datetime.date.today().strftime("%Y%m%d")
         df = bdi("PETR4", today)
         assert len(df) > 0
-        assert "tipo_intervalo" in df.columns
+        assert "session_type" in df.columns
         # Regular session type should be present
-        assert 1 in df["tipo_intervalo"].values or "1" in df["tipo_intervalo"].values
+        assert 1 in df["session_type"].values or "1" in df["session_type"].values
 
     def test_numeric_values(self):
         """OHLCV values are numeric."""
         today = datetime.date.today().strftime("%Y%m%d")
         df = bdi("PETR4", today)
         assert len(df) > 0
-        for field in ["open", "high", "low", "last"]:
+        for field in ["open", "high", "low", "close"]:
             assert pd.api.types.is_numeric_dtype(df[field])
 
     def test_vale3(self):

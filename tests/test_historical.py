@@ -12,8 +12,8 @@ class TestBdh:
         df = data["PETR4.BVMF"]
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "last" in df.columns
-        assert pd.notna(df["last"].iloc[0])
+        assert "close" in df.columns
+        assert pd.notna(df["close"].iloc[0])
 
     def test_multiple_tickers(self):
         data = bdh(["PETR4", "VALE3"], "20260515", "20260519")
@@ -42,16 +42,16 @@ class TestBdhOhlcv:
         data = bdh_ohlcv("PETR4", "20260519")
         assert isinstance(data, pd.Series)
         assert not data.empty
-        assert "last" in data.index
+        assert "close" in data.index
         assert "high" in data.index
         assert "low" in data.index
         assert "open" in data.index
 
     def test_no_data_returns_empty(self):
-        # Weekend date
-        data = bdh_ohlcv("PETR4", "20260517")
+        # Very old date where no data should exist
+        data = bdh_ohlcv("PETR4", "19000101")
         assert isinstance(data, pd.Series)
-        assert data.empty or data.get("last") == ""
+        assert data.empty
 
 
 class TestBdt:
@@ -59,7 +59,7 @@ class TestBdt:
         df = bdt("USDBRL", "20260519100000", "20260519101000")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "last" in df.columns
+        assert "close" in df.columns
 
     def test_chronological_order(self):
         df = bdt("USDBRL", "20260519100000", "20260519110000")

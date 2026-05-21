@@ -8,15 +8,22 @@ import pandas as pd
 
 from .._core.constants import BASE_URL
 from .._core.dates import DateLike, business_days, default_end_date, to_date_str
+from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, create_http_session, get_session_token
+from .._core.logging import get_logger
 from .._core.normalize import ensure_list
 from .._core.output import to_dataframe, to_series
+from .._core.retry import http_retry
+from .._core.validation import DateParam, Ticker, TickerList, validate_params
+
+logger = get_logger(__name__)
 
 
+@validate_params
 def bdh(
-    tickers: str | list[str],
-    start_date: DateLike,
-    end_date: DateLike | None = None,
+    tickers: TickerList,
+    start_date: DateParam,
+    end_date: DateParam | None = None,
     session_token: str | None = None,
 ) -> dict[str, pd.DataFrame]:
     """
@@ -32,11 +39,11 @@ def bdh(
 
     Returns:
         Dict mapping "SYMBOL.EXCHANGE" -> DataFrame with DatetimeIndex.
-        Columns: last, settle, settle_rate, yield, dattol (numeric where applicable).
+        Columns: close, settle, settle_rate, yield (numeric where applicable).
 
     Example:
         >>> data = bdh("PETR4", "20260501", "20260519")
-        >>> data["PETR4.BVMF"]["last"].plot()
+        >>> data["PETR4.BVMF"]["close"].plot()
     """
     token = get_session_token(session_token)
     tickers = ensure_list(tickers)
@@ -58,16 +65,14 @@ def bdh(
         params["10113"] = ";".join(tickers)
         params["DatasTolerancia"] = ";".join(chunk_dates)
 
-        r = s.get(
-            f"{BASE_URL}/BaseHistoricaNumerica/HistoricoFechamentos",
-            params=params,
-            timeout=30,
-        )
+        logger.debug("bdh: fetching %d dates for %s", len(chunk_dates), tickers)
+        r = _bdh_fetch(s, params)
 
         root = ET.fromstring(r.text)
         if root.findtext("STATUS") != "success":
             msg = root.findtext("MESSAGE") or "Unknown error"
-            raise RuntimeError(f"ContentProxy error: {msg}")
+            logger.error("bdh ContentProxy error: %s", msg)
+            raise ContentProxyError(f"ContentProxy error: {msg}")
 
         for tick in root.findall(".//TICK"):
             sym = tick.findtext("SYMBOL") or ""
@@ -84,12 +89,29 @@ def bdh(
     for sym in results:
         results[sym].sort(key=lambda r: r["dat"])
 
-    return {sym: to_dataframe(rows) for sym, rows in results.items()}
+    out: dict[str, pd.DataFrame] = {}
+    for sym, rows in results.items():
+        df = to_dataframe(rows)
+        # Drop tolerance rows with no actual trade data (NaT index)
+        df = df[df.index.notna()]
+        out[sym] = df
+    return out
 
 
+@http_retry
+def _bdh_fetch(s, params: dict):
+    """Isolated HTTP call for retry."""
+    return s.get(
+        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoFechamentos",
+        params=params,
+        timeout=30,
+    )
+
+
+@validate_params
 def bdh_ohlcv(
-    ticker: str,
-    date: DateLike,
+    ticker: Ticker,
+    date: DateParam,
     session_token: str | None = None,
 ) -> pd.Series:
     """
@@ -103,12 +125,12 @@ def bdh_ohlcv(
         session_token: BCAA session token
 
     Returns:
-        Series with numeric values: last, settle, low, high, open, neg, qtt,
-        total_value, open_interest, vwap, total_neg. Empty Series if no data.
+        Series with numeric values: close, settle, low, high, open, trades,
+        volume, turnover, open_interest, vwap, cum_trades. Empty Series if no data.
 
     Example:
         >>> s = bdh_ohlcv("PETR4", "20260519")
-        >>> print(s["last"], s["high"])
+        >>> print(s["close"], s["high"])
     """
     token = get_session_token(session_token)
     s = create_http_session()
@@ -119,11 +141,8 @@ def bdh_ohlcv(
     params["10077"] = date_str
     params["Precisao"] = "2"
 
-    r = s.get(
-        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoData",
-        params=params,
-        timeout=15,
-    )
+    logger.debug("bdh_ohlcv: %s on %s", ticker, date_str)
+    r = _bdh_ohlcv_fetch(s, params)
 
     root = ET.fromstring(r.text)
     if root.findtext("STATUS") != "success":
@@ -135,3 +154,13 @@ def bdh_ohlcv(
 
     record = {child.tag.lower(): (child.text or "") for child in tick}
     return to_series(record)
+
+
+@http_retry
+def _bdh_ohlcv_fetch(s, params: dict):
+    """Isolated HTTP call for retry."""
+    return s.get(
+        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoData",
+        params=params,
+        timeout=15,
+    )

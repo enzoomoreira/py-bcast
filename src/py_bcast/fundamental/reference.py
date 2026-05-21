@@ -5,9 +5,25 @@ from __future__ import annotations
 import pandas as pd
 
 from .._core.aetp import aetp_request, rows_to_dicts
+from .._core.columns import (
+    COMPANY_DETAIL_FIELDS,
+    COMPANY_LIST_FIELDS,
+    INDEX_FIELDS,
+    INDICATOR_HISTORY_FIELDS,
+    INDICATOR_META_FIELDS,
+    QUOTE_FIELDS,
+    SECTOR_FIELDS,
+    SHARES_FIELDS,
+    TICKER_FIELDS,
+)
 from .._core.dates import DateLike, to_date_str
+from .._core.exceptions import ProtocolError
+from .._core.logging import get_logger
 from .._core.normalize import ensure_str
 from .._core.output import to_dataframe, to_reference_dataframe, to_series
+from .._core.validation import CvmCode, DateParam, Ticker, validate_params
+
+logger = get_logger(__name__)
 
 
 def bcompany(
@@ -38,14 +54,14 @@ def bcompany(
         parsed = aetp_request(
             "fundamental/empresa/metadado", {}, session_token
         )
+        return to_reference_dataframe(rows_to_dicts(parsed), rename=COMPANY_LIST_FIELDS)
     else:
         parsed = aetp_request(
             "fundamental/empresa",
             {"13004": ensure_str(cvm_code)},
             session_token,
         )
-
-    return to_reference_dataframe(rows_to_dicts(parsed))
+        return to_reference_dataframe(rows_to_dicts(parsed), rename=COMPANY_DETAIL_FIELDS)
 
 
 def bindices(
@@ -68,7 +84,7 @@ def bindices(
         >>> df.head()
     """
     parsed = aetp_request("ativos/indice", {}, session_token)
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=INDEX_FIELDS)
 
 
 def bsectors(
@@ -92,7 +108,7 @@ def bsectors(
     parsed = aetp_request(
         "fundamental/setor", {}, session_token
     )
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=SECTOR_FIELDS)
 
 
 def bquote(
@@ -114,7 +130,7 @@ def bquote(
 
     Example:
         >>> q = bquote("PETR4")
-        >>> print(q["last"])
+        >>> print(q["close"])
     """
     try:
         parsed = aetp_request(
@@ -122,11 +138,12 @@ def bquote(
             {"10068": ticker},
             session_token,
         )
-    except RuntimeError:
+    except ProtocolError:
+        logger.warning("bquote: no data for %s", ticker)
         return pd.Series(dtype="object")
 
     rows = rows_to_dicts(parsed)
-    return to_series(rows[0]) if rows else pd.Series(dtype="object")
+    return to_series(rows[0], rename=QUOTE_FIELDS) if rows else pd.Series(dtype="object")
 
 
 def btickers(
@@ -153,7 +170,7 @@ def btickers(
         {"13004": ensure_str(cvm_code)},
         session_token,
     )
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=TICKER_FIELDS)
 
 
 def bshares(
@@ -183,7 +200,7 @@ def bshares(
     )
 
     rows = rows_to_dicts(parsed)
-    return to_series(rows[0]) if rows else pd.Series(dtype="object")
+    return to_series(rows[0], rename=SHARES_FIELDS) if rows else pd.Series(dtype="object")
 
 
 def bindicators(
@@ -224,7 +241,7 @@ def bindicators(
         session_token,
     )
     rows = rows_to_dicts(parsed)
-    return to_dataframe(rows)
+    return to_dataframe(rows, rename=INDICATOR_HISTORY_FIELDS)
 
 
 def bindicator_meta(
@@ -247,4 +264,4 @@ def bindicator_meta(
         >>> df.head()
     """
     parsed = aetp_request("fundamental/indicador/metadado", {}, session_token)
-    return to_reference_dataframe(rows_to_dicts(parsed))
+    return to_reference_dataframe(rows_to_dicts(parsed), rename=INDICATOR_META_FIELDS)

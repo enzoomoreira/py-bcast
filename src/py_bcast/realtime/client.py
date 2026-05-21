@@ -13,6 +13,8 @@ import win32ui
 import dde
 
 from .._core.constants import DDE_SERVICE, DDE_TOPIC_REALTIME, DDE_TOPIC_SNAPSHOT, SNAPSHOT_FIELDS
+from .._core.exceptions import DDEError
+from .._core.logging import get_logger
 from .._core.dde import (
     APPCMD_CLIENTONLY,
     CF_TEXT,
@@ -36,6 +38,8 @@ from .._core.dde import (
     PeekMessageW,
     TranslateMessage,
 )
+
+logger = get_logger(__name__)
 
 SubscriptionCallback = Callable[[str, str, str], None]  # (ticker, field, value)
 
@@ -122,7 +126,8 @@ class BroadcastClient:
             if data and "NOK" not in data and data != "N/A" and data.strip():
                 return data.strip()
             return None
-        except Exception:
+        except Exception as exc:
+            logger.debug("DDE request failed for %s: %s", item, exc)
             return None
 
     def snapshot(self, ticker: str) -> dict[str, str]:
@@ -141,7 +146,8 @@ class BroadcastClient:
             raw = self._conv_ativo.Request(ticker)
             if not raw or "N/A" == raw.strip():
                 return {}
-        except Exception:
+        except Exception as exc:
+            logger.debug("DDE snapshot failed for %s: %s", ticker, exc)
             return {}
 
         parts = raw.split('\t')
@@ -188,7 +194,7 @@ class BroadcastClient:
                 DdeFreeStringHandle(self._inst_id.value, h_item)
                 if not result:
                     err = DdeGetLastError(self._inst_id.value)
-                    raise RuntimeError(f"Advise failed for {item} (error={err})")
+                    raise DDEError(f"Advise failed for {item} (error={err})")
 
     def unsubscribe(self, tickers: str | list[str], fields: str | list[str]):
         """Stop streaming for specified tickers/fields."""
@@ -284,8 +290,8 @@ class BroadcastClient:
                 if sub:
                     try:
                         sub.callback(sub.ticker, sub.field, data_str)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Subscription callback error for %s: %s", item_name, exc)
                 return 1
             return 0
 
@@ -295,7 +301,7 @@ class BroadcastClient:
             ctypes.byref(self._inst_id), self._callback, APPCMD_CLIENTONLY, 0,
         )
         if rc != 0:
-            raise RuntimeError(f"DdeInitialize failed: {rc}")
+            raise DDEError(f"DdeInitialize failed: {rc}")
 
         h_svc = self._make_str(DDE_SERVICE)
         h_top = self._make_str(DDE_TOPIC_REALTIME)
@@ -304,9 +310,10 @@ class BroadcastClient:
         DdeFreeStringHandle(self._inst_id.value, h_top)
 
         if not self._h_conv:
-            raise RuntimeError("DdeConnect for streaming failed")
+            raise DDEError("DdeConnect for streaming failed")
 
         self._streaming = True
+        logger.info("DDE streaming initialized successfully")
 
     def _make_str(self, text: str) -> HSZ:
         return DdeCreateStringHandleW(self._inst_id.value, text, CP_WINUNICODE)

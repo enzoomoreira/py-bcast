@@ -11,7 +11,7 @@ class TestBmacro:
         df = bmacro("USDBRL", "20260512", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "last" in df.columns
+        assert "close" in df.columns
 
     def test_ibov(self):
         df = bmacro("IBOV", "20260512", "20260519")
@@ -30,7 +30,8 @@ class TestBmacro:
         assert df.index.is_monotonic_increasing
 
     def test_empty_range(self):
-        with pytest.raises(RuntimeError):
+        from py_bcast._core.exceptions import ContentProxyError
+        with pytest.raises(ContentProxyError):
             bmacro("USDBRL", "20260518", "20260510")
 
 
@@ -39,7 +40,7 @@ class TestBdiCdi:
         df = bdi_cdi("20260501", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "last" in df.columns
+        assert "close" in df.columns
 
     def test_historical_since_1986(self):
         df = bdi_cdi("19860601", "19860630")
@@ -55,7 +56,7 @@ class TestBreturn:
         df = breturn("PETR4", "20260501", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "last" in df.columns
+        assert "close" in df.columns
 
     def test_sorted(self):
         df = breturn("PETR4", "20260501", "20260519")

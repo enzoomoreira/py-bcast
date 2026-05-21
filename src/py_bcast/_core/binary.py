@@ -10,6 +10,11 @@ Protocol structure (SOH=0x01 separated records, NULL=0x00 separated fields):
 
 from __future__ import annotations
 
+from .exceptions import ProtocolError
+from .logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def parse_binary_response(data: bytes) -> dict:
     """
@@ -24,7 +29,8 @@ def parse_binary_response(data: bytes) -> dict:
     records = data.split(b"\x01")
 
     if len(records) < 3:
-        raise RuntimeError(f"aefundamental error: malformed response ({len(records)} records)")
+        logger.error("Malformed binary response: only %d records", len(records))
+        raise ProtocolError(f"aefundamental error: malformed response ({len(records)} records)")
 
     # Record 1 = metadata/status info
     error_fields = records[1].split(b"\x00")
@@ -39,7 +45,8 @@ def parse_binary_response(data: bytes) -> dict:
             if decoded == "10037" and i + 1 < len(all_fields):
                 msg = all_fields[i + 1].decode("utf-8", errors="replace")
                 break
-        raise RuntimeError(f"aefundamental error: {msg or first_field}")
+        logger.error("Binary protocol error: %s", msg or first_field)
+        raise ProtocolError(f"aefundamental error: {msg or first_field}")
 
     # Record 2 = field definitions
     field_record = records[2].split(b"\x00")

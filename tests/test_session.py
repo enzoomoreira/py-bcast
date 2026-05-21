@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from py_bcast._core.session import get_session_token, discover_session_token, _find_bcsys32_pid
+from py_bcast._core.exceptions import SessionError
 
 
 class TestGetSessionToken:
@@ -62,14 +63,14 @@ class TestDiscoverSessionToken:
     def test_raises_when_terminal_not_running(self):
         """Clear error when bcsys32.exe is not found."""
         with patch("py_bcast._core.session._find_bcsys32_pid", return_value=None):
-            with pytest.raises(RuntimeError, match="not running"):
+            with pytest.raises(SessionError, match="not running"):
                 discover_session_token()
 
     def test_raises_when_memory_unreadable(self):
         """Clear error when process memory cannot be read."""
         with patch("py_bcast._core.session._find_bcsys32_pid", return_value=12345):
             with patch("py_bcast._core.session._scan_process_memory", return_value=[]):
-                with pytest.raises(RuntimeError, match="Could not read"):
+                with pytest.raises(SessionError, match="Could not read"):
                     discover_session_token()
 
     def test_raises_when_no_valid_token(self):
@@ -77,7 +78,7 @@ class TestDiscoverSessionToken:
         with patch("py_bcast._core.session._find_bcsys32_pid", return_value=12345):
             with patch("py_bcast._core.session._scan_process_memory", return_value=["A" * 33]):
                 with patch("py_bcast._core.session._validate_token", return_value=False):
-                    with pytest.raises(RuntimeError, match="none validated"):
+                    with pytest.raises(SessionError, match="none validated"):
                         discover_session_token()
 
     def test_returns_first_valid_token(self):

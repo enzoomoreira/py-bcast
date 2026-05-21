@@ -7,6 +7,10 @@ from typing import Optional
 
 from .._core.constants import BASE_URL
 from .._core.http import create_http_session
+from .._core.logging import get_logger
+from .._core.retry import http_retry
+
+logger = get_logger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -59,12 +63,8 @@ def bnews(news_id: int | str) -> dict:
     'Fique de Olho: Azzas contrata Itaú BBA ...'
     """
     s = create_http_session()
-    r = s.post(
-        f"{BASE_URL}{_CONTENT_PATH}",
-        json={"videoId": str(news_id)},
-        headers={"Content-Type": "application/json"},
-        timeout=10,
-    )
+    logger.debug("bnews: fetching content ID %s", news_id)
+    r = _news_fetch_content(s, news_id)
     r.raise_for_status()
     data = r.json().get("d")
     if not data or not data.get("Title"):
@@ -152,15 +152,8 @@ def bnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dic
     ...     print(f"[{item['id']}] {item['date']} {item['title'][:50]}")
     """
     s = create_http_session()
-    r = s.get(
-        f"{BASE_URL}{_HANDLER_PATH}",
-        params={
-            "category": str(category),
-            "daysAgo": str(days_ago),
-            "limit": str(limit),
-        },
-        timeout=10,
-    )
+    logger.debug("bnews_search: category=%d days_ago=%d", category, days_ago)
+    r = _news_search_fetch(s, category, days_ago, limit)
     r.raise_for_status()
 
     results = []
@@ -181,6 +174,31 @@ def bnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dic
     return results
 
 
+@http_retry
+def _news_fetch_content(s, news_id):
+    """Isolated HTTP call for retry."""
+    return s.post(
+        f"{BASE_URL}{_CONTENT_PATH}",
+        json={"videoId": str(news_id)},
+        headers={"Content-Type": "application/json"},
+        timeout=10,
+    )
+
+
+@http_retry
+def _news_search_fetch(s, category: int, days_ago: int, limit: int):
+    """Isolated HTTP call for retry."""
+    return s.get(
+        f"{BASE_URL}{_HANDLER_PATH}",
+        params={
+            "category": str(category),
+            "daysAgo": str(days_ago),
+            "limit": str(limit),
+        },
+        timeout=10,
+    )
+
+
 def _find_latest_id() -> Optional[int]:
     """Binary search for the latest valid news ID."""
     s = create_http_session()
@@ -188,12 +206,7 @@ def _find_latest_id() -> Optional[int]:
     lo, hi = 56_000_000, 58_000_000
 
     # Verify lo is valid
-    r = s.post(
-        f"{BASE_URL}{_CONTENT_PATH}",
-        json={"videoId": str(lo)},
-        headers={"Content-Type": "application/json"},
-        timeout=5,
-    )
+    r = _news_fetch_content(s, lo)
     if r.status_code != 200:
         return None
     data = r.json().get("d")
@@ -202,12 +215,7 @@ def _find_latest_id() -> Optional[int]:
 
     while hi - lo > 1:
         mid = (lo + hi) // 2
-        r = s.post(
-            f"{BASE_URL}{_CONTENT_PATH}",
-            json={"videoId": str(mid)},
-            headers={"Content-Type": "application/json"},
-            timeout=5,
-        )
+        r = _news_fetch_content(s, mid)
         if r.status_code == 200:
             d = r.json().get("d")
             if d and d.get("Title"):

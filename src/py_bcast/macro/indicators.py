@@ -8,16 +8,24 @@ import pandas as pd
 
 from .._core.constants import BASE_URL
 from .._core.dates import DateLike, to_date_str
+from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, create_http_session, get_session_token
+from .._core.logging import get_logger
 from .._core.normalize import ensure_list
 from .._core.output import to_dataframe, to_reference_dataframe
+from .._core.columns import CONTENT_PROXY_RENAME
+from .._core.retry import http_retry
+from .._core.validation import DateParam, Ticker, TickerList, validate_params
 from .._core.xml_helpers import content_proxy_get, parse_ticks
 
+logger = get_logger(__name__)
 
+
+@validate_params
 def bmacro(
-    ticker: str,
-    start_date: DateLike,
-    end_date: DateLike,
+    ticker: Ticker,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -45,7 +53,7 @@ def bmacro(
 
     Example:
         >>> df = bmacro("USDBRL", "20260101", "20260519")
-        >>> df["last"].plot()
+        >>> df["close"].plot()
     """
     root = content_proxy_get(
         "BaseHistoricaNumerica/MacroEconomicos",
@@ -56,9 +64,10 @@ def bmacro(
     return to_dataframe(rows)
 
 
+@validate_params
 def bdi_cdi(
-    start_date: DateLike,
-    end_date: DateLike,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -76,7 +85,7 @@ def bdi_cdi(
 
     Example:
         >>> df = bdi_cdi("20260101", "20260519")
-        >>> df["last"].iloc[-1]
+        >>> df["close"].iloc[-1]
     """
     root = content_proxy_get(
         "BaseHistoricaNumerica/DiCetipAcumulado",
@@ -87,10 +96,11 @@ def bdi_cdi(
     return to_dataframe(rows)
 
 
+@validate_params
 def breturn(
-    ticker: str,
-    start_date: DateLike,
-    end_date: DateLike,
+    ticker: Ticker,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -109,7 +119,7 @@ def breturn(
 
     Example:
         >>> df = breturn("PETR4", "20260101", "20260519")
-        >>> df["last"].cumsum().plot()
+        >>> df["close"].cumsum().plot()
     """
     root = content_proxy_get(
         "BaseHistoricaNumerica/RetornoDiario",
@@ -120,8 +130,9 @@ def breturn(
     return to_dataframe(rows)
 
 
+@validate_params
 def bvolume(
-    tickers: str | list[str],
+    tickers: TickerList,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -147,16 +158,14 @@ def bvolume(
     params = base_params(token)
     params["10113"] = ";".join(tickers)
 
-    r = s.get(
-        f"{BASE_URL}/BaseHistoricaNumerica/VolumesMedios",
-        params=params,
-        timeout=15,
-    )
+    logger.debug("bvolume: fetching volumes for %s", tickers)
+    r = _bvolume_fetch(s, params)
 
     root = ET.fromstring(r.text)
     if root.findtext("STATUS") != "success":
         msg = root.findtext("MESSAGE") or "Unknown error"
-        raise RuntimeError(f"ContentProxy error: {msg}")
+        logger.error("bvolume ContentProxy error: %s", msg)
+        raise ContentProxyError(f"ContentProxy error: {msg}")
 
     rows = []
     for tick in root.findall(".//TICK"):
@@ -171,7 +180,26 @@ def bvolume(
         df = df.set_index("symbol")
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df[col])
+    # Apply standard column renames
+    name_map = {k: v for k, v in CONTENT_PROXY_RENAME.items()
+                if v is not None and k in df.columns}
+    drop_cols = [k for k in df.columns
+                 if CONTENT_PROXY_RENAME.get(k) is None and k in CONTENT_PROXY_RENAME]
+    if drop_cols:
+        df = df.drop(columns=drop_cols)
+    if name_map:
+        df = df.rename(columns=name_map)
     return df
+
+
+@http_retry
+def _bvolume_fetch(s, params: dict):
+    """Isolated HTTP call for retry."""
+    return s.get(
+        f"{BASE_URL}/BaseHistoricaNumerica/VolumesMedios",
+        params=params,
+        timeout=15,
+    )
 
 
 def binflation(
@@ -192,7 +220,7 @@ def binflation(
 
     Example:
         >>> df = binflation()
-        >>> df[["symbol", "last"]]
+        >>> df[["symbol", "close"]]
     """
     root = content_proxy_get(
         "BaseHistoricaNumerica/Inflacao",
@@ -201,4 +229,4 @@ def binflation(
         timeout=15,
     )
     rows = parse_ticks(root)
-    return to_reference_dataframe(rows)
+    return to_reference_dataframe(rows, rename=CONTENT_PROXY_RENAME)
