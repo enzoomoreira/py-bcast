@@ -49,6 +49,18 @@ class Settings:
     rate_limit_calls: int = 10  # max requests per period
     rate_limit_period: float = 1.0  # period in seconds
 
+    # ── Terminal routing ─────────────────────────────────────────────────────
+    # "auto"   — detecta automaticamente: Plus se disponivel, legacy caso contrario
+    # "legacy" — sempre usa bcsys32.exe + ContentProxy
+    # "plus"   — sempre usa Broadcast+.exe + svc.aebroadcast.com.br
+    terminal: Literal["auto", "legacy", "plus"] = "auto"
+
+    # ── Broadcast+ credentials (optional — for ECDH headless login) ──────────
+    # Used when neither BROADCAST_PLUS_TOKEN env var nor Broadcast+.exe
+    # memory scan yields a valid JWT.
+    plus_login: str | None = None
+    plus_password: str | None = field(default=None, repr=False)  # never printed
+
 
 # Module-level singleton
 _settings = Settings()
@@ -85,6 +97,14 @@ def configure(**kwargs: object) -> None:
         if not hasattr(_settings, key):
             raise TypeError(f"Unknown setting: {key!r}")
         setattr(_settings, key, value)
+    if "terminal" in kwargs:
+        # Reset auto-detection cache so next call re-probes availability
+        try:
+            from .routing import reset_terminal_cache  # noqa: PLC0415
+        except ImportError:
+            pass
+        else:
+            reset_terminal_cache()
 
 
 def _resolve_cache_dir() -> str:

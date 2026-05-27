@@ -5,6 +5,7 @@ description = "Python client for AE Broadcast market data terminal"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=41.0.0",
     "diskcache>=5.6.3",
     "httpx>=0.28.1",
     "pandas>=3.0.3",
@@ -25,6 +26,11 @@ packages = ["src/py_bcast"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "legacy_session: needs BROADCAST_SESSION (env var or running bcsys32.exe)",
+    "legacy_db: needs aetp_17.dat on disk (bcsys32.exe must have run here)",
+    "plus: needs Broadcast+ access (BROADCAST_PLUS_TOKEN or running Broadcast+.exe)",
+]
 
 [dependency-groups]
 dev = [

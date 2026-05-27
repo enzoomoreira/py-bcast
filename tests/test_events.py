@@ -1,8 +1,11 @@
 """Integration tests for events, dividends, and portfolios."""
 
 import pandas as pd
+import pytest
 
 from py_bcast import bcalendar, bdividends, bdy, bportfolios, bportfolio
+
+pytestmark = pytest.mark.legacy_session
 
 
 class TestBcalendar:

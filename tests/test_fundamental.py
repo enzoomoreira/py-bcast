@@ -5,6 +5,8 @@ import pytest
 
 from py_bcast import bconsensus
 
+pytestmark = pytest.mark.legacy_session
+
 
 class TestBconsensus:
     """Test aefundamental/consenso endpoint via bconsensus()."""
@@ -20,9 +22,17 @@ class TestBconsensus:
     def test_all_fields_present(self):
         """Response includes all expected fields."""
         data = bconsensus("PETR4")
-        expected = {"buy", "hold", "sell", "total_analysts",
-                    "target_low", "target_high", "target_mean",
-                    "target_median", "upside_pct"}
+        expected = {
+            "buy",
+            "hold",
+            "sell",
+            "total_analysts",
+            "target_low",
+            "target_high",
+            "target_mean",
+            "target_median",
+            "upside_pct",
+        }
         assert expected == set(data.index)
 
     def test_numeric_values(self):

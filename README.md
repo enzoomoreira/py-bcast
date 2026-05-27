@@ -1,28 +1,39 @@
 # py-bcast
 
-Python client for **AE Broadcast** (Agência Estado) market data terminal — a Bloomberg `blpapi`/`xbbg`-like interface for the Broadcast+ ecosystem.
+Python client for **AE Broadcast** (Agência Estado) market data terminal — a Bloomberg `blpapi`/`xbbg`-like interface. Suporta os dois terminais em paralelo: **Antigo** (`bcsys32.exe`, DDE + ContentProxy) e **Novo** (`Broadcast+.exe`, JWT + WebSocket).
 
 ## Features
 
-- **Real-time streaming** via DDE (bdp, subscribe, snapshot)
+**Terminal Antigo (`bcsys32.exe`)**
+- **Real-time streaming** via DDE (`bdp`, `subscribe`, `snapshot`)
 - **Historical data** via HTTP (daily OHLCV, intraday bars, tick-by-tick)
 - **Macroeconomic series** — FX, indices, commodities, CDI, inflation, returns
 - **Fundamental data** — analyst consensus, indicators (Market Cap, Beta), company metadata
 - **Corporate events** — dividends, JCP, calendar, dividend yield, broker portfolios
 - **Reference data** — 1020 companies, 37 indices, 38 sectors, real-time quotes
 - **News & multimedia** — full-text articles, Dow Jones wires, podcasts (no auth needed)
-- **Instrument database** — search 623K+ instruments across 30+ exchanges
-- **Async API** — `async_api` namespace with async versions of all HTTP data functions
-- **Caching** — in-memory (default) and disk-based (diskcache) response cache with configurable TTL
-- **Rate limiting** — token-bucket limiter and connection pooling to protect the server
-- Proper Python package with `src/` layout, type annotations, Pydantic validation, and structured logging
+- **Instrument database** — 623K+ instruments across 30+ exchanges (local `aetp_17.dat`)
+
+**Terminal Novo (`Broadcast+.exe`)**
+- **Real-time streaming** via WebSocket (`BroadcastPlusClient`) com auth refresh transparente
+- **Times & trades** (`btrades`) — ultimos 500 trades em fuso `America/Sao_Paulo`
+- **Headless login** via ECDH P-384 + AES-GCM (`configure(plus_login=..., plus_password=...)`)
+- **Token discovery** — memory scan do `Broadcast+.exe` ou `BROADCAST_PLUS_TOKEN` env var
+
+**Compartilhado entre os backends**
+- **Routing automatico** — `configure(terminal="auto"|"legacy"|"plus")`; `bsearch()` ja roteia
+- **Async API** — `async_api` namespace com versoes async de todas as funcoes HTTP
+- **Caching** — memoria (default) e disco (`diskcache`) com TTL configuravel
+- **Rate limiting** — token-bucket e connection pooling
+- Proper Python package com `src/` layout, type annotations, Pydantic validation, structured logging
 
 ## Requirements
 
 - Windows 10/11
 - Python 3.12+
-- Terminal Broadcast running (`bcsys32.exe`)
-- `BROADCAST_SESSION` env var set for historical data
+- Pelo menos um dos dois:
+  - **Legacy**: `bcsys32.exe` rodando (ou `BROADCAST_SESSION` env var)
+  - **Plus**: `Broadcast+.exe` rodando (ou `BROADCAST_PLUS_TOKEN` env var, ou credenciais via `configure`)
 
 ## Installation
 
@@ -36,6 +47,8 @@ pip install -e .
 ```
 
 ## Quick Start
+
+### Terminal Antigo (`bcsys32.exe`)
 
 ```python
 import os
@@ -51,7 +64,7 @@ data = bdh("PETR4", "20260501", "20260520")
 df = data["PETR4.BVMF"]   # DataFrame with DatetimeIndex
 print(df["close"].tail())
 
-# Intraday 2-min bars (ALL instruments)
+# Intraday 2-min bars
 bars = bdi("PETR4", "20260520")
 
 # Macro series (FX, indices, commodities, rates)
@@ -64,9 +77,9 @@ print(data["buy"], data["target_mean"])
 # Dividends history (CVM code + ticker)
 divs = bdividends(9512, "PETR4")
 
-# Instrument search (623K+ instruments)
-bsearch("PETR", exchange="BVMF")
-bsearch("VIX", exchange="CBOEI")
+# Instrument search — retorna pd.DataFrame (schema unificado entre backends)
+df = bsearch("PETR", exchange="BVMF")
+print(df[["ticker", "name", "exchange"]].head())
 
 # Real-time streaming
 from py_bcast import BroadcastClient
@@ -74,6 +87,34 @@ with BroadcastClient() as bc:
     bc.subscribe(["PETR4", "VALE3"], ["ULT", "VAR"],
                  callback=lambda t, f, v: print(f"{t}.{f} = {v}"))
     bc.run(duration=60)
+```
+
+### Terminal Novo (`Broadcast+.exe`)
+
+```python
+from py_bcast import BroadcastPlusClient, btrades, bsearch, configure
+
+# Headless: define BROADCAST_PLUS_TOKEN no ambiente, ou:
+configure(plus_login="user@example.com", plus_password="...")
+
+# Forca o backend Plus (ou deixa "auto" para detectar Broadcast+.exe rodando)
+configure(terminal="plus")
+
+# Instrument search via API
+df = bsearch("PETR", max_results=5)
+print(df[["ticker", "name", "exchange", "has_intraday"]])
+
+# Times & trades intraday (DataFrame com DatetimeIndex em America/Sao_Paulo)
+trades = btrades("PETR4", "20260525")
+print(trades[["last", "size", "tendency"]].head())
+
+# Streaming WebSocket
+def on_quote(data: dict) -> None:
+    print(data["COD"], data["ULT"], data["VAR"])
+
+with BroadcastPlusClient() as client:
+    client.subscribe(["PETR4", "VALE3"], callback=on_quote)
+    client.run(duration=60)
 ```
 
 ## Supported Assets
@@ -95,66 +136,63 @@ with BroadcastClient() as bc:
 
 ```
 src/py_bcast/
-├── __init__.py         # Public API (~40 exported symbols + async_api namespace)
-├── _core/              # Private infrastructure
-│   ├── config.py       # Settings dataclass + configure()
-│   ├── exceptions.py   # Exception hierarchy (PyBcastError, SessionError, …)
-│   ├── logging.py      # Logger factory (get_logger, configure_logging)
-│   ├── session.py      # Auto-discovery of session token
-│   ├── http.py         # Singleton HTTP client pool (sync + async, httpx)
-│   ├── cache.py        # Response cache (memory + diskcache backends)
+├── __init__.py         # Public API (~45 exported symbols + async_api namespace)
+├── _core/              # Shared infrastructure (both backends)
+│   ├── config.py       # Settings dataclass + configure() (incl. terminal=, plus_login=, plus_password=)
+│   ├── routing.py      # get_active_terminal() — picks legacy vs plus per call
+│   ├── memory.py       # Win32 helpers: find_process_pid + scan_process_memory
+│   ├── exceptions.py   # PyBcastError, SessionError, BroadcastPlusError, BroadcastPlusAuthError, …
+│   ├── session.py      # Legacy session token discovery (memory scan of bcsys32.exe)
+│   ├── constants.py    # Service names, URLs (legacy + plus), exchange normalization
+│   ├── http.py         # Legacy ContentProxy httpx client pool
+│   ├── cache.py        # Response cache (memory + diskcache)
 │   ├── ratelimit.py    # Token-bucket rate limiter
 │   ├── retry.py        # Tenacity retry decorator
-│   ├── validation.py   # Pydantic validation types + @validate_params
-│   ├── dde.py          # DDEML ctypes bindings
-│   ├── constants.py    # Service names, fields, URLs
-│   ├── binary.py       # SOH binary protocol decoder
-│   ├── aetp.py         # Shared aetp/output helpers
-│   └── xml_helpers.py  # Shared XML helpers
-├── _async/             # Async API (async versions of all HTTP data functions)
-│   ├── historical.py   # abdh, abdh_ohlcv, abdi, abdt
-│   ├── macro.py        # abmacro, abdi_cdi, abreturn, abvolume, abinflation
-│   ├── fundamental.py  # abconsensus, abcompany, abquote, abtickers, abshares
-│   └── news.py         # abnews, abnews_latest, abnews_search
-├── realtime/
-│   └── client.py       # BroadcastClient, bdp, bdps
-├── historical/
-│   ├── prices.py       # bdh, bdh_ohlcv
-│   └── intraday.py     # bdi, bdt
-├── macro/
-│   └── indicators.py   # bmacro, bdi_cdi, breturn, bvolume, binflation
-├── fundamental/
-│   ├── consensus.py    # bconsensus
-│   ├── reference.py    # bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators
-│   └── events.py       # bcalendar, bdividends, bdy, bportfolios, bportfolio
-├── news/
-│   └── api.py          # bnews, bnews_latest, bnews_search
-└── instruments/
-    └── db.py           # InstrumentDB, bsearch
+│   ├── validation.py   # Pydantic types + @validate_params
+│   └── (logging, dates, normalize, output, columns, resolve, xml_helpers, ...)
+├── _plus/              # Broadcast+ backend
+│   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login
+│   ├── crypto.py       # ECDH P-384 + AES-GCM-256 (matching app.asar buildEncryptedResult)
+│   ├── http.py         # plus_request() with 401-refresh; singleton httpx.Client
+│   ├── realtime.py     # BroadcastPlusClient (WebSocket /stock/ws)
+│   └── intraday.py     # btrades() — POST /stock/v1/timesAndTrades
+├── _async/             # Async versions of all legacy HTTP data functions
+├── realtime/client.py  # Legacy DDE: BroadcastClient, bdp, bdps
+├── historical/         # bdh, bdh_ohlcv, bdi, bdt (legacy ContentProxy)
+├── macro/indicators.py # bmacro, bdi_cdi, breturn, bvolume, binflation
+├── fundamental/        # bconsensus, bcompany, bindices, …, bcalendar, bdividends, …
+├── news/api.py         # bnews, bnews_latest, bnews_search
+└── instruments/db.py   # InstrumentDB + bsearch (auto-routing legacy/plus)
 tests/
-├── test_historical.py  # HTTP integration tests
-├── test_intraday.py    # Intraday bars tests
-├── test_macro.py       # Macro/CDI/inflation tests
-├── test_reference.py   # Reference data tests
-├── test_events.py      # Events/dividends tests
-├── test_fundamental.py # Consensus tests
-├── test_instruments.py # Instrument DB tests
-└── test_session.py     # Session discovery tests
-scripts/                # Utilities for data regeneration
+├── conftest.py         # Resource-aware skips (legacy_session, legacy_db, plus markers)
+├── test_session.py     # Session discovery + memory scanning
+├── test_instruments.py # bsearch + InstrumentDB (legacy_db + plus)
+├── test_historical.py, test_intraday.py, test_macro.py,
+├── test_reference.py, test_events.py, test_fundamental.py  # legacy_session
+└── ...
+scripts/                # Utilities for data regeneration / probing
 docs/
-├── architecture.md     # System architecture & protocols
-├── api.md              # Full API reference
-├── compatibility.md    # 227-endpoint status checklist
-├── instruments.md      # Instrument database details
-├── limitations.md      # Known limitations & workarounds
-└── fields.md           # DDE field reference (56 fields)
+├── architecture.md         # Dual-backend overview + shared core
+├── compatibility.md        # Legacy vs Plus feature mapping
+├── legacy/                 # Terminal Antigo (bcsys32.exe)
+│   ├── api.md              # API reference
+│   ├── endpoints.md        # 227-endpoint status catalog
+│   ├── internals.md        # DDE, ContentProxy, protocols
+│   ├── fields.md           # DDE field reference (644 fields)
+│   ├── instruments.md      # Instrument database details
+│   ├── limitations.md      # Known limitations & workarounds
+│   └── roadmap.md          # Implementation backlog
+└── plus/                   # Terminal Novo (Broadcast+.exe)
+    ├── api.md              # API reference (Plus functions)
+    ├── endpoints.md        # Discovered endpoint catalog
+    ├── internals.md        # Auth ECDH/JWT, WebSocket, schemas
+    ├── limitations.md      # Known limitations & blockers
+    └── roadmap.md          # Implementation backlog
 ```
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — data channels, protocols, auth
-- [API Reference](docs/api.md) — all functions with examples
-- [Compatibility](docs/compatibility.md) — 227-endpoint status checklist (what works, what's blocked, why)
-- [Instruments](docs/instruments.md) — 623K instruments, exchanges, symbols
-- [Limitations](docs/limitations.md) — what doesn't work and why
-- [Fields](docs/fields.md) — complete DDE field mapping
+- [Architecture](docs/architecture.md) — dual-backend overview, shared core
+- [Compatibility](docs/compatibility.md) — Legacy vs Plus feature mapping
+- **Terminal Antigo:** [API](docs/legacy/api.md) | [Endpoints](docs/legacy/endpoints.md) | [Internals](docs/legacy/internals.md) | [Limitations](docs/legacy/limitations.md) | [Roadmap](docs/legacy/roadmap.md)
+- **Terminal Novo:** [API](docs/plus/api.md) | [Endpoints](docs/plus/endpoints.md) | [Internals](docs/plus/internals.md) | [Limitations](docs/plus/limitations.md) | [Roadmap](docs/plus/roadmap.md)

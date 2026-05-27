@@ -1,16 +1,22 @@
-# Known Limitations
+# Known Limitations — Terminal Antigo (bcsys32.exe)
+
+Limitacoes e endpoints bloqueados do backend `bcsys32.exe` + ContentProxy `cp.ae.com.br:44780`.
+
+Para limitacoes do Terminal Novo, ver [`../plus/limitations.md`](../plus/limitations.md).
+
+---
 
 ## Blocked Endpoint Groups
 
 ### AEInstrumentos (100% blocked)
 
-ALL endpoints return `ErrorCode=88007, Tipo de resposta indisponível ou inválido`.  
-Uses a proprietary binary protocol that rejects both `TipoResposta=xml` and requests without it.  
+ALL endpoints return `ErrorCode=88007, Tipo de resposta indisponivel ou invalido`.
+Uses a proprietary binary protocol that rejects both `TipoResposta=xml` and requests without it.
 These are only accessible from the Java/Swing desktop terminal.
 
 Affected: EventoServlet, InstrumentoServlet, BolsaServlet, MercadoServlet, SimbologiaServlet, SetorServlet, CorretoraServlet, IndicesServlet, and ~40 more.
 
-**Workaround**: Many equivalent datasets exist via `aetp/output/fundamental/` (see compatibility.md section 5).
+**Workaround**: Many equivalent datasets exist via `aetp/output/fundamental/` (see [`endpoints.md`](./endpoints.md) section 5).
 
 ### AEContent / News (100% blocked)
 
@@ -18,18 +24,18 @@ Same error 88007. News content requires the proprietary binary framing.
 
 ### contentProxyOutput / Fundos CVM (100% broken)
 
-All ~30 endpoints return HTTP 500 with Java stack traces.  
+All ~30 endpoints return HTTP 500 with Java stack traces.
 The Tomcat backend for CVM fund data is crashed/misconfigured.
 
 ### GraphQL Backend (aetp/output/fundamental/indicador/*)
 
-The financial indicators backend (P/L, ROE, Dívida Líquida, EBITDA multiples, etc.) is hosted on AWS (`ab684f71...elb.us-east-1.amazonaws.com`) and is **offline**.
+The financial indicators backend (P/L, ROE, Divida Liquida, EBITDA multiples, etc.) is hosted on AWS (`ab684f71...elb.us-east-1.amazonaws.com`) and is **offline**.
 
 Affected endpoints: IndicadorPeriodo (166), IndicadorHistorico (167), IndicadorTicker (168), IndicadorTickerFixo (170), DemonstrativoFiltros (182), ComposicaoIndices (214).
 
 **Not affected** (these work despite sharing the same path prefix):
-- IndicadorMetadado (165) — returns 80 indicator definitions ✅
-- IndicadorHistoricoDiario (171) — returns daily Market Cap, Beta, etc. ✅
+- IndicadorMetadado (165) — returns 80 indicator definitions
+- IndicadorHistoricoDiario (171) — returns daily Market Cap, Beta, etc.
 
 ---
 
@@ -60,14 +66,14 @@ The `MacroEconomicos` endpoint (id=95) uses internal AE symbols, NOT the common 
 Also uses `DataInicio`/`DataFim` params (NOT tag `961`):
 
 ```python
-bmacro("AEIPCA", "20250101", "20260520")   # ← correct
-bmacro("IPCA", "20250101", "20260520")     # ← won't work
+bmacro("AEIPCA", "20250101", "20260520")   # correct
+bmacro("IPCA", "20250101", "20260520")     # won't work
 ```
 
-| Wrong ❌ | Right ✅ | Data |
-|----------|----------|------|
-| `SELIC` | `AESLIC` | Taxa SELIC (reunião COPOM) |
-| `CDI` | `AECTIP` | CDI CETIP diário |
+| Wrong | Right | Data |
+|-------|-------|------|
+| `SELIC` | `AESLIC` | Taxa SELIC (reuniao COPOM) |
+| `CDI` | `AECTIP` | CDI CETIP diario |
 | `IPCA` | `AEIPCA` | IPCA mensal |
 | `IGPM` | `AEIGPM` | IGP-M mensal |
 | `INPC` | `AEINPC` | INPC mensal |
@@ -79,8 +85,8 @@ Standard market symbols (USDBRL, IBOV, SPX, GOLD, WTI, DI1F27) work directly.
 Both use `YYYYMMDDHHMMSS` (14 digits), not 12.
 
 ```
-10071=20250519100000  ← start (10:00:00)
-10072=20250519110000  ← end   (11:00:00)
+10071=20250519100000  <- start (10:00:00)
+10072=20250519110000  <- end   (11:00:00)
 ```
 
 ### HistoricoData — Tag 10077, NOT 961
@@ -108,11 +114,11 @@ Use `bdh()` for daily data or `bdi()` for intraday — both work for ALL instrum
 # Daily closing prices (all instruments)
 data = bdh("PETR4", "20250501", "20250520")
 
-# Intraday 2-min bars (all instruments!)
+# Intraday 2-min bars (all instruments)
 bars = bdi("PETR4", "20250519")  # works!
 
 # Tick data does NOT work for B3
-ticks = bdt("PETR4", "20250519100000", "20250519110000")  # → []
+ticks = bdt("PETR4", "20250519100000", "20250519110000")  # -> []
 ```
 
 ---
@@ -122,25 +128,6 @@ ticks = bdt("PETR4", "20250519100000", "20250519110000")  # → []
 - `bcsys32.exe` must be running on the same machine
 - Only works on Windows (DDE is a Windows-only protocol)
 - The `pywin32` package must be installed (`pip install pywin32`)
-
----
-
-## Protocol Exploration Status
-
-| Protocol | Status | Notes |
-|----------|--------|-------|
-| DDE (Service=BC) | ✅ Fully working | Real-time + snapshot |
-| HTTP BaseHistoricaNumerica | ✅ Working | ~18 endpoints, 9 implemented |
-| HTTP aefundamental | ✅ Partial | Consensus + binary parser |
-| HTTP aetp/output | ✅ **~40 working, 14 implemented** | Binary SOH, richest data source |
-| HTTP IntegracaoTabelas | ✅ Partial | 4 commodity/formula endpoints |
-| HTTP AEInstrumentos | ❌ 100% blocked | `PROPRIETARY` — error 88007 |
-| HTTP AEContent | ❌ 100% blocked | `PROPRIETARY` — error 88007 |
-| HTTP contentProxyOutput | ❌ 100% broken | `DEAD_BACKEND` — all HTTP 500 |
-| HTTP MarkitOutput2 | ❌ Mostly broken | Only ListaTipoCDS works |
-| AETP TCP:8100 | ❌ Not cracked | Binary protocol, custom framing |
-| SPC .NET (AESpcNET.dll) | ❌ Dead end | Server doesn't route data to external clients |
-| RTD COM | ❌ Not available | Broadcast has no RTD server (uses DDE) |
 
 ---
 
@@ -163,3 +150,22 @@ The decoder in `src/py_bcast/fundamental.py` (`_parse_binary_response()`) handle
 - Error detection via presence of tag `10037` in the raw data
 
 This decoder works for ALL `aefundamental/` and `aetp/output/` responses. No additional protocol work is needed to implement new endpoints from these groups.
+
+---
+
+## AETP TCP:8100 (Not Cracked)
+
+The AETP TCP binary protocol on port 8100 is used internally by the terminal to:
+- Pre-register data subscriptions (required for B3 tick data)
+- Authenticate for some endpoint groups
+
+Header format discovered:
+```
+Offset  Size  Description
+0x00    4     Magic: 1a fe ce fa
+0x04    4     Payload length (uint32 LE)
+0x08    1     Checksum (XOR of all payload bytes)
+0x09    N     Payload
+```
+
+The server accepts connections and responds, but never delivers actual data to external clients (only to the desktop terminal that has pre-registered sessions). Reproducing this protocol via HTTP is blocked by `Query=NONE` errors on affected endpoints.

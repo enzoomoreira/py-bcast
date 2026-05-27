@@ -1,11 +1,20 @@
 """Integration tests for reference data functions."""
 
 import pandas as pd
+import pytest
 
 from py_bcast import (
-    bcompany, bindices, bsectors, bquote, btickers, bshares,
-    bindicators, bindicator_meta,
+    bcompany,
+    bindices,
+    bsectors,
+    bquote,
+    btickers,
+    bshares,
+    bindicators,
+    bindicator_meta,
 )
+
+pytestmark = pytest.mark.legacy_session
 
 
 class TestBcompany:

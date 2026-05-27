@@ -1,237 +1,93 @@
 # Architecture
 
-## System Overview
+py_bcast suporta dois backends independentes que rodam em paralelo:
 
-py_bcast interfaces with AE Broadcast through **five data channels**:
+| | Terminal Antigo | Terminal Novo |
+|---|---|---|
+| **Processo** | `bcsys32.exe` (Java/Win32) | `Broadcast+.exe` v7.4.4 (Electron) |
+| **API** | `http://cp.ae.com.br:44780` (ContentProxy) | `https://svc.aebroadcast.com.br:44761` |
+| **Tempo real** | DDE (Windows DDEML) | WebSocket |
+| **Formato** | XML + binary SOH | JSON |
+| **Auth** | Tag `10039` BCAA session token | JWT Bearer (ECDH P-384 login) |
+| **Internals** | [`legacy/internals.md`](./legacy/internals.md) | [`plus/internals.md`](./plus/internals.md) |
+| **Endpoints** | [`legacy/endpoints.md`](./legacy/endpoints.md) | [`plus/endpoints.md`](./plus/endpoints.md) |
+| **API publica** | [`legacy/api.md`](./legacy/api.md) | [`plus/api.md`](./plus/api.md) |
 
-```mermaid
-graph LR
-    subgraph "py_bcast (this library)"
-        CLIENT["realtime/client.py<br/>BroadcastClient, bdp, bdps"]
-        HIST["historical/<br/>bdh, bdh_ohlcv, bdi, bdt"]
-        MACRO["macro/indicators.py<br/>bmacro, bdi_cdi, breturn,<br/>bvolume, binflation"]
-        FUND["fundamental/consensus.py<br/>bconsensus"]
-        REF["fundamental/reference.py<br/>bcompany, bindices, bsectors,<br/>bquote, btickers, bshares,<br/>bindicators, bindicator_meta"]
-        EVT["fundamental/events.py<br/>bcalendar, bdividends, bdy,<br/>bportfolios, bportfolio"]
-        NEWS["news/api.py<br/>bnews, bnews_latest,<br/>bnews_search"]
-        INST["instruments/db.py<br/>InstrumentDB, bsearch"]
-    end
-
-    subgraph "bcsys32.exe (Terminal)"
-        DDE["DDE Server<br/>Service=BC"]
-        DB["aetp_17.dat<br/>(instrument DB)"]
-    end
-
-    subgraph "ContentProxy (cp.ae.com.br:44780)"
-        BHN["/BaseHistoricaNumerica/"]
-        AEF["/aefundamental/"]
-        AETP["/aetp/output/<br/>(binary SOH)"]
-        AEI["/AEInstrumentos/<br/>(blocked)"]
-    end
-
-    CLIENT -->|"DDE Request/Advise<br/>Topic=COT,ATIVO"| DDE
-    HIST -->|"HTTP GET (xml)"| BHN
-    MACRO -->|"HTTP GET (xml)"| BHN
-    FUND -->|"HTTP GET (binary SOH)"| AEF
-    REF -->|"HTTP GET (binary SOH)"| AETP
-    EVT -->|"HTTP GET (binary SOH)"| AETP
-    NEWS -->|"HTTP GET/POST (JSON/XML)"| CMM
-    INST -->|"Read + XOR decode"| DB
-```
-
-## Data Channels
-
-| # | Channel | Module | Protocol | Data |
-|---|---------|--------|----------|------|
-| 1 | DDE | `realtime/client.py` | Win32 DDEML | Real-time quotes, streaming, snapshots |
-| 2 | HTTP | `historical/` | REST/XML | Daily history, intraday OHLCV, tick data |
-| 3 | HTTP | `macro/indicators.py` | REST/XML | Macro series, CDI, returns, volumes, inflation |
-| 4 | HTTP | `fundamental/consensus.py` | REST/binary SOH | Analyst consensus |
-| 5 | HTTP | `fundamental/reference.py` | REST/binary SOH | Companies, indices, sectors, quotes, indicators |
-| 6 | HTTP | `fundamental/events.py` | REST/binary SOH | Calendar, dividends, DY, broker portfolios |
-| 7 | HTTP | `news/api.py` | REST/JSON+XML | News, podcasts, multimedia (no auth) |
-| 8 | Local file | `instruments/db.py` | XOR(0xAE) TSV | 623K instruments, 30+ exchanges |
-
-### Endpoint Groups (HTTP)
-
-| Group | Path | Protocol | Status | Count |
-|-------|------|----------|--------|-------|
-| BaseHistoricaNumerica | `/BaseHistoricaNumerica/` | XML | ~18 working | ~30 total |
-| aefundamental | `/aefundamental/` | Binary SOH | 7 working | ~15 total |
-| aetp/output | `/aetp/output/` | Binary SOH | **~40 working** | ~60 total |
-| CentralMultimidia | `/CentralMultimidia/` | JSON/XML | **2 working** | 2 total |
-| AEInstrumentos | `/AEInstrumentos/` | Binary (proprietary) | ALL blocked | ~50 total |
-| AEContent | `/AEContent/` | Binary (proprietary) | ALL blocked | ~8 total |
-| contentProxyOutput | `/contentProxyOutput/` | JSON/XML | ALL 500 errors | ~30 total |
-| IntegracaoTabelas | `/IntegracaoTabelas/` | XML | 4 working | ~6 total |
-| MarkitOutput2 | `/MarkitOutput2/` | XML | 1 working | 5 total |
-
-## DDE Protocol
-
-The Broadcast terminal exposes market data via Windows DDE — the same mechanism used by its Excel add-in.
-
-### Addressing
-
-| Component | Value | Notes |
-|-----------|-------|-------|
-| Service | `BC` | Fixed |
-| Topic | `COT` | Real-time quotes |
-| Topic | `ATIVO` | Full snapshot (56 fields) |
-| Item | `TICKER.FIELD` | Dot separator |
-
-### Operating Modes
-
-| Mode | DDE Operation | py_bcast Function |
-|------|--------------|-------------------|
-| Request | `XTYP_REQUEST` | `bdp()`, `BroadcastClient.request()` |
-| Advise | `XTYP_ADVSTART` | `BroadcastClient.subscribe()` |
-| Snapshot | Request on ATIVO | `BroadcastClient.snapshot()` |
-
-### Implementation Notes
-
-- **pywin32 `dde` module** — for one-shot Request (simple, high-level)
-- **ctypes DDEML** — for Advise/streaming (message pump + 64-bit callback)
-- On Windows x64, DDE handles (HDDEDATA, HCONV, HSZ) are 8-byte pointers → use `ctypes.c_ssize_t`, not `c_ulong`
-
-## HTTP ContentProxy
-
-### Infrastructure
+Zero sobreposicao de endpoints entre os dois servidores. Cada backend tem seu subpacote (`src/py_bcast/` para Legacy, `src/py_bcast/_plus/` para Plus) e compartilha o `_core/` com o outro.
 
 ```mermaid
 graph LR
-    nginx["nginx :44780"]
-    nginx --> BHN["/BaseHistoricaNumerica/<br/>(JBoss, XML)"]
-    nginx --> AEF["/aefundamental/<br/>(JBoss, binary SOH)"]
-    nginx --> AETP["/aetp/output/<br/>(JBoss, binary SOH)"]
-    nginx --> AEI["/AEInstrumentos/<br/>(binary, BLOCKED)"]
-    nginx --> CMM["/CentralMultimidia/<br/>(ASP.NET, no auth)"]
-    nginx --> CPO["/contentProxyOutput/<br/>(Tomcat, 500s)"]
-    nginx --> IT["/IntegracaoTabelas/<br/>(XML)"]
-    nginx --> BCAA["bcaa/ws/platform/<br/>(Spring Boot auth)"]
+    subgraph "py_bcast"
+        CORE["_core/<br/>config, cache, ratelimit,<br/>retry, validation, http"]
+
+        subgraph "Legacy (bcsys32.exe)"
+            L_RT["realtime/<br/>bdp, BroadcastClient"]
+            L_HIST["historical/<br/>bdh, bdi, bdt"]
+            L_MACRO["macro/"]
+            L_FUND["fundamental/"]
+            L_NEWS["news/"]
+            L_INST["instruments/"]
+        end
+
+        subgraph "Plus (Broadcast+.exe)"
+            P_SESS["_plus/session.py<br/>get_plus_token"]
+            P_HTTP["_plus/http.py<br/>plus_request"]
+        end
+
+        CORE --> L_RT
+        CORE --> L_HIST
+        CORE --> L_MACRO
+        CORE --> L_FUND
+        CORE --> L_NEWS
+        CORE --> P_SESS
+        CORE --> P_HTTP
+    end
+
+    L_RT -->|"DDE"| BCSYS["bcsys32.exe<br/>cp.ae.com.br:44780"]
+    L_HIST -->|"HTTP/XML"| BCSYS
+    L_MACRO -->|"HTTP/XML"| BCSYS
+    L_FUND -->|"HTTP/SOH"| BCSYS
+    L_NEWS -->|"HTTP/JSON"| BCSYS
+    P_SESS -->|"ECDH login"| PLUS["Broadcast+.exe<br/>svc.aebroadcast.com.br:44761"]
+    P_HTTP -->|"Bearer JWT"| PLUS
 ```
 
-### Authentication
+---
 
-| Mechanism | Usage |
-|-----------|-------|
-| Tag `10039` in query string | Primary — bypasses nginx auth |
-| Basic Auth `broad:@&Br0@dc@st` | Fallback for static resources |
-| BCAA session token | Hex string obtained from terminal config |
-| None (public) | `/CentralMultimidia/` — news & multimedia |
+## Shared Core (`_core/`)
 
-### Working Endpoints (Implemented in py-bcast)
+Infraestrutura interna compartilhada pelos dois backends:
 
-| Endpoint | Path | Function |
-|----------|------|----------|
-| `HistoricoFechamentos` | BaseHistoricaNumerica | `bdh()` |
-| `HistoricoData` | BaseHistoricaNumerica | `bdh_ohlcv()` |
-| `HistoricoIntraday` | BaseHistoricaNumerica | `bdi()` |
-| `HistoricoTick` | BaseHistoricaNumerica | `bdt()` |
-| `MacroEconomicos` | BaseHistoricaNumerica | `bmacro()` |
-| `DiCetipAcumulado` | BaseHistoricaNumerica | `bdi_cdi()` |
-| `RetornoDiario` | BaseHistoricaNumerica | `breturn()` |
-| `VolumesMedios` | BaseHistoricaNumerica | `bvolume()` |
-| `Inflacao` | BaseHistoricaNumerica | `binflation()` |
-| `aefundamental/consenso` | aefundamental | `bconsensus()` |
-| `fundamental/empresa/metadado` | aetp/output | `bcompany()` |
-| `fundamental/empresa` | aetp/output | `bcompany(cvm_code)` |
-| `ativos/indice` | aetp/output | `bindices()` |
-| `fundamental/setor` | aetp/output | `bsectors()` |
-| `fundamental/ativo/cotacao` | aetp/output | `bquote()` |
-| `fundamental/ativo/simbolo` | aetp/output | `btickers()` |
-| `fundamental/ativo/quantidade` | aetp/output | `bshares()` |
-| `fundamental/indicador/metadado` | aetp/output | `bindicator_meta()` |
-| `fundamental/indicador/historico-diario` | aetp/output | `bindicators()` |
-| `fundamental/calendario-eventos-corporativos` | aetp/output | `bcalendar()` |
-| `fundamental/empresa/eventos/jcp-dividendos` | aetp/output | `bdividends()` |
-| `fundamental/empresa/eventos/dividend-yield` | aetp/output | `bdy()` |
-| `fundamental/empresa/carteira-recomendada/corretoras` | aetp/output | `bportfolios()` |
-| `fundamental/empresa/carteira-recomendada/ultima` | aetp/output | `bportfolio()` |
+| Modulo | Proposito |
+|--------|-----------|
+| `config.py` | `Settings` dataclass com todos os parametros tunaveis. `configure(**kwargs)` atualiza em runtime; `get_settings()` retorna o singleton. Inclui campos `terminal`, `plus_login`, `plus_password`. |
+| `routing.py` | `get_active_terminal()` resolve qual backend (`"legacy"` ou `"plus"`) atender em cada chamada. Auto-detecta por env var ou processo rodando. Cache invalidado por `configure(terminal=...)`. |
+| `memory.py` | Win32 helpers compartilhados: `find_process_pid(image_name)` via `tasklist` e `scan_process_memory(pid, pattern)` com `ReadProcessMemory`. Usado pelos dois backends para extrair tokens. |
+| `exceptions.py` | Hierarquia de excecoes: `PyBcastError` -> `SessionError`, `ContentProxyError`, `ProtocolError`, `DDEError`, `BroadcastPlusError`, `BroadcastPlusAuthError`. |
+| `logging.py` | `get_logger(name)` factory; NullHandler por padrao. |
+| `http.py` | Singleton `httpx.Client` e `httpx.AsyncClient` com connection pooling (Legacy ContentProxy). |
+| `cache.py` | Cache de dois backends. `"memory"` usa dict TTL thread-safe; `"disk"` usa `diskcache`. |
+| `ratelimit.py` | Token-bucket rate limiter. `rate_limit()` (sync) e `rate_limit_async()` (async). |
+| `retry.py` | `@http_retry` decorator via Tenacity. Retries em HTTP 5xx e erros de conexao. |
+| `validation.py` | Tipos Pydantic (`Ticker`, `DateParam`, `CvmCode`, ...) e `@validate_params` decorator. |
+| `constants.py` | Constantes de ambos os backends: `PLUS_BASE_URL`, `PLUS_WS_URL`, `PLUS_VERSION`, `PLUS_APP_ID`. Inclui `PLUS_EXCHANGE_NAME_TO_CODE` + `normalize_exchange()`. |
 
-### Working Endpoints (Not Yet Implemented)
+---
 
-See `docs/compatibility.md` for the full list. Key remaining opportunities:
+## Referencia Rapida
 
-| Endpoint | Path | Data |
-|----------|------|------|
-| EmpresasHistorico | BaseHistoricaNumerica | Full quarterly financials (1.2MB!) |
-| FIIAnbimaBovespa | BaseHistoricaNumerica | FII: div yield, last dividend, avg volume |
-| HistoricoDiarioSimbolos | BaseHistoricaNumerica | Multi-ticker daily (alternative to bdh) |
-| Volatilidades | BaseHistoricaNumerica | Historical volatility |
-| Fundos | BaseHistoricaNumerica | Fund NAV/quote history |
-| TitulosPublicos | BaseHistoricaNumerica | Government bonds |
-| CalculoTaxaPre | BaseHistoricaNumerica | Pre-fixed rate curve |
-| CarteiraTopFundos | aetp/output | Which funds invest in a stock |
-| EmpresaAcoesUnits | aetp/output | Shares ON/PN, free float |
-
-### Query Parameters (Tags)
-
-| Tag | Name | Format |
-|-----|------|--------|
-| 10023 | Platform | `4` (fixed) |
-| 10039 | Session | BCAA session token |
-| 305 | Symbol | Ticker (e.g., `PETR4`) |
-| 961 | Start date (series) | `YYYYMMDD` |
-| 1789 | End date (series) | `YYYYMMDD` |
-| 10029 | Precisao | Integer (decimal places) |
-| 10057 | Start date (range) | `YYYYMMDD` |
-| 10058 | End date (range) | `YYYYMMDD` |
-| 10068 | Ticker (fundamental) | Ticker string |
-| 10071 | Start datetime | `YYYYMMDDHHMMSS` |
-| 10072 | End datetime | `YYYYMMDDHHMMSS` |
-| 10074 | DataHoraInicioMinutos | `YYYYMMDDHHMM` (12 digits) |
-| 10077 | Single date | `YYYYMMDD` |
-| 10087 | Corretora (broker) ID | Integer |
-| 10113 | Symbols (multi) | Semicolon-separated |
-| 12078 | Number of days | Integer |
-| 13004 | CVM company code | Integer (9512=Petrobras, 4170=Vale) |
-| 13539 | Notional/value | Float |
-| 13798 | Sector ID | Integer |
-| TipoResposta | Response format | `xml` |
-| DatasTolerancia | Date list | Semicolon-separated `YYYYMMDD` |
-
-## Instrument Database
-
-The terminal maintains a local instrument master file:
-
-| Property | Value |
-|----------|-------|
-| Path | `%APPDATA%\Agencia Estado\Broadcast\DataFiles\aetp_17.dat` |
-| Size | ~105 MB |
-| Encoding | XOR with key `0xAE` |
-| Format | TSV (tab-separated) |
-| Header | Tag numbers as column names |
-| Records | 623,247 instruments |
-| Exchanges | 30+ (BVMF, GTISFX, CMX, ICEEU, etc.) |
-
-### Key Columns
-
-| Tag | Content | Example |
-|-----|---------|---------|
-| 305 | Full symbol | `PETR4.BVMF` |
-| 10068 | Short ticker | `PETR4` |
-| 10045 | Name | `PETROLEO BRASILEIRO S.A. PETROBRAS, PN` |
-| 303 | ISIN | `BRPETRACNPR6` |
-| 10092 | Exchange ID | `BVMF` |
-
-## Library Infrastructure
-
-The `_core/` subpackage provides internal cross-cutting infrastructure consumed by all domain modules.
-
-| Module | Purpose |
-|--------|---------|
-| `config.py` | `Settings` dataclass with all tunable parameters. `configure(**kwargs)` updates at runtime; `get_settings()` returns the singleton. |
-| `exceptions.py` | Typed exception hierarchy: `PyBcastError` → `SessionError`, `ContentProxyError`, `ProtocolError`, `DDEError`, `ValidationError`. |
-| `logging.py` | `get_logger(name)` factory; NullHandler by default so the library never emits logs unless the app configures them. |
-| `http.py` | Singleton `httpx.Client` and `httpx.AsyncClient` with keep-alive connection pooling. Replaces per-request `requests.Session` creation. |
-| `cache.py` | Two-backend response cache. `"memory"` uses a thread-safe TTL dict; `"disk"` uses `diskcache`. Cache keys exclude the session token (tag `10039`). |
-| `ratelimit.py` | Token-bucket rate limiter. `rate_limit()` (sync) and `rate_limit_async()` (async) enforce `settings.rate_limit_calls` per `settings.rate_limit_period` second. |
-| `retry.py` | `@http_retry` decorator via Tenacity. Retries on HTTP 5xx and connection errors with exponential backoff. Settings read from `config.py`. |
-| `validation.py` | Pydantic-based input types (`Ticker`, `DateParam`, `CvmCode`, …) and `@validate_params` decorator that wraps `validate_call` and maps Pydantic errors to `ValidationError`. |
-
-- Numbers use **comma** as decimal separator (pt-BR locale): `44,60`
-- DDE dates: `dd/mm/yyyy` (e.g., `19/05/2026`)
-- DDE times: `HH:MM` (e.g., `15:19`)
-- HTTP dates: `YYYYMMDD`
-- Tick times: `HH:MM:SS.mmm`
-- Variation as signed percentage: `-3,2328`
+| O que voce precisa | Onde esta |
+|---|---|
+| Como funciona o DDE / ContentProxy | [`legacy/internals.md`](./legacy/internals.md) |
+| Catalogo de todos os endpoints Legacy | [`legacy/endpoints.md`](./legacy/endpoints.md) |
+| API publica do Terminal Antigo | [`legacy/api.md`](./legacy/api.md) |
+| Backlog de implementacao Legacy | [`legacy/roadmap.md`](./legacy/roadmap.md) |
+| Limitacoes e blockers Legacy | [`legacy/limitations.md`](./legacy/limitations.md) |
+| Como funciona o auth ECDH / WebSocket Plus | [`plus/internals.md`](./plus/internals.md) |
+| Catalogo de todos os endpoints Plus | [`plus/endpoints.md`](./plus/endpoints.md) |
+| API publica do Terminal Novo | [`plus/api.md`](./plus/api.md) |
+| Backlog de implementacao Plus | [`plus/roadmap.md`](./plus/roadmap.md) |
+| Limitacoes e blockers Plus | [`plus/limitations.md`](./plus/limitations.md) |
+| Mapeamento cruzado Legacy vs Plus | [`compatibility.md`](./compatibility.md) |
+| Banco de instrumentos aetp_17.dat | [`legacy/instruments.md`](./legacy/instruments.md) |
+| Campos DDE (ULT, VAR, MAX, ...) | [`legacy/fields.md`](./legacy/fields.md) |

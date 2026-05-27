@@ -1,8 +1,11 @@
 """Integration tests for historical data functions."""
 
 import pandas as pd
+import pytest
 
 from py_bcast import bdh, bdh_ohlcv, bdt
+
+pytestmark = pytest.mark.legacy_session
 
 
 class TestBdh:

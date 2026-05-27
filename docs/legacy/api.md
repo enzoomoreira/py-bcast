@@ -1,4 +1,10 @@
-# API Reference
+# API Reference — Terminal Antigo (bcsys32.exe)
+
+Referencia da API publica da lib para o backend do Terminal Antigo (`bcsys32.exe` + ContentProxy `cp.ae.com.br:44780`).
+
+Para equivalentes no Terminal Novo, ver [`../plus/api.md`](../plus/api.md).
+
+---
 
 ## Real-Time Data (DDE)
 
@@ -411,7 +417,7 @@ Fetch a single news article by its numeric ID.
 from py_bcast import bnews
 
 article = bnews(56134402)
-print(article["title"])    # "Fique de Olho: Azzas contrata Itaú BBA..."
+print(article["title"])    # "Fique de Olho: Azzas contrata Itau BBA..."
 print(article["content"])  # HTML body text
 print(article["files"])    # [{"filename": "...", "extension": "mp4", "url": "..."}]
 ```
@@ -471,7 +477,7 @@ for f in article["files"]:
 
 **Returns:** `list[dict]` with keys: id, title, date, time.
 
-**Available categories:** Comentário Financeiro (567), Comentário Agrícola (566), Podcast (748), Comentário Político (848), Cabeça de Gestor (849), E-Investidor-Mídia (857), Capital Insights (1133), Crédito Privado 360 (1160).
+**Available categories:** Comentario Financeiro (567), Comentario Agricola (566), Podcast (748), Comentario Politico (848), Cabeca de Gestor (849), E-Investidor-Midia (857), Capital Insights (1133), Credito Privado 360 (1160).
 
 ---
 
@@ -632,34 +638,54 @@ data = asyncio.run(async_api.abdh("PETR4", "20260501", "20260520"))
 
 ### `bsearch(query, exchange=None, max_results=20)`
 
-Search 623K+ instruments by ticker, name, or ISIN.
+Search 623K+ instruments by ticker, name, or ISIN. **Roteia automaticamente** entre Legacy (banco local `aetp_17.dat`) e Plus (`POST /stock/v1/quote/symbol/search`) — ver [`configure(terminal=...)`](../plus/api.md#roteamento-de-backend).
+
+**Retorna:** `pd.DataFrame` com schema unificado entre os dois backends. Colunas exclusivas de um backend ficam como `pd.NA` quando o outro responde.
+
+| Coluna | Tipo | Origem |
+|--------|------|--------|
+| `ticker` | `string` | Ambos |
+| `name` | `string` | Ambos |
+| `exchange` | `string` (codigo: `"BVMF"`, `"CME"`, ...) | Ambos — Plus normalizado via `normalize_exchange()` |
+| `backend` | `category` (`"legacy"` ou `"plus"`) | Ambos |
+| `full_symbol` | `string` (`"PETR4.BVMF"`) | Legacy |
+| `isin` | `string` | Legacy |
+| `cvm_code` | `Int64` | Plus |
+| `type_id`, `market_id`, `exchange_id` | `Int64` | Plus |
+| `has_intraday`, `has_daily`, `is_realtime` | `boolean` | Plus |
 
 ```python
 from py_bcast import bsearch
 
-bsearch("PETR", exchange="BVMF")
-# [{'ticker': 'PETR3', 'full_symbol': 'PETR3.BVMF',
-#   'name': 'PETROLEO BRASILEIRO...', 'isin': 'BRPETRACNOR2', 'exchange': 'BVMF'}, ...]
+df = bsearch("PETR", exchange="BVMF")
+df.iloc[0]["ticker"]         # 'PETR4'
+df[df.ticker == "PETR4"]      # filtros pandas idiomaticos
 
 bsearch("VIX", exchange="CBOEI")
-# [{'ticker': 'VIX', 'full_symbol': 'I:VIX.CBOEI', ...}]
-
-bsearch("BRPETRACNPR6")  # search by ISIN
-# [{'ticker': 'PETR4', ...}]
+bsearch("BRPETRACNPR6")       # busca por ISIN (Legacy)
 ```
+
+A constante `INSTRUMENT_COLUMNS` em `py_bcast.instruments.db` define a ordem estavel das colunas.
 
 ### `InstrumentDB`
 
-Direct access to the instrument database singleton.
+Acesso direto ao singleton do banco local de instrumentos (Legacy). Carrega lazy na primeira chamada de `.get()`.
 
 ```python
 from py_bcast import InstrumentDB
 
 db = InstrumentDB.get()
-db.lookup("PETR4")    # exact match → dict or None
-len(db)               # 623247
-db.exchanges          # {"PR": 189985, "BVMF": 138181, ...}
+inst = db.lookup("PETR4")
+# {'ticker': 'PETR4', 'name': 'PETROLEO BRASILEIRO...', 'exchange': 'BVMF',
+#  'backend': 'legacy', 'full_symbol': 'PETR4.BVMF', 'isin': 'BRPETRACNPR6',
+#  'cvm_code': None, 'has_intraday': None, ...}
+
+db.search("PETR", exchange="BVMF")   # mesmo schema do bsearch (pd.DataFrame)
+len(db)                              # 623247
+db.exchanges                         # {"PR": 189985, "BVMF": 138181, ...}
 ```
+
+`lookup()` retorna um `dict` (single instrument) com as mesmas chaves do DataFrame — campos Plus-only ficam como `None`.
 
 ---
 
@@ -698,7 +724,7 @@ All exceptions inherit from `PyBcastError`.
 - `.error_tag` — error message extracted from tag 10037 in the binary response
 - `.record_count` — number of records found when the response was malformed
 
-Both exceptions append an English **hint** to their `str()` output when the server message matches a known pattern (e.g. `"Não foram encontrados registros..."` → `"No records found for the given criteria"`).
+Both exceptions append an English **hint** to their `str()` output when the server message matches a known pattern (e.g. `"Nao foram encontrados registros..."` -> `"No records found for the given criteria"`).
 
 `DDEAdviseError` exposes:
 - `.item` — full DDE item string (e.g. `"EMBR3.ULT"`)

@@ -5,6 +5,8 @@ import pytest
 
 from py_bcast import bmacro, bdi_cdi, breturn, bvolume, binflation
 
+pytestmark = pytest.mark.legacy_session
+
 
 class TestBmacro:
     def test_usdbrl(self):
@@ -31,6 +33,7 @@ class TestBmacro:
 
     def test_empty_range(self):
         from py_bcast._core.exceptions import ContentProxyError
+
         with pytest.raises(ContentProxyError):
             bmacro("USDBRL", "20260518", "20260510")
 

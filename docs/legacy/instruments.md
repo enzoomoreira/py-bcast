@@ -90,15 +90,18 @@ py_bcast provides access to 623,247 instruments across 30+ exchanges via the loc
 ```python
 from py_bcast import bsearch, InstrumentDB
 
-# Quick search
-results = bsearch("PETR", exchange="BVMF")
-results = bsearch("USD", exchange="GTISFX")
-results = bsearch("BRPETRACNPR6")  # by ISIN
+# Quick search — retorna pd.DataFrame
+df = bsearch("PETR", exchange="BVMF")
+df = bsearch("USD", exchange="GTISFX")
+df = bsearch("BRPETRACNPR6")        # by ISIN
 
 # Direct database access
 db = InstrumentDB.get()
 inst = db.lookup("PETR4")
-# {'ticker': 'PETR4', 'full_symbol': 'PETR4.BVMF',
-#  'name': 'PETROLEO BRASILEIRO S.A. PETROBRAS, PN, A Vista',
-#  'isin': 'BRPETRACNPR6', 'exchange': 'BVMF'}
+# {'ticker': 'PETR4', 'name': 'PETROLEO BRASILEIRO S.A. PETROBRAS, PN, A Vista',
+#  'exchange': 'BVMF', 'backend': 'legacy',
+#  'full_symbol': 'PETR4.BVMF', 'isin': 'BRPETRACNPR6',
+#  'cvm_code': None, 'type_id': None, ...}
 ```
+
+Schema completo do `bsearch` (DataFrame) e do `lookup` (dict): [`api.md#bsearch`](./api.md#bsearchquery-exchangenone-max_results20).

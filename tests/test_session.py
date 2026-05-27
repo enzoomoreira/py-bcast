@@ -1,11 +1,11 @@
 """Tests for automatic session token discovery."""
 
-import os
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from py_bcast._core.session import get_session_token, discover_session_token, _find_bcsys32_pid
+from py_bcast._core.session import get_session_token, discover_session_token
+from py_bcast._core.memory import find_process_pid
 from py_bcast._core.exceptions import SessionError
 
 
@@ -27,16 +27,20 @@ class TestGetSessionToken:
         """Falls back to auto-discovery when no env var set."""
         monkeypatch.delenv("BROADCAST_SESSION", raising=False)
         import py_bcast._core.session as _sess
+
         monkeypatch.setattr(_sess, "_cached_token", None)
-        with patch("py_bcast._core.session.discover_session_token", return_value="AUTO_DISCOVERED"):
+        with patch(
+            "py_bcast._core.session.discover_session_token",
+            return_value="AUTO_DISCOVERED",
+        ):
             token = get_session_token()
             assert token == "AUTO_DISCOVERED"
 
     def test_auto_discovery_error_propagates(self, monkeypatch):
         """SessionError from discovery propagates to caller."""
         monkeypatch.delenv("BROADCAST_SESSION", raising=False)
-        # Clear the cached token so discovery is attempted
         import py_bcast._core.session as _sess
+
         monkeypatch.setattr(_sess, "_cached_token", None)
         with patch(
             "py_bcast._core.session.discover_session_token",
@@ -46,20 +50,19 @@ class TestGetSessionToken:
                 get_session_token()
 
 
-class TestFindPid:
-    """Test PID discovery."""
+class TestFindProcessPid:
+    """Test PID discovery via tasklist."""
 
     def test_finds_running_process(self):
-        """Should find bcsys32.exe if running."""
-        pid = _find_bcsys32_pid()
-        # On CI this might be None, on dev machine with terminal it should be int
+        """Should find bcsys32.exe if running (None otherwise)."""
+        pid = find_process_pid("bcsys32.exe")
         assert pid is None or isinstance(pid, int)
 
     def test_returns_none_when_not_running(self):
         """Returns None when process not found."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout='INFO: No tasks are running\n')
-            assert _find_bcsys32_pid() is None
+        with patch("py_bcast._core.memory.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="INFO: No tasks are running\n")
+            assert find_process_pid("bcsys32.exe") is None
 
 
 class TestDiscoverSessionToken:
@@ -67,47 +70,52 @@ class TestDiscoverSessionToken:
 
     def test_raises_when_terminal_not_running(self):
         """Clear error when bcsys32.exe is not found."""
-        with patch("py_bcast._core.session._find_bcsys32_pid", return_value=None):
+        with patch("py_bcast._core.session.find_process_pid", return_value=None):
             with pytest.raises(SessionError, match="not running"):
                 discover_session_token()
 
     def test_raises_when_memory_unreadable(self):
         """Clear error when process memory cannot be read."""
-        with patch("py_bcast._core.session._find_bcsys32_pid", return_value=12345):
-            with patch("py_bcast._core.session._scan_process_memory", return_value=[]):
+        with patch("py_bcast._core.session.find_process_pid", return_value=12345):
+            with patch("py_bcast._core.session.scan_process_memory", return_value=[]):
                 with pytest.raises(SessionError, match="Could not read"):
                     discover_session_token()
 
     def test_raises_when_no_valid_token(self):
         """Clear error when candidates don't validate."""
-        with patch("py_bcast._core.session._find_bcsys32_pid", return_value=12345):
-            with patch("py_bcast._core.session._scan_process_memory", return_value=["A" * 33]):
-                with patch("py_bcast._core.session._validate_token", return_value=False):
+        with patch("py_bcast._core.session.find_process_pid", return_value=12345):
+            with patch(
+                "py_bcast._core.session.scan_process_memory",
+                return_value=["A" * 33],
+            ):
+                with patch(
+                    "py_bcast._core.session._validate_token", return_value=False
+                ):
                     with pytest.raises(SessionError, match="none validated"):
                         discover_session_token()
 
     def test_returns_first_valid_token(self):
         """Returns first candidate that validates."""
-        with patch("py_bcast._core.session._find_bcsys32_pid", return_value=12345):
+        with patch("py_bcast._core.session.find_process_pid", return_value=12345):
             with patch(
-                "py_bcast._core.session._scan_process_memory",
-                return_value=["A" * 33, "F9bca84c7cb51fbdb4456a86c6548fb13"],
+                "py_bcast._core.session.scan_process_memory",
+                return_value=["A" * 33, "Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
             ):
                 with patch(
                     "py_bcast._core.session._validate_token",
-                    side_effect=lambda t: t == "F9bca84c7cb51fbdb4456a86c6548fb13",
+                    side_effect=lambda t: t == "Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 ):
                     token = discover_session_token()
-                    assert token == "F9bca84c7cb51fbdb4456a86c6548fb13"
+                    assert token == "Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 
-@pytest.mark.integration
+@pytest.mark.legacy_session
 class TestLiveDiscovery:
-    """Integration test — requires running Broadcast terminal."""
+    """Live test against a running bcsys32.exe."""
 
     def test_live_discovery(self):
         """Discover token from actual running bcsys32.exe."""
-        pid = _find_bcsys32_pid()
+        pid = find_process_pid("bcsys32.exe")
         if pid is None:
             pytest.skip("bcsys32.exe not running")
         token = discover_session_token()

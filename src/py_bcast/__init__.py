@@ -44,17 +44,30 @@ Quick Start:
 """
 
 from .realtime import BroadcastClient, bdp, bdps
+from ._plus.realtime import BroadcastPlusClient
+from ._plus.intraday import btrades
 from .historical import bdh, bdh_ohlcv, bdi, bdt
 from .fundamental import (
     bconsensus,
-    bcompany, bindices, bsectors, bquote, btickers, bshares,
-    bindicators, bindicator_meta,
-    bcalendar, bdividends, bdy, bportfolios, bportfolio,
+    bcompany,
+    bindices,
+    bsectors,
+    bquote,
+    btickers,
+    bshares,
+    bindicators,
+    bindicator_meta,
+    bcalendar,
+    bdividends,
+    bdy,
+    bportfolios,
+    bportfolio,
 )
 from .instruments import InstrumentDB, bsearch
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
 from .news import bnews, bnews_latest, bnews_search, MULTIMEDIA_CATEGORIES
 from ._core.session import discover_session_token, clear_token_cache
+from ._plus.session import discover_plus_token, clear_plus_token_cache
 from ._core.resolve import resolve_cvm, resolve_indicator
 from ._core.exceptions import (
     PyBcastError,
@@ -64,6 +77,8 @@ from ._core.exceptions import (
     DDEError,
     DDEAdviseError,
     ValidationError,
+    BroadcastPlusError,
+    BroadcastPlusAuthError,
 )
 from ._core.constants import DMLERR_ADVACKTIMEOUT, DMLERR_NAMES
 from ._core.logging import configure_logging
@@ -73,12 +88,15 @@ from . import _async as async_api
 
 __all__ = [
     "BroadcastClient",
+    "BroadcastPlusClient",
     "bdp",
     "bdps",
     "bdh",
     "bdh_ohlcv",
     "bdi",
     "bdt",
+    # Broadcast+ data functions
+    "btrades",
     "bconsensus",
     "InstrumentDB",
     "bsearch",
@@ -110,6 +128,9 @@ __all__ = [
     "MULTIMEDIA_CATEGORIES",
     "discover_session_token",
     "clear_token_cache",
+    # Broadcast+ session
+    "discover_plus_token",
+    "clear_plus_token_cache",
     "resolve_cvm",
     "resolve_indicator",
     # Exceptions
@@ -120,6 +141,8 @@ __all__ = [
     "DDEError",
     "DDEAdviseError",
     "ValidationError",
+    "BroadcastPlusError",
+    "BroadcastPlusAuthError",
     # DDE constants
     "DMLERR_ADVACKTIMEOUT",
     "DMLERR_NAMES",

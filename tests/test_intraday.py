@@ -7,6 +7,8 @@ import pytest
 
 from py_bcast import bdi
 
+pytestmark = pytest.mark.legacy_session
+
 
 class TestBdi:
     """Test HistoricoIntraday endpoint via bdi()."""
@@ -36,7 +38,9 @@ class TestBdi:
 
     def test_historical_range(self):
         """Can fetch multiple days of intraday data."""
-        week_ago = (datetime.date.today() - datetime.timedelta(days=7)).strftime("%Y%m%d")
+        week_ago = (datetime.date.today() - datetime.timedelta(days=7)).strftime(
+            "%Y%m%d"
+        )
         df = bdi("PETR4", week_ago)
         # Should have more bars than a single day (~200/day)
         assert len(df) > 200

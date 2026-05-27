@@ -133,3 +133,42 @@ class ValidationError(PyBcastError, ValueError):
     Inherits from ValueError so ``except ValueError`` still catches it,
     preserving backward-compatible catch patterns.
     """
+
+
+class BroadcastPlusError(PyBcastError):
+    """HTTP-level error from the Broadcast+ API (svc.aebroadcast.com.br).
+
+    Attributes:
+        endpoint: The API path that failed (e.g. "/stock/v1/quote/symbol").
+        server_message: Message extracted from the JSON error body.
+        status_code: HTTP status code, if available.
+    """
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        endpoint: str | None = None,
+        server_message: str | None = None,
+        status_code: int | None = None,
+    ):
+        self.endpoint = endpoint
+        self.server_message = server_message
+        self.status_code = status_code
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        parts = [super().__str__()]
+        if self.endpoint:
+            parts.append(f"Endpoint: {self.endpoint}")
+        if self.server_message:
+            parts.append(f"Server: {self.server_message}")
+        return " | ".join(p for p in parts if p)
+
+
+class BroadcastPlusAuthError(BroadcastPlusError):
+    """Authentication failure for Broadcast+ (JWT unavailable or rejected).
+
+    Raised when the full auth chain (env var -> memory scan -> ECDH login)
+    is exhausted without producing a valid token.
+    """
