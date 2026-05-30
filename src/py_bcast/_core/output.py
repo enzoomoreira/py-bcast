@@ -11,7 +11,34 @@ import pandas as pd
 from .columns import CONTENT_PROXY_RENAME
 
 
-def _apply_rename(df: pd.DataFrame, rename: dict[str, str | None] | None) -> pd.DataFrame:
+def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Coerce each wholly-numeric column to a numeric dtype, in place.
+
+    A column is treated as numeric when every non-blank cell parses as a
+    number; its blank cells ('' or NA) then become NaN. If any non-blank cell
+    fails to parse, the column is genuine text and is left untouched (blanks
+    stay as the empty strings the server sent).
+
+    Replaces the old ``to_numeric(...).fillna(original)`` pattern, which
+    restored blank strings into otherwise-numeric columns and forced the whole
+    column back to ``object`` dtype (the binflation "all object" bug). Inputs
+    here are US-formatted (dot decimal, scientific notation); BR-formatted
+    scalar strings from the DDE/WebSocket paths are handled separately.
+    """
+    for col in df.columns:
+        coerced = pd.to_numeric(df[col], errors="coerce")
+        stripped = df[col].astype("string").str.strip()
+        blank = (stripped.isna() | (stripped == "")).fillna(True)
+        failed = coerced.isna() & ~blank
+        if bool(failed.any()):
+            continue
+        df[col] = coerced
+    return df
+
+
+def _apply_rename(
+    df: pd.DataFrame, rename: dict[str, str | None] | None
+) -> pd.DataFrame:
     """Rename and drop columns based on a mapping.
 
     Keys mapping to None are dropped. Keys mapping to a string are renamed.
@@ -28,7 +55,9 @@ def _apply_rename(df: pd.DataFrame, rename: dict[str, str | None] | None) -> pd.
     return df
 
 
-def _apply_rename_series(s: pd.Series, rename: dict[str, str | None] | None) -> pd.Series:
+def _apply_rename_series(
+    s: pd.Series, rename: dict[str, str | None] | None
+) -> pd.Series:
     """Rename and drop index entries based on a mapping."""
     if rename is None:
         return s
@@ -81,7 +110,9 @@ def to_dataframe(
                 dt_strings = df[date_col] + " " + df[time_col]
                 # Strip optional milliseconds for consistent parsing
                 dt_strings = dt_strings.str.replace(r"\.\d+$", "", regex=True)
-                df.index = pd.to_datetime(dt_strings, format="%Y%m%d %H:%M:%S", errors="coerce")
+                df.index = pd.to_datetime(
+                    dt_strings, format="%Y%m%d %H:%M:%S", errors="coerce"
+                )
             else:
                 dt_strings = df[date_col] + df[time_col]
                 # Determine format based on time_col length
@@ -96,10 +127,7 @@ def to_dataframe(
             df = df.drop(columns=[date_col])
         df.index.name = None
 
-    # Coerce numeric columns
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df[col])
-
+    df = coerce_numeric_columns(df)
     return _apply_rename(df, rename)
 
 
@@ -117,8 +145,7 @@ def to_multi_dataframe(
         Dict mapping symbol -> DataFrame with DatetimeIndex.
     """
     return {
-        symbol: to_dataframe(rows, date_col=date_col)
-        for symbol, rows in data.items()
+        symbol: to_dataframe(rows, date_col=date_col) for symbol, rows in data.items()
     }
 
 
@@ -166,8 +193,5 @@ def to_reference_dataframe(
 
     df = pd.DataFrame(rows)
 
-    # Coerce numeric columns
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df[col])
-
+    df = coerce_numeric_columns(df)
     return _apply_rename(df, rename)

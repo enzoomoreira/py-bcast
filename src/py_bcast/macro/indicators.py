@@ -7,12 +7,16 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 
 from .._core.constants import BASE_URL
-from .._core.dates import DateLike, to_date_str
+from .._core.dates import to_date_str
 from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.normalize import ensure_list
-from .._core.output import to_dataframe, to_reference_dataframe
+from .._core.output import (
+    coerce_numeric_columns,
+    to_dataframe,
+    to_reference_dataframe,
+)
 from .._core.columns import CONTENT_PROXY_RENAME
 from .._core.retry import http_retry
 from .._core.validation import DateParam, Ticker, TickerList, validate_params
@@ -57,7 +61,11 @@ def bmacro(
     """
     root = content_proxy_get(
         "BaseHistoricaNumerica/MacroEconomicos",
-        {"305": ticker, "DataInicio": to_date_str(start_date), "DataFim": to_date_str(end_date)},
+        {
+            "305": ticker,
+            "DataInicio": to_date_str(start_date),
+            "DataFim": to_date_str(end_date),
+        },
         session_token=session_token,
     )
     rows = parse_ticks(root, sort_by="dat")
@@ -123,7 +131,11 @@ def breturn(
     """
     root = content_proxy_get(
         "BaseHistoricaNumerica/RetornoDiario",
-        {"305": ticker, "DataInicio": to_date_str(start_date), "DataFim": to_date_str(end_date)},
+        {
+            "305": ticker,
+            "DataInicio": to_date_str(start_date),
+            "DataFim": to_date_str(end_date),
+        },
         session_token=session_token,
     )
     rows = parse_ticks(root, sort_by="dat")
@@ -182,13 +194,18 @@ def bvolume(
     df = pd.DataFrame(rows)
     if "symbol" in df.columns:
         df = df.set_index("symbol")
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(df[col])
+    df = coerce_numeric_columns(df)
     # Apply standard column renames
-    name_map = {k: v for k, v in CONTENT_PROXY_RENAME.items()
-                if v is not None and k in df.columns}
-    drop_cols = [k for k in df.columns
-                 if CONTENT_PROXY_RENAME.get(k) is None and k in CONTENT_PROXY_RENAME]
+    name_map = {
+        k: v
+        for k, v in CONTENT_PROXY_RENAME.items()
+        if v is not None and k in df.columns
+    }
+    drop_cols = [
+        k
+        for k in df.columns
+        if CONTENT_PROXY_RENAME.get(k) is None and k in CONTENT_PROXY_RENAME
+    ]
     if drop_cols:
         df = df.drop(columns=drop_cols)
     if name_map:
