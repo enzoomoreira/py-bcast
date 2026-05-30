@@ -16,7 +16,7 @@ from .._core.dates import DateLike, to_date_str
 from .._core.normalize import ensure_str
 from .._core.output import to_dataframe, to_reference_dataframe
 from .._core.resolve import resolve_cvm
-from .._core.validation import CvmCode, DateParam, Ticker, validate_params
+from .._core.validation import CvmCode, DateParam, validate_params
 
 
 @validate_params
@@ -183,5 +183,6 @@ def bportfolio(
         "fundamental/empresa/carteira-recomendada/ultima",
         {"10087": ensure_str(broker_id)},
         session_token,
+        empty_ok=False,
     )
     return to_reference_dataframe(rows_to_dicts(parsed), rename=PORTFOLIO_FIELDS)

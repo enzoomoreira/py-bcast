@@ -77,6 +77,7 @@ from ._core.exceptions import (
     DDEError,
     DDEAdviseError,
     ValidationError,
+    NotFoundError,
     BroadcastPlusError,
     BroadcastPlusAuthError,
 )
@@ -141,6 +142,7 @@ __all__ = [
     "DDEError",
     "DDEAdviseError",
     "ValidationError",
+    "NotFoundError",
     "BroadcastPlusError",
     "BroadcastPlusAuthError",
     # DDE constants

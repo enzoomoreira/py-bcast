@@ -22,7 +22,6 @@ from .._core.logging import get_logger
 from .._core.normalize import ensure_str
 from .._core.output import to_dataframe, to_reference_dataframe, to_series
 from .._core.resolve import resolve_cvm, resolve_indicator
-from .._core.validation import CvmCode, DateParam, Ticker, validate_params
 
 logger = get_logger(__name__)
 
@@ -52,17 +51,18 @@ def bcompany(
         >>> petr = bcompany(9512)   # Petrobras detail
     """
     if cvm_code is None:
-        parsed = aetp_request(
-            "fundamental/empresa/metadado", {}, session_token
-        )
+        parsed = aetp_request("fundamental/empresa/metadado", {}, session_token)
         return to_reference_dataframe(rows_to_dicts(parsed), rename=COMPANY_LIST_FIELDS)
     else:
         parsed = aetp_request(
             "fundamental/empresa",
             {"13004": ensure_str(cvm_code)},
             session_token,
+            empty_ok=False,
         )
-        return to_reference_dataframe(rows_to_dicts(parsed), rename=COMPANY_DETAIL_FIELDS)
+        return to_reference_dataframe(
+            rows_to_dicts(parsed), rename=COMPANY_DETAIL_FIELDS
+        )
 
 
 def bindices(
@@ -106,9 +106,7 @@ def bsectors(
         >>> df = bsectors()
         >>> df.head()
     """
-    parsed = aetp_request(
-        "fundamental/setor", {}, session_token
-    )
+    parsed = aetp_request("fundamental/setor", {}, session_token)
     return to_reference_dataframe(rows_to_dicts(parsed), rename=SECTOR_FIELDS)
 
 
@@ -144,7 +142,9 @@ def bquote(
         return pd.Series(dtype="object")
 
     rows = rows_to_dicts(parsed)
-    return to_series(rows[0], rename=QUOTE_FIELDS) if rows else pd.Series(dtype="object")
+    return (
+        to_series(rows[0], rename=QUOTE_FIELDS) if rows else pd.Series(dtype="object")
+    )
 
 
 def btickers(
@@ -176,6 +176,7 @@ def btickers(
         "fundamental/ativo/simbolo",
         {"13004": str(cvm_code)},
         session_token,
+        empty_ok=False,
     )
     return to_reference_dataframe(rows_to_dicts(parsed), rename=TICKER_FIELDS)
 
@@ -204,10 +205,13 @@ def bshares(
         "fundamental/ativo/quantidade",
         {"10068": ticker},
         session_token,
+        empty_ok=False,
     )
 
     rows = rows_to_dicts(parsed)
-    return to_series(rows[0], rename=SHARES_FIELDS) if rows else pd.Series(dtype="object")
+    return (
+        to_series(rows[0], rename=SHARES_FIELDS) if rows else pd.Series(dtype="object")
+    )
 
 
 def bindicators(

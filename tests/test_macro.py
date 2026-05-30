@@ -32,10 +32,12 @@ class TestBmacro:
         assert df.index.is_monotonic_increasing
 
     def test_empty_range(self):
-        from py_bcast._core.exceptions import ContentProxyError
-
-        with pytest.raises(ContentProxyError):
-            bmacro("USDBRL", "20260518", "20260510")
+        # Valid symbol, no rows in the (inverted) range: the server replies
+        # "não foram encontrados registros", which the unified error policy
+        # maps to an empty DataFrame rather than an exception.
+        df = bmacro("USDBRL", "20260518", "20260510")
+        assert isinstance(df, pd.DataFrame)
+        assert df.empty
 
 
 class TestBdiCdi:

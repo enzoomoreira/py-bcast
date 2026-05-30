@@ -27,6 +27,41 @@ def _get_hint(message: str | None) -> str | None:
     return None
 
 
+# Server messages that mean "the requested entity does not exist" (bad input).
+_NOT_FOUND_MARKERS = (
+    "não existe",
+    "ativo não encontrado",
+    "empresa não encontrada",
+)
+# Server messages that mean "a valid query simply matched no rows".
+_NO_RECORDS_MARKERS = (
+    "não foram encontrados registros",
+    "registro não encontrado",
+)
+
+
+def is_not_found(message: str | None) -> bool:
+    """True if the server message means the looked-up entity does not exist."""
+    if not message:
+        return False
+    low = message.strip().lower()
+    return any(m in low for m in _NOT_FOUND_MARKERS)
+
+
+def is_no_records(message: str | None) -> bool:
+    """True if the server message means a valid query returned zero rows.
+
+    Note this is ambiguous on the AETP binary path (the server returns the
+    same message for an unknown entity and an empty-but-valid range), so AETP
+    callers disambiguate with an explicit ``empty_ok`` flag rather than relying
+    on the message alone.
+    """
+    if not message:
+        return False
+    low = message.strip().lower()
+    return any(m in low for m in _NO_RECORDS_MARKERS)
+
+
 class PyBcastError(Exception):
     """Base exception for all py_bcast errors."""
 
@@ -133,6 +168,35 @@ class ValidationError(PyBcastError, ValueError):
     Inherits from ValueError so ``except ValueError`` still catches it,
     preserving backward-compatible catch patterns.
     """
+
+
+class NotFoundError(PyBcastError):
+    """The requested entity does not exist on the server.
+
+    Raised for a well-formed but non-existent input — an unknown ticker, CVM
+    code, broker, or indicator. This is distinct from:
+        - ValidationError: the input itself was malformed.
+        - an empty result: a valid query that simply matched no rows, which
+          returns an empty DataFrame with schema instead of raising.
+
+    Attributes:
+        identifier: The value that was looked up (e.g. "PETR99", 99999999).
+        kind: The kind of entity (e.g. "ticker", "symbol", "cvm_code",
+              "broker", "indicator").
+    """
+
+    def __init__(
+        self,
+        identifier: object = None,
+        *,
+        kind: str = "entity",
+        message: str | None = None,
+    ):
+        self.identifier = identifier
+        self.kind = kind
+        if message is None:
+            message = f"{kind} not found: {identifier!r}"
+        super().__init__(message)
 
 
 class BroadcastPlusError(PyBcastError):

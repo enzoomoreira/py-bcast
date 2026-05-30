@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 
-from .exceptions import ValidationError
+from .exceptions import NotFoundError, ValidationError
 from .logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,14 +38,15 @@ def resolve_cvm(ticker: str, session_token: str | None = None) -> int:
 
     quote = bquote(key, session_token=session_token)
     if quote.empty:
-        raise ValidationError(
-            f"Cannot resolve ticker '{key}' to CVM code — "
-            f"bquote returned no data. Verify the ticker exists."
-        )
+        raise NotFoundError(key, kind="ticker")
     cvm_raw = quote.get("cvm_code")
-    if cvm_raw is None or (isinstance(cvm_raw, float) and cvm_raw != cvm_raw):  # NaN check
-        raise ValidationError(
-            f"Ticker '{key}' has no associated CVM code in quote data."
+    if cvm_raw is None or (
+        isinstance(cvm_raw, float) and cvm_raw != cvm_raw
+    ):  # NaN check
+        raise NotFoundError(
+            key,
+            kind="ticker",
+            message=f"Ticker '{key}' has no associated CVM code in quote data.",
         )
     cvm = int(float(cvm_raw))
     _cvm_cache[key] = cvm
@@ -106,12 +107,20 @@ def resolve_indicator(name_or_id: str | int, session_token: str | None = None) -
             return item["id"]
 
     # Priority 2: startswith
-    starts = [item for item in _indicator_meta_cache if _strip_accents(item["name"].lower()).startswith(query)]
+    starts = [
+        item
+        for item in _indicator_meta_cache
+        if _strip_accents(item["name"].lower()).startswith(query)
+    ]
     if len(starts) == 1:
         return starts[0]["id"]
 
     # Priority 3: contains
-    contains = [item for item in _indicator_meta_cache if query in _strip_accents(item["name"].lower())]
+    contains = [
+        item
+        for item in _indicator_meta_cache
+        if query in _strip_accents(item["name"].lower())
+    ]
     if len(contains) == 1:
         return contains[0]["id"]
     if len(contains) > 1:
@@ -129,8 +138,10 @@ def resolve_indicator(name_or_id: str | int, session_token: str | None = None) -
             f"Use the numeric ID or a more specific name."
         )
 
-    raise ValidationError(
-        f"Indicator '{s}' not found. Use bindicator_meta() to list available indicators."
+    raise NotFoundError(
+        s,
+        kind="indicator",
+        message=f"Indicator '{s}' not found. Use bindicator_meta() to list available indicators.",
     )
 
 

@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from .cache import cache_get, cache_set
 from .config import get_settings
 from .constants import BASE_URL
-from .exceptions import ContentProxyError
+from .exceptions import ContentProxyError, NotFoundError, is_no_records, is_not_found
 from .http import base_params, get_http_client, get_session_token
 from .logging import get_logger
 from .ratelimit import rate_limit
@@ -55,19 +55,42 @@ def content_proxy_get(
     r = _content_proxy_fetch(s, endpoint, merged, timeout)
 
     root = ET.fromstring(r.text)
-    if root.findtext("STATUS") != "success":
-        msg = root.findtext("MESSAGE") or "Unknown error"
+    raise_for_content_proxy_status(root, endpoint, params)
+
+    # Store in cache
+    cache_set(endpoint, merged, root, get_settings().cache_ttl)
+
+    return root
+
+
+def raise_for_content_proxy_status(
+    root: ET.Element,
+    endpoint: str,
+    params: dict[str, str],
+) -> None:
+    """Classify a ContentProxy STATUS != success response.
+
+    Maps the server MESSAGE to the unified error policy:
+        - unknown symbol ("não existe")          -> NotFoundError
+        - valid query, no rows ("não foram ...")  -> return (benign; caller
+          gets a zero-TICK root and yields an empty DataFrame with schema)
+        - anything else                           -> ContentProxyError
+
+    A ``success`` status is a no-op.
+    """
+    if root.findtext("STATUS") == "success":
+        return
+    msg = root.findtext("MESSAGE") or "Unknown error"
+    if is_not_found(msg):
+        raise NotFoundError(params.get("305") or params.get("10113"), kind="symbol")
+    if not is_no_records(msg):
         logger.error("ContentProxy error on %s: %s", endpoint, msg)
         raise ContentProxyError(
             f"ContentProxy error on {endpoint}: {msg}",
             endpoint=endpoint,
             server_message=msg,
         )
-
-    # Store in cache
-    cache_set(endpoint, merged, root, get_settings().cache_ttl)
-
-    return root
+    logger.debug("ContentProxy no records on %s: %s", endpoint, msg)
 
 
 @http_retry
