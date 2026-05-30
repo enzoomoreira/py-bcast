@@ -58,14 +58,22 @@ def parse_binary_response(data: bytes) -> dict:
     field_record = records[2].split(b"\x00")
     # First element is field count, rest are tag numbers, last may be empty
     field_tags = [f.decode("latin-1") for f in field_record[1:] if f]
+    n_fields = len(field_tags)
 
     # Record 3+ = data rows (before the ETX terminator record)
     rows = []
     for rec in records[3:]:
         if rec == b"\x03" or rec == b"":
             break
-        values = [v.decode("latin-1", errors="replace") for v in rec.split(b"\x00") if v]
-        if values:
+        parts = rec.split(b"\x00")
+        values = [v.decode("latin-1", errors="replace") for v in parts]
+        # Align positionally to the declared field count. Each data record
+        # ends with a NULL terminator (trailing empty) which we drop; short
+        # rows are padded. Interior empty fields are KEPT — filtering them
+        # would shift every subsequent value left and corrupt the mapping on
+        # sparse rows (e.g. a dividend with no ex-date / record-date).
+        values = (values + [""] * n_fields)[:n_fields]
+        if any(values):
             rows.append(values)
 
     return {"fields": field_tags, "rows": rows}

@@ -201,12 +201,13 @@ class InstrumentDB:
                 exact.append(inst)
             elif ticker_up.startswith(q):
                 starts_with.append(inst)
-            elif (
+            elif len(contains) < max_results * 10 and (
                 q in ticker_up or q in inst["name"].upper() or q in inst["isin"].upper()
             ):
+                # Cap the (lowest-priority) contains bucket but keep scanning —
+                # breaking the loop here would starve exact/starts_with matches
+                # that appear later in file order.
                 contains.append(inst)
-                if len(contains) >= max_results * 10:
-                    break
 
         starts_with.sort(key=lambda r: (not r["ticker"].isalnum(), len(r["ticker"])))
         contains.sort(key=lambda r: (not r["ticker"].isalnum(), len(r["ticker"])))

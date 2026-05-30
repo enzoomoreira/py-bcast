@@ -194,14 +194,14 @@ CALENDAR_FIELDS: dict[str, str] = {
     "12024": "event_date",
     "13004": "cvm_code",
     "12063": "company",
-    "13824": "sector",
-    "13702": "subsector",
-    "13703": "segment",
-    "13704": "event_type",
+    "13824": "logo_url",
+    "13702": "sector",
+    "13703": "subsector",
+    "13704": "segment",
     "13763": "description",
-    "13007": "announcement_date",
+    "13007": "reference_period",
     "10066": "time",
-    "13813": "details",
+    "13813": "announcement_date",
 }
 
 # bdividends(cvm, ticker)
