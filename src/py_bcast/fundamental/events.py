@@ -7,14 +7,18 @@ import pandas as pd
 from .._core.aetp import aetp_request, rows_to_dicts
 from .._core.columns import (
     CALENDAR_FIELDS,
+    CALENDAR_SCHEMA,
     DIVIDEND_FIELDS,
+    DIVIDEND_SCHEMA,
     DY_FIELDS,
+    DY_SCHEMA,
     PORTFOLIO_FIELDS,
     PORTFOLIO_LIST_FIELDS,
+    PORTFOLIO_LIST_SCHEMA,
 )
 from .._core.dates import DateLike, to_date_str
 from .._core.normalize import ensure_str
-from .._core.output import to_dataframe, to_reference_dataframe
+from .._core.output import to_reference_dataframe
 from .._core.resolve import resolve_cvm
 from .._core.validation import CvmCode, DateParam, validate_params
 
@@ -49,7 +53,9 @@ def bcalendar(
         {"10057": to_date_str(start_date), "10058": to_date_str(end_date)},
         session_token,
     )
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=CALENDAR_FIELDS)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed), rename=CALENDAR_FIELDS, schema=CALENDAR_SCHEMA
+    )
 
 
 def bdividends(
@@ -84,7 +90,9 @@ def bdividends(
         {"13004": ensure_str(cvm_code), "10068": ticker},
         session_token,
     )
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=DIVIDEND_FIELDS)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed), rename=DIVIDEND_FIELDS, schema=DIVIDEND_SCHEMA
+    )
 
 
 def bdy(
@@ -130,7 +138,7 @@ def bdy(
         session_token,
     )
     rows = rows_to_dicts(parsed)
-    return to_dataframe(rows, rename=DY_FIELDS)
+    return to_reference_dataframe(rows, rename=DY_FIELDS, schema=DY_SCHEMA)
 
 
 def bportfolios(
@@ -155,7 +163,11 @@ def bportfolios(
     parsed = aetp_request(
         "fundamental/empresa/carteira-recomendada/corretoras", {}, session_token
     )
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=PORTFOLIO_LIST_FIELDS)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed),
+        rename=PORTFOLIO_LIST_FIELDS,
+        schema=PORTFOLIO_LIST_SCHEMA,
+    )
 
 
 @validate_params

@@ -258,3 +258,81 @@ PORTFOLIO_FIELDS: dict[str, str] = {
     "13800": "rec_segment_id",
     "13704": "rec_segment",
 }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Group C: empty-result schemas (column -> dtype)
+#
+# Used ONLY to build a schema-preserving empty DataFrame when a valid query
+# returns zero rows. The populated frame keeps its coercion-inferred dtypes
+# untouched — server dtypes are data-dependent (an all-blank text column
+# coerces to float64; an integer column flips int64<->float64 with blanks),
+# so forcing a dtype on real data would corrupt it. Two families:
+#   - numeric / time-series: float64 columns (concat with populated frames
+#     stays numeric instead of upcasting to object)
+#   - reference / mixed: object columns named after the field map (the column
+#     set is the deliverable; dtypes here are not stable enough to declare)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _object_schema(fields: dict[str, str]) -> dict[str, str]:
+    """Empty-frame schema with every field-map column as object dtype."""
+    return {name: "object" for name in fields.values()}
+
+
+# Numeric time-series (paired with an empty DatetimeIndex)
+MACRO_SCHEMA: dict[str, str] = {"close": "float64"}
+CDI_SCHEMA: dict[str, str] = {
+    "accumulated": "float64",
+    "close": "float64",
+    "change_pct": "float64",
+}
+RETURN_SCHEMA: dict[str, str] = {"change_pct": "float64", "close": "float64"}
+INTRADAY_BAR_SCHEMA: dict[str, str] = {  # bdi
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "volume": "float64",
+    "trades": "float64",
+    "turnover": "float64",
+    "open_interest": "float64",
+    "cum_trades": "float64",
+    "session_type": "float64",
+}
+TICK_SCHEMA: dict[str, str] = {  # bdt
+    "close": "float64",
+    "size": "float64",
+    "trades": "float64",
+    "open_interest": "float64",
+    "calendar_days": "float64",
+    "working_days": "float64",
+}
+
+# Numeric reference (RangeIndex)
+INFLATION_SCHEMA: dict[str, str] = {
+    "symbol": "object",
+    **{f"mes{i}": "float64" for i in range(12)},
+    "return_3m": "float64",
+    "return_6m": "float64",
+    "return_12m": "float64",
+    "return_ytd": "float64",
+}
+VOLUME_SCHEMA: dict[str, str] = {
+    "avg_volume": "float64",
+    "avg_turnover": "float64",
+    "avg_trades": "float64",
+    "months": "float64",
+    "dat": "float64",
+}
+
+# Reference / mixed (RangeIndex, object) — only endpoints that can return empty
+COMPANY_LIST_SCHEMA = _object_schema(COMPANY_LIST_FIELDS)
+INDEX_SCHEMA = _object_schema(INDEX_FIELDS)
+SECTOR_SCHEMA = _object_schema(SECTOR_FIELDS)
+INDICATOR_META_SCHEMA = _object_schema(INDICATOR_META_FIELDS)
+INDICATOR_HISTORY_SCHEMA = _object_schema(INDICATOR_HISTORY_FIELDS)
+CALENDAR_SCHEMA = _object_schema(CALENDAR_FIELDS)
+DIVIDEND_SCHEMA = _object_schema(DIVIDEND_FIELDS)
+DY_SCHEMA = _object_schema(DY_FIELDS)
+PORTFOLIO_LIST_SCHEMA = _object_schema(PORTFOLIO_LIST_FIELDS)

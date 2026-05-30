@@ -6,7 +6,8 @@ import datetime
 
 import pandas as pd
 
-from .._core.dates import DateLike, to_date_str, to_datetime_str
+from .._core.dates import to_date_str, to_datetime_str
+from .._core.columns import INTRADAY_BAR_SCHEMA, TICK_SCHEMA
 from .._core.output import to_dataframe
 from .._core.validation import DateParam, DateTimeParam, Ticker, validate_params
 from .._core.xml_helpers import content_proxy_get, parse_ticks
@@ -61,7 +62,7 @@ def bdt(
     ticks = parse_ticks(root)
     # API returns newest first — reverse to chronological order
     ticks.reverse()
-    return to_dataframe(ticks, date_col="dat", time_col="hor")
+    return to_dataframe(ticks, date_col="dat", time_col="hor", schema=TICK_SCHEMA)
 
 
 @validate_params
@@ -110,4 +111,6 @@ def bdi(
     bars = parse_ticks(root)
     # API returns newest first — reverse to chronological order
     bars.reverse()
-    return to_dataframe(bars, date_col="dat", time_col="hor")
+    return to_dataframe(
+        bars, date_col="dat", time_col="hor", schema=INTRADAY_BAR_SCHEMA
+    )

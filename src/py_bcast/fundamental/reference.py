@@ -8,11 +8,16 @@ from .._core.aetp import aetp_request, rows_to_dicts
 from .._core.columns import (
     COMPANY_DETAIL_FIELDS,
     COMPANY_LIST_FIELDS,
+    COMPANY_LIST_SCHEMA,
     INDEX_FIELDS,
+    INDEX_SCHEMA,
     INDICATOR_HISTORY_FIELDS,
+    INDICATOR_HISTORY_SCHEMA,
     INDICATOR_META_FIELDS,
+    INDICATOR_META_SCHEMA,
     QUOTE_FIELDS,
     SECTOR_FIELDS,
+    SECTOR_SCHEMA,
     SHARES_FIELDS,
     TICKER_FIELDS,
 )
@@ -20,7 +25,7 @@ from .._core.dates import DateLike, to_date_str
 from .._core.exceptions import ProtocolError
 from .._core.logging import get_logger
 from .._core.normalize import ensure_str
-from .._core.output import to_dataframe, to_reference_dataframe, to_series
+from .._core.output import to_reference_dataframe, to_series
 from .._core.resolve import resolve_cvm, resolve_indicator
 
 logger = get_logger(__name__)
@@ -52,7 +57,11 @@ def bcompany(
     """
     if cvm_code is None:
         parsed = aetp_request("fundamental/empresa/metadado", {}, session_token)
-        return to_reference_dataframe(rows_to_dicts(parsed), rename=COMPANY_LIST_FIELDS)
+        return to_reference_dataframe(
+            rows_to_dicts(parsed),
+            rename=COMPANY_LIST_FIELDS,
+            schema=COMPANY_LIST_SCHEMA,
+        )
     else:
         parsed = aetp_request(
             "fundamental/empresa",
@@ -85,7 +94,9 @@ def bindices(
         >>> df.head()
     """
     parsed = aetp_request("ativos/indice", {}, session_token)
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=INDEX_FIELDS)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed), rename=INDEX_FIELDS, schema=INDEX_SCHEMA
+    )
 
 
 def bsectors(
@@ -107,7 +118,9 @@ def bsectors(
         >>> df.head()
     """
     parsed = aetp_request("fundamental/setor", {}, session_token)
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=SECTOR_FIELDS)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed), rename=SECTOR_FIELDS, schema=SECTOR_SCHEMA
+    )
 
 
 def bquote(
@@ -263,7 +276,9 @@ def bindicators(
         session_token,
     )
     rows = rows_to_dicts(parsed)
-    return to_dataframe(rows, rename=INDICATOR_HISTORY_FIELDS)
+    return to_reference_dataframe(
+        rows, rename=INDICATOR_HISTORY_FIELDS, schema=INDICATOR_HISTORY_SCHEMA
+    )
 
 
 def bindicator_meta(
@@ -286,4 +301,8 @@ def bindicator_meta(
         >>> df.head()
     """
     parsed = aetp_request("fundamental/indicador/metadado", {}, session_token)
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=INDICATOR_META_FIELDS)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed),
+        rename=INDICATOR_META_FIELDS,
+        schema=INDICATOR_META_SCHEMA,
+    )

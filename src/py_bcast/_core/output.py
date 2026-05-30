@@ -70,11 +70,17 @@ def _apply_rename_series(
     return s
 
 
+def _empty_frame(schema: dict[str, str] | None) -> pd.DataFrame:
+    """Build a typed empty DataFrame from a column -> dtype schema."""
+    return pd.DataFrame({col: pd.Series(dtype=dt) for col, dt in schema.items()})
+
+
 def to_dataframe(
     rows: list[dict[str, str]],
     date_col: str = "dat",
     time_col: str | None = None,
     rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
+    schema: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Convert a list of row dicts into a DataFrame with DatetimeIndex.
 
@@ -89,13 +95,22 @@ def to_dataframe(
                   with date_col for intraday DatetimeIndex.
         rename: Column rename mapping. Keys → None are dropped; keys → str
                 are renamed. Default: CONTENT_PROXY_RENAME. Pass None to skip.
+        schema: Column → dtype map used only when ``rows`` is empty, to return
+                an empty DataFrame with the right columns and a DatetimeIndex
+                (instead of a bare, schema-less frame). The populated frame
+                keeps its coercion-inferred dtypes.
 
     Returns:
         DataFrame with DatetimeIndex and numeric columns.
-        Returns empty DataFrame if rows is empty.
+        Empty DataFrame (with schema + DatetimeIndex if ``schema`` is given)
+        if rows is empty.
     """
     if not rows:
-        return pd.DataFrame()
+        if schema is None:
+            return pd.DataFrame()
+        df = _empty_frame(schema)
+        df.index = pd.DatetimeIndex([])
+        return df
 
     df = pd.DataFrame(rows)
 
@@ -175,6 +190,7 @@ def to_series(
 def to_reference_dataframe(
     rows: list[dict[str, str]],
     rename: dict[str, str | None] | None = None,
+    schema: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Convert reference/event data to a DataFrame without DatetimeIndex.
 
@@ -184,12 +200,16 @@ def to_reference_dataframe(
         rows: List of dicts from API response.
         rename: Rename mapping. Default: None (no rename — AETP endpoints
                 pass their own per-endpoint map).
+        schema: Column → dtype map used only when ``rows`` is empty, to return
+                an empty DataFrame with the right columns (instead of a bare,
+                schema-less frame). The populated frame keeps its
+                coercion-inferred dtypes.
 
     Returns:
         DataFrame with RangeIndex and numeric columns where applicable.
     """
     if not rows:
-        return pd.DataFrame()
+        return pd.DataFrame() if schema is None else _empty_frame(schema)
 
     df = pd.DataFrame(rows)
 

@@ -17,7 +17,14 @@ from .._core.output import (
     to_dataframe,
     to_reference_dataframe,
 )
-from .._core.columns import CONTENT_PROXY_RENAME
+from .._core.columns import (
+    CDI_SCHEMA,
+    CONTENT_PROXY_RENAME,
+    INFLATION_SCHEMA,
+    MACRO_SCHEMA,
+    RETURN_SCHEMA,
+    VOLUME_SCHEMA,
+)
 from .._core.retry import http_retry
 from .._core.validation import DateParam, Ticker, TickerList, validate_params
 from .._core.xml_helpers import content_proxy_get, parse_ticks
@@ -69,7 +76,7 @@ def bmacro(
         session_token=session_token,
     )
     rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows)
+    return to_dataframe(rows, schema=MACRO_SCHEMA)
 
 
 @validate_params
@@ -101,7 +108,7 @@ def bdi_cdi(
         session_token=session_token,
     )
     rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows)
+    return to_dataframe(rows, schema=CDI_SCHEMA)
 
 
 @validate_params
@@ -139,7 +146,7 @@ def breturn(
         session_token=session_token,
     )
     rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows)
+    return to_dataframe(rows, schema=RETURN_SCHEMA)
 
 
 @validate_params
@@ -189,7 +196,9 @@ def bvolume(
         rows.append(data)
 
     if not rows:
-        return pd.DataFrame()
+        empty = pd.DataFrame({c: pd.Series(dtype=t) for c, t in VOLUME_SCHEMA.items()})
+        empty.index = pd.Index([], name="symbol")
+        return empty
 
     df = pd.DataFrame(rows)
     if "symbol" in df.columns:
@@ -250,4 +259,6 @@ def binflation(
         timeout=15,
     )
     rows = parse_ticks(root)
-    return to_reference_dataframe(rows, rename=CONTENT_PROXY_RENAME)
+    return to_reference_dataframe(
+        rows, rename=CONTENT_PROXY_RENAME, schema=INFLATION_SCHEMA
+    )
