@@ -14,9 +14,16 @@ class TestBmacro:
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
         assert "close" in df.columns
+        assert "ticker" in df.columns
+        assert df["ticker"].iloc[0] == "USDBRL"
         # B5: redundant ref_date (dup of index) and empty hor are dropped
         assert "ref_date" not in df.columns
         assert "hor" not in df.columns
+
+    def test_multiple(self):
+        df = bmacro(["USDBRL", "IBOV"], "20260512", "20260519")
+        assert isinstance(df, pd.DataFrame)
+        assert {"USDBRL", "IBOV"} <= set(df["ticker"].unique())
 
     def test_ibov(self):
         df = bmacro("IBOV", "20260512", "20260519")
@@ -65,6 +72,13 @@ class TestBreturn:
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
         assert "close" in df.columns
+        assert "ticker" in df.columns
+        assert df["ticker"].iloc[0] == "PETR4"
+
+    def test_multiple(self):
+        df = breturn(["PETR4", "VALE3"], "20260501", "20260519")
+        assert isinstance(df, pd.DataFrame)
+        assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
 
     def test_sorted(self):
         df = breturn("PETR4", "20260501", "20260519")

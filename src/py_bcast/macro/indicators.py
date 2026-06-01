@@ -11,6 +11,7 @@ from .._core.dates import to_date_str
 from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
+from .._core.multi import vectorize
 from .._core.normalize import ensure_list
 from .._core.output import to_dataframe, to_reference_dataframe
 from .._core.columns import (
@@ -22,21 +23,41 @@ from .._core.columns import (
     VOLUME_SCHEMA,
 )
 from .._core.retry import http_retry
-from .._core.validation import DateParam, Ticker, TickerList, validate_params
+from .._core.validation import DateParam, TickerList, validate_params
 from .._core.xml_helpers import content_proxy_get, parse_ticks
 
 logger = get_logger(__name__)
 
 
+def _bmacro_one(
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Fetch the macro series for a single symbol."""
+    root = content_proxy_get(
+        "BaseHistoricaNumerica/MacroEconomicos",
+        {
+            "305": ticker,
+            "DataInicio": to_date_str(start_date),
+            "DataFim": to_date_str(end_date),
+        },
+        session_token=session_token,
+    )
+    rows = parse_ticks(root, sort_by="dat")
+    return to_dataframe(rows, schema=MACRO_SCHEMA)
+
+
 @validate_params
 def bmacro(
-    ticker: Ticker,
+    ticker: TickerList,
     start_date: DateParam,
     end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch macroeconomic/index historical series.
+    Fetch macroeconomic/index historical series for one or more symbols.
 
     Uses MacroEconomicos endpoint. Supports FX, indices, commodities, rates,
     and synthetic AETAXAS indicators.
@@ -49,30 +70,23 @@ def bmacro(
         AETAXAS: AEIPCA, AEIGPM, AECTIP, AEB052, AEB200, AEFS10, etc.
 
     Args:
-        ticker: Symbol (e.g., "USDBRL", "IBOV", "AEIPCA")
+        ticker: Single symbol or list (e.g., "USDBRL" or ["USDBRL", "IBOV"]).
         start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
         end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
         session_token: BCAA session token
 
     Returns:
-        DataFrame with DatetimeIndex. Columns depend on symbol but typically
-        include: last, open, high, low, settle, var, neg, qtt.
+        Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block
+        per symbol). Columns depend on symbol but typically include close,
+        open, high, low, settle, change_pct, trades, volume.
 
     Example:
         >>> df = bmacro("USDBRL", "20260101", "20260519")
         >>> df["close"].plot()
     """
-    root = content_proxy_get(
-        "BaseHistoricaNumerica/MacroEconomicos",
-        {
-            "305": ticker,
-            "DataInicio": to_date_str(start_date),
-            "DataFim": to_date_str(end_date),
-        },
-        session_token=session_token,
+    return vectorize(
+        ticker, lambda t: _bmacro_one(t, start_date, end_date, session_token)
     )
-    rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows, schema=MACRO_SCHEMA)
 
 
 @validate_params
@@ -107,31 +121,13 @@ def bdi_cdi(
     return to_dataframe(rows, schema=CDI_SCHEMA)
 
 
-@validate_params
-def breturn(
-    ticker: Ticker,
-    start_date: DateParam,
-    end_date: DateParam,
+def _breturn_one(
+    ticker: str,
+    start_date: str,
+    end_date: str,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Fetch adjusted daily returns for a symbol.
-
-    Uses RetornoDiario endpoint.
-
-    Args:
-        ticker: Symbol (e.g., "PETR4", "VALE3", "IBOV")
-        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
-        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
-        session_token: BCAA session token
-
-    Returns:
-        DataFrame with DatetimeIndex. Columns: last (return value).
-
-    Example:
-        >>> df = breturn("PETR4", "20260101", "20260519")
-        >>> df["close"].cumsum().plot()
-    """
+    """Fetch adjusted daily returns for a single symbol."""
     root = content_proxy_get(
         "BaseHistoricaNumerica/RetornoDiario",
         {
@@ -143,6 +139,37 @@ def breturn(
     )
     rows = parse_ticks(root, sort_by="dat")
     return to_dataframe(rows, schema=RETURN_SCHEMA)
+
+
+@validate_params
+def breturn(
+    ticker: TickerList,
+    start_date: DateParam,
+    end_date: DateParam,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch adjusted daily returns for one or more symbols.
+
+    Uses RetornoDiario endpoint.
+
+    Args:
+        ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block
+        per symbol). Columns: change_pct, close.
+
+    Example:
+        >>> df = breturn("PETR4", "20260101", "20260519")
+        >>> df["close"].cumsum().plot()
+    """
+    return vectorize(
+        ticker, lambda t: _breturn_one(t, start_date, end_date, session_token)
+    )
 
 
 @validate_params
