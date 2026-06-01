@@ -24,7 +24,7 @@ Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada 
 | `bcalendar()` | `aetp/output/fundamental/calendario` | `GET /stock/v1/calendar` | Confirmado — feriados por pais |
 | `bdividends()` | `aetp/output/fundamental/eventos/jcp-dividendos` | `POST /stock/v1/corporateevents/{symbol}` | Confirmado — JCP + dividendos + fatores de ajuste |
 | `bdy()` | `aetp/output/fundamental/eventos/dividend-yield` | incluido em `corporateevents` | A implementar |
-| `bnews()` / `bnews_latest()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | Confirmado — 121 secoes, tagging rico |
+| `bnews()` / `bnews_recent()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | Confirmado — 121 secoes, tagging rico |
 | `bsearch()` | `aetp_17.dat` (arquivo local) | `POST /stock/v1/quote/symbol/search` | **Implementado com routing automatico** — schema unificado em `pd.DataFrame` |
 | `bportfolios()` / `bportfolio()` | `aetp/output/fundamental/empresa/carteira-recomendada` | Sem equivalente | Sem suporte no Plus |
 | `bmacro()` / `bdi_cdi()` | `BaseHistoricaNumerica/DiCetipAcumulado` | Sem equivalente | Sem suporte no Plus |

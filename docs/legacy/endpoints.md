@@ -26,7 +26,7 @@ Catalogo completo de todos os endpoints HTTP descobertos no ContentProxy (`cp.ae
 | Funcionalidade | Status | py-bcast | Notas |
 |---|---|---|---|
 | Cotacao em tempo real (streaming) | Implementado | `bdp()` | Via DDE, Service=BC, Topic=COT |
-| Multi-ativo simultaneo | Implementado | `bdps()` | Lista de tickers |
+| Multi-ativo simultaneo | Implementado | `bdp()` | Aceita lista de tickers |
 | Campos: ULT, VAR, MAX, MIN, ABE, FEC, OCP, OVD | Implementado | `bdp()` | Todos os campos DDE |
 | Campos: NEG, QUL, MED, QTT, VTT, VOC, VOV | Implementado | `bdp()` | |
 | Campos: CNG, CAB, AJU (mercadorias/futuros) | Implementado | `bdp()` | |
@@ -299,7 +299,7 @@ por ID sequencial (atualmente ~56M), incluindo texto, Dow Jones, press releases,
 | `/CentralMultimidia/Default.aspx/GetVideoContent` | POST | Implementado | Conteudo completo por ID (JSON) |
 | `/CentralMultimidia/` | GET | Implementado | Pagina HTML com categorias |
 
-**py-bcast**: `bnews(id)`, `bnews_latest(n)`, `bnews_search(category)`
+**py-bcast**: `bnews(id)`, `bnews_recent(n)`, `bnews_multimedia(category)`
 
 **Categorias de multimidia disponiveis:**
 
@@ -358,7 +358,7 @@ IDs sao sequenciais e cobrem AE-News, Dow Jones Newswires, Trading News, Press R
 | Funcionalidade | Status | py-bcast | Notas |
 |---|---|---|---|
 | Banco de instrumentos (aetp_17.dat) | Implementado | `InstrumentDB`, `bsearch()` | 623K instrumentos, XOR(0xAE) |
-| DDE streaming (subscribe + callback) | Implementado | `bdp()`, `bdps()` | Requer bcsys32.exe |
+| DDE streaming (subscribe + callback) | Implementado | `bdp()` | Requer bcsys32.exe |
 | AETP TCP:8100 | Bloqueado | — | Protocolo binario interno, nao cracked |
 | SPC .NET (AESpcNET.dll) | Bloqueado | — | Dead end |
 
@@ -387,7 +387,7 @@ IDs sao sequenciais e cobrem AE-News, Dow Jones Newswires, Trading News, Press R
 
 | Status | Count | Descricao |
 |--------|-------|-----------|
-| Implementado na lib | **27 funcoes** | bdp, bdps, bdh, bdh_ohlcv, bdi, bdt, bmacro, bdi_cdi, breturn, bvolume, binflation, bconsensus, bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolios, bportfolio, bsearch, InstrumentDB |
+| Implementado na lib | **26 funcoes** | bdp, bdh, bdh_ohlcv, bdi, bdt, bmacro, bdi_cdi, breturn, bvolume, binflation, bconsensus, bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolios, bportfolio, bsearch, InstrumentDB |
 | Funcional, nao implementado | **~35** | Endpoints que retornam dados reais (FIIs, Fundos, Financials, TitulosPublicos, etc.) |
 | Bloqueado/Quebrado | ~70 | Ver categorias abaixo |
 | Fora de escopo | ~8 | Contribuicao, admin, banners |

@@ -59,9 +59,8 @@ from py_bcast import bdp, bdh, bdi, bmacro, bconsensus, bdividends, bsearch
 # Real-time quote
 price = bdp("PETR4", "ULT")
 
-# Historical daily (works for ALL instruments)
-data = bdh("PETR4", "20260501", "20260520")
-df = data["PETR4.BVMF"]   # DataFrame with DatetimeIndex
+# Historical daily (works for ALL instruments) — flat DataFrame, ticker column
+df = bdh("PETR4", "20260501", "20260520")
 print(df["close"].tail())
 
 # Intraday 2-min bars
@@ -70,12 +69,12 @@ bars = bdi("PETR4", "20260520")
 # Macro series (FX, indices, commodities, rates)
 fx = bmacro("USDBRL", "20260101", "20260520")
 
-# Analyst consensus
-data = bconsensus("PETR4")
-print(data["buy"], data["target_mean"])
+# Analyst consensus (DataFrame, one row per ticker)
+df = bconsensus("PETR4")
+print(df["buy"].iloc[0], df["target_mean"].iloc[0])
 
-# Dividends history (CVM code + ticker)
-divs = bdividends(9512, "PETR4")
+# Dividends history (ticker; CVM auto-resolved)
+divs = bdividends("PETR4")
 
 # Instrument search — retorna pd.DataFrame (schema unificado entre backends)
 df = bsearch("PETR", exchange="BVMF")
@@ -157,11 +156,11 @@ src/py_bcast/
 │   ├── realtime.py     # BroadcastPlusClient (WebSocket /stock/ws)
 │   └── intraday.py     # btrades() — POST /stock/v1/timesAndTrades
 ├── _async/             # Async versions of all legacy HTTP data functions
-├── realtime/client.py  # Legacy DDE: BroadcastClient, bdp, bdps
+├── realtime/client.py  # Legacy DDE: BroadcastClient, bdp (one or many tickers)
 ├── historical/         # bdh, bdh_ohlcv, bdi, bdt (legacy ContentProxy)
 ├── macro/indicators.py # bmacro, bdi_cdi, breturn, bvolume, binflation
 ├── fundamental/        # bconsensus, bcompany, bindices, …, bcalendar, bdividends, …
-├── news/api.py         # bnews, bnews_latest, bnews_search
+├── news/api.py         # bnews, bnews_recent, bnews_multimedia
 └── instruments/db.py   # InstrumentDB + bsearch (auto-routing legacy/plus)
 tests/
 ├── conftest.py         # Resource-aware skips (legacy_session, legacy_db, plus markers)

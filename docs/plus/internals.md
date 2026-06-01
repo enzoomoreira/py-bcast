@@ -323,7 +323,7 @@ Analise de quais componentes do `_core/` sao reutilizaveis para o backend Plus:
 | `_core/logging.py` | Sim | `get_logger()` e generico |
 | `_core/validation.py` | Sim | `Ticker`, `DateParam`, etc. |
 | `_core/dates.py` | Sim | Conversoes de data |
-| `_core/output.py` | Sim | `to_dataframe()`, `to_series()` |
+| `_core/output.py` | Sim | `to_dataframe()`, `to_record_dataframe()`, `to_reference_dataframe()` |
 | `_core/normalize.py` | Sim | `ensure_list()` etc. |
 | `_core/http.py` | Parcial | `get_http_client()` reutilizavel; `base_params()` especifico do ContentProxy |
 | `_core/session.py` | Nao | BCAA token discovery e especifico do bcsys32.exe |

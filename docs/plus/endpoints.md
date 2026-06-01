@@ -215,7 +215,7 @@ Cada funcao da lib precisa de adapter dedicado para o backend Plus.
 | `bsectors()` | `aetp/output/fundamental/setor` (binary SOH) | `GET /stock/v1/instrumentTypes` | Confirmado — tipos de instrumento |
 | `bcalendar()` | `aetp/output/fundamental/calendario` (binary SOH) | `GET /stock/v1/calendar` | Confirmado — feriados por pais |
 | `bdividends()` | `aetp/output/fundamental/eventos/jcp-dividendos` | `POST /stock/v1/corporateevents/{symbol}` | Confirmado — JCP + dividendos + fatores |
-| `bnews()` / `bnews_latest()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | Confirmado (121 secoes, tagging) |
+| `bnews()` / `bnews_recent()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | Confirmado (121 secoes, tagging) |
 | `bsearch()` | `aetp_17.dat` (arquivo local XOR) | `POST /stock/v1/quote/symbol` | Confirmado (`forbidden`/`notFound` para validacao) |
 
 ### Novas Capacidades (sem equivalente no terminal antigo)

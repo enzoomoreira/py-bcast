@@ -12,25 +12,24 @@ Requires `bcsys32.exe` running on the same machine.
 
 ### `bdp(ticker, fields)`
 
-One-shot reference data request (like Bloomberg's BDP).
+One-shot reference data request (like Bloomberg's BDP). Accepts a single ticker
+**or a list**. Numeric values (prices, percentages) come back as `float`; codes
+and text stay strings; unavailable fields are `None`.
 
 ```python
 from py_bcast import bdp
 
-price = bdp("PETR4", "ULT")           # "45.99"
-data = bdp("PETR4", ["ULT", "VAR"])   # {"ULT": "45.99", "VAR": "-1.2"}
+price = bdp("PETR4", "ULT")            # 45.99
+data  = bdp("PETR4", ["ULT", "VAR"])   # {"ULT": 45.99, "VAR": -1.2}
+
+# Many tickers -> dict keyed by ticker
+batch = bdp(["PETR4", "VALE3", "ITUB4"], ["ULT", "VAR"])
+# {"PETR4": {"ULT": 45.99, ...}, "VALE3": {...}, ...}
 ```
 
-### `bdps(tickers, fields)`
-
-Batch request for multiple tickers.
-
-```python
-from py_bcast import bdps
-
-result = bdps(["PETR4", "VALE3", "ITUB4"], ["ULT", "VAR"])
-# {"PETR4": {"ULT": "45.99", ...}, "VALE3": {...}, ...}
-```
+> **Changed in 0.6.0:** `bdps` was removed — `bdp` now accepts a list of tickers
+> and returns a dict keyed by ticker. Numeric values are parsed to `float`
+> (Brazilian-formatted strings like `"1.234,56"` become `1234.56`).
 
 ### `BroadcastClient`
 
@@ -80,35 +79,42 @@ Requires `BROADCAST_SESSION` environment variable set with a valid BCAA session 
 
 ### `bdh(tickers, start_date, end_date)`
 
-Historical daily closing prices. Works for **all** instruments.
+Historical daily closing prices. Works for **all** instruments. Accepts a single
+ticker or a list.
 
 ```python
 from py_bcast import bdh
 
 # Single ticker
-data = bdh("PETR4", "20260501", "20260520")
-df = data["PETR4.BVMF"]   # DataFrame with DatetimeIndex
-print(df["close"])          # closing price series
+df = bdh("PETR4", "20260501", "20260520")   # flat DataFrame, DatetimeIndex
+petr = df[df["ticker"] == "PETR4.BVMF"]
+print(petr["close"])
 
-# Multiple tickers
-data = bdh(["PETR4", "VALE3", "USDBRL"], "20260515", "20260520")
+# Multiple tickers — one flat frame, distinguished by the ticker column
+df = bdh(["PETR4", "VALE3", "USDBRL"], "20260515", "20260520")
 ```
 
-**Returns:** `dict[symbol, DataFrame]` — each DataFrame has a DatetimeIndex and columns: `close`, `settle`, `settle_rate`, `yield`.
+**Returns:** a single flat (long) `DataFrame` with a `DatetimeIndex`, one block of rows per symbol, and columns: `ticker`, `close`, `settle`, `settle_rate`, `yield`. Empty DataFrame with that schema if no data.
+
+> **Changed in 0.6.0:** previously returned `dict[symbol, DataFrame]`; now a single flat DataFrame with a `ticker` column.
 
 ### `bdh_ohlcv(ticker, date)`
 
-Full OHLCV for a single ticker on a single date.
+Full OHLCV for one or more tickers on a single date.
 
 ```python
 from py_bcast import bdh_ohlcv
 
 bar = bdh_ohlcv("PETR4", "20260519")
-print(bar["close"], bar["high"], bar["low"], bar["open"])
-print(bar["trades"], bar["volume"], bar["turnover"])
+print(bar["close"].iloc[0], bar["high"].iloc[0], bar["low"].iloc[0])
+
+# Multiple tickers on the same date
+df = bdh_ohlcv(["PETR4", "VALE3"], "20260519")
 ```
 
-**Returns:** `Series` with index: `close`, `settle`, `settle_rate`, `low`, `high`, `open`, `trades`, `volume`, `turnover`, `open_interest`, `vwap`, `cum_trades`. Empty Series if no data.
+**Returns:** a `DataFrame` with a `DatetimeIndex` (one row per ticker) and columns: `ticker`, `close`, `settle`, `settle_rate`, `low`, `high`, `open`, `trades`, `volume`, `turnover`, `open_interest`, `vwap`, `cum_trades`. Empty DataFrame with that schema if there is no data for the date; `NotFoundError` for an unknown ticker.
+
+> **Changed in 0.6.0:** previously returned a `Series`; now a one-row-per-ticker DataFrame.
 
 ### `bdi(ticker, start_date)`
 
@@ -123,9 +129,12 @@ print(df[["open", "high", "low", "close", "volume", "trades"]].tail())
 
 # Multiple days of intraday data
 df = bdi("USDBRL", "20260515")  # from May 15 to now
+
+# Multiple symbols -> one flat frame, distinguished by the ticker column
+df = bdi(["PETR4", "VALE3"], "20260520")
 ```
 
-**Returns:** `DataFrame` with DatetimeIndex and columns: `open`, `high`, `low`, `close`, `volume`, `trades`, `turnover`, `open_interest`, `cum_trades`, `session_type`.
+**Returns:** `DataFrame` with DatetimeIndex and columns: `ticker`, `open`, `high`, `low`, `close`, `volume`, `trades`, `turnover`, `open_interest`, `cum_trades`, `session_type`.
 
 **Notes:**
 - Bars are 2-minute candles (server-determined granularity)
@@ -142,9 +151,12 @@ from py_bcast import bdt
 
 df = bdt("USDBRL", "20260519100000", "20260519110000")
 print(df["close"])  # tick prices with DatetimeIndex
+
+# Multiple symbols -> one flat frame with a ticker column
+df = bdt(["USDBRL", "EURUSD"], "20260519100000", "20260519110000")
 ```
 
-**Returns:** `DataFrame` with DatetimeIndex and columns: `close`, `size`, `trades`, `open_interest`, `calendar_days`, `working_days`.
+**Returns:** `DataFrame` with DatetimeIndex and columns: `ticker`, `close`, `size`, `trades`, `open_interest`, `calendar_days`, `working_days`.
 
 **Supported symbols:** USDBRL, EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, USDCNY, USDMXN, EURBRL, GBPBRL, JPYBRL, CHFBRL, AUDBRL, CADBRL, GOLD, SILVER, WTI, DAX, FTSE, VIX, DXY, US10Y, US2Y.
 
@@ -154,18 +166,22 @@ print(df["close"])  # tick prices with DatetimeIndex
 
 ### `bconsensus(ticker)`
 
-Analyst consensus recommendations and target prices.
+Analyst consensus recommendations and target prices. Accepts a single ticker or
+a list.
 
 ```python
 from py_bcast import bconsensus
 
-data = bconsensus("PETR4")
-# {'buy': '3', 'hold': '2', 'sell': '0', 'total_analysts': '5',
-#  'target_low': '43.00', 'target_high': '64.00',
-#  'target_mean': '48.60', 'target_median': '45.00', 'upside_pct': '8.7350'}
+df = bconsensus("PETR4")
+print(df["buy"].iloc[0], df["target_mean"].iloc[0])
+
+# Multiple tickers -> one flat frame
+df = bconsensus(["PETR4", "VALE3"])
 ```
 
-**Returns:** `dict` with keys: buy, hold, sell, total_analysts, target_low, target_high, target_mean, target_median, upside_pct. Empty dict if no data.
+**Returns:** a one-row-per-ticker `DataFrame` with columns: `ticker`, `buy`, `hold`, `sell`, `total_analysts`, `target_low`, `target_high`, `target_mean`, `target_median`, `upside_pct`. Empty DataFrame with that schema when a (valid) ticker has no analyst coverage.
+
+> **Changed in 0.6.0:** previously returned a `dict`; now a DataFrame.
 
 ---
 
@@ -187,11 +203,14 @@ df = bmacro("AEIPCA", "20250101", "20260520")
 
 # Commodities
 df = bmacro("GOLD", "20200101", "20260520")
+
+# Multiple symbols -> one flat frame with a ticker column
+df = bmacro(["USDBRL", "IBOV"], "20260101", "20260520")
 ```
 
 **Supported symbols:** USDBRL, EURUSD, IBOV, SPX, DAX, GOLD, WTI, DI1F27, AEIPCA, AEIGPM, AECTIP, AEB052, AEB200, AEFS10, and many more.
 
-**Returns:** `DataFrame` with DatetimeIndex sorted chronologically. Columns vary but typically include: `close`, `open`, `high`, `low`, `settle`, `change_pct`, `trades`, `volume`.
+**Returns:** `DataFrame` with DatetimeIndex sorted chronologically and a `ticker` column. Other columns vary by symbol but typically include: `close`, `open`, `high`, `low`, `settle`, `change_pct`, `trades`, `volume`.
 
 ### `bdi_cdi(start_date, end_date)`
 
@@ -215,9 +234,12 @@ from py_bcast import breturn
 
 df = breturn("PETR4", "20260101", "20260520")
 print(df["close"].tail())
+
+# Multiple symbols -> one flat frame with a ticker column
+df = breturn(["PETR4", "VALE3"], "20260101", "20260520")
 ```
 
-**Returns:** `DataFrame` with DatetimeIndex sorted chronologically. Columns: `close`.
+**Returns:** `DataFrame` with DatetimeIndex sorted chronologically and columns: `ticker`, `change_pct`, `close`.
 
 ### `bvolume(tickers)`
 
@@ -227,10 +249,12 @@ Average volume statistics (1m/2m/3m/6m averages).
 from py_bcast import bvolume
 
 df = bvolume(["PETR4", "VALE3"])
-print(df[["avg_volume", "avg_turnover", "avg_trades", "months"]])
+print(df[df["symbol"] == "PETR4.BVMF"])
 ```
 
-**Returns:** `DataFrame` indexed by symbol with columns: `avg_volume`, `avg_turnover`, `avg_trades`, `months`.
+**Returns:** a flat `DataFrame` (RangeIndex), one row per (symbol, averaging window), with columns: `symbol`, `avg_volume`, `avg_turnover`, `avg_trades`, `months`, `dat`.
+
+> **Changed in 0.6.0:** `symbol` is now a regular column (it repeats per averaging window, so it can never be a unique index) instead of the DataFrame index.
 
 ### `binflation()`
 
@@ -285,42 +309,61 @@ sectors = bsectors()
 
 ### `bquote(ticker)`
 
-Current quote (price, volume) for a symbol via aetp.
+Current quote (price, volume) for one or more symbols via aetp. Accepts a single
+ticker or a list.
 
 ```python
 from py_bcast import bquote
 
 q = bquote("PETR4")
-print(q["close"], q["volume"])  # 46.09, 1500000
+print(q["close"].iloc[0])
+
+# Multiple tickers -> one flat frame
+df = bquote(["PETR4", "VALE3"])
 ```
+
+**Returns:** a one-row-per-symbol `DataFrame` with a `ticker` column and quote fields (`close`, `volume`, `cvm_code`, etc.). This is also the ticker -> CVM resolution primitive, so it stays "soft": an unknown ticker yields an empty block (with schema) rather than raising.
+
+> **Changed in 0.6.0:** previously returned a `Series`; now a DataFrame.
 
 ### `btickers(ticker_or_cvm)`
 
-All tickers (stocks/units) for a company. Accepts a ticker string (CVM auto-resolved) or a CVM code directly.
+All tickers (stocks/units) for one or more companies. Accepts a ticker string (CVM auto-resolved), a CVM code directly, or a list mixing both.
 
 ```python
 from py_bcast import btickers
 
-df = btickers("PETR4")  # auto-resolves CVM
-df = btickers(9512)     # direct CVM code — same result
+df = btickers("PETR4")        # auto-resolves CVM
+df = btickers(9512)           # direct CVM code — same result
+df = btickers(["PETR4", 4170])  # mixed list
 print(df["ticker"].tolist())  # ['PETR3', 'PETR4']
 ```
 
+> **Note:** the endpoint emits its own `ticker` column (the company's symbols), so for a list use the `cvm_code` column to tell the companies apart.
+
 ### `bshares(ticker)`
 
-Shares outstanding for a ticker.
+Shares outstanding for one or more tickers. Accepts a single ticker or a list.
 
 ```python
 from py_bcast import bshares
 
-data = bshares("PETR4")
+df = bshares("PETR4")
+print(df["total_shares"].iloc[0])
+
+# Multiple tickers -> one flat frame
+df = bshares(["PETR4", "VALE3"])
 ```
+
+**Returns:** a one-row-per-ticker `DataFrame` with a `ticker` column. Raises `NotFoundError` for an unknown ticker (fail-fast across a list).
+
+> **Changed in 0.6.0:** previously returned a `Series`; now a DataFrame.
 
 ### `bindicators(ticker_or_cvm, indicator, start_date, end_date)`
 
 Daily fundamental indicator history.
 
-Accepts a **ticker string or CVM code** and an **indicator name or numeric ID**. Use `bindicator_meta()` to discover all available indicators.
+Accepts a **ticker string or CVM code** (or a list mixing both) and an **indicator name or numeric ID**. With a list, the result is one flat DataFrame with a `ticker` column. Use `bindicator_meta()` to discover all available indicators.
 
 ```python
 from py_bcast import bindicators
@@ -362,24 +405,26 @@ events = bcalendar("20260101", "20260520")  # ~1600+ events
 
 ### `bdividends(ticker, cvm_code=None)`
 
-Dividend/JCP payment history for a company. CVM code is auto-resolved from the ticker if not provided.
+Dividend/JCP payment history for one or more companies. CVM code is auto-resolved from the ticker if not provided. Accepts a single ticker or a list (with a list, `cvm_code` is ignored and each ticker resolves its own).
 
 ```python
 from py_bcast import bdividends
 
-divs = bdividends("PETR4")           # ticker-only (recommended)
-divs = bdividends("PETR4", 9512)     # explicit CVM — skips resolution
+divs = bdividends("PETR4")            # ticker-only (recommended)
+divs = bdividends("PETR4", 9512)      # explicit CVM — skips resolution
+divs = bdividends(["PETR4", "VALE3"]) # list -> one flat frame, ticker column
 ```
 
 ### `bdy(ticker, start_date, end_date, cvm_code=None)`
 
-Dividend yield historical series. CVM code is auto-resolved from the ticker if not provided.
+Dividend yield historical series for one or more companies. CVM code is auto-resolved from the ticker if not provided. Accepts a single ticker or a list (with a list, `cvm_code` is ignored and each ticker resolves its own).
 
 ```python
 from py_bcast import bdy
 
-dy = bdy("PETR4", "20250101", "20260520")           # ticker-only (recommended)
+dy = bdy("PETR4", "20250101", "20260520")                 # ticker-only (recommended)
 dy = bdy("PETR4", "20250101", "20260520", cvm_code=9512)  # explicit CVM
+dy = bdy(["PETR4", "VALE3"], "20250101", "20260520")      # list -> one flat frame
 ```
 
 ### `bportfolios()`
@@ -430,14 +475,14 @@ print(article["files"])    # [{"filename": "...", "extension": "mp4", "url": "..
 - Content is HTML (may contain `<br/>`, `<PRE>`, `<span>` tags)
 - Files list contains attached media (mp4, png) with direct download URLs
 
-### `bnews_latest(count=10)`
+### `bnews_recent(count=10)`
 
 Fetch the most recent news articles.
 
 ```python
-from py_bcast import bnews_latest
+from py_bcast import bnews_recent
 
-for article in bnews_latest(5):
+for article in bnews_recent(5):
     print(f"[{article['id']}] {article['title'][:60]}")
 ```
 
@@ -447,19 +492,21 @@ for article in bnews_latest(5):
 - Uses binary search to find the current ID ceiling, then scans backwards
 - First call may take a few seconds (binary search); subsequent IDs are sequential
 
-### `bnews_search(category, days_ago=60, limit=20)`
+### `bnews_multimedia(category, days_ago=60, limit=20)`
 
-List multimedia/podcast content from a specific category.
+List multimedia/podcast content from a specific category. (Renamed from
+`bnews_search` in 0.6.0 — it lists a category's multimedia, it is not a text
+search.)
 
 ```python
-from py_bcast import bnews_search, MULTIMEDIA_CATEGORIES
+from py_bcast import bnews_multimedia, MULTIMEDIA_CATEGORIES
 
 # List available categories
 for cat_id, name in MULTIMEDIA_CATEGORIES.items():
     print(f"{cat_id}: {name}")
 
 # Get recent podcasts
-items = bnews_search(748)  # 748 = Podcast
+items = bnews_multimedia(748)  # 748 = Podcast
 for item in items:
     print(f"[{item['id']}] {item['date']} {item['title']}")
 
@@ -498,7 +545,7 @@ from py_bcast import bcompany
 detail = bcompany(resolve_cvm("ITUB4"))
 ```
 
-Raises `ValidationError` if the ticker cannot be resolved.
+Raises `NotFoundError` if the ticker cannot be resolved.
 
 ### `resolve_indicator(name_or_id)`
 
@@ -574,11 +621,11 @@ cache_invalidate("bdh:PETR4:...")           # clear specific key
 
 ## Async API
 
-All HTTP data functions have async equivalents in the `py_bcast._async` namespace, prefixed with `a` (e.g. `abdh`, `abmacro`). They share the same connection pool, cache, and rate limiter as the sync API.
+All HTTP data functions have async equivalents in the `py_bcast._async` namespace, prefixed with `a` (e.g. `abdh`, `abmacro`). They share the same connection pool, cache, and rate limiter as the sync API, and speak the **same contract**: flat DataFrame with a `ticker` column, multi-ticker input, `NotFoundError` for unknown inputs, empty-with-schema for valid-but-empty queries. (The list cores run concurrently via `asyncio.gather`.)
 
 ```python
 import asyncio
-from py_bcast._async import abdh, abmacro, abconsensus, abnews_latest
+from py_bcast._async import abdh, abmacro, abconsensus, abnews_recent
 
 async def main():
     # Historical prices
@@ -627,10 +674,10 @@ data = asyncio.run(async_api.abdh("PETR4", "20260501", "20260520"))
 | `abtickers` | `btickers` | `_async.fundamental` | accepts ticker or CVM code |
 | `abshares` | `bshares` | `_async.fundamental` |
 | `abnews` | `bnews` | `_async.news` |
-| `abnews_latest` | `bnews_latest` | `_async.news` |
-| `abnews_search` | `bnews_search` | `_async.news` |
+| `abnews_recent` | `bnews_recent` | `_async.news` |
+| `abnews_multimedia` | `bnews_multimedia` | `_async.news` |
 
-> **Note:** `abnews_latest` uses `asyncio.gather` internally for parallel article fetches, which is significantly faster than the sequential sync version.
+> **Note:** `abnews_recent` uses `asyncio.gather` internally for parallel article fetches, which is significantly faster than the sequential sync version.
 
 ---
 
@@ -697,20 +744,26 @@ db.exchanges                         # {"PR": 189985, "BVMF": 138181, ...}
 
 > **Tip:** Set `BROADCAST_SESSION` in your shell profile or `.env` to eliminate the startup cost entirely.
 
-> **Note:** News functions (`bnews`, `bnews_latest`, `bnews_search`) do NOT require a session token.
+> **Note:** News functions (`bnews`, `bnews_recent`, `bnews_multimedia`) do NOT require a session token.
 
 ## Error Handling
 
 All exceptions inherit from `PyBcastError`.
 
+**Error policy (since 0.6.0).** Three distinct situations, three distinct outcomes:
+- **Input does not exist** (unknown ticker / CVM / broker / indicator) -> raises `NotFoundError`. In a multi-input call, the first bad input raises (fail-fast); bad inputs are never silently dropped. Exception: `bquote`/`bconsensus` are "soft" (a valid query with no coverage yields an empty block, not a raise).
+- **Valid query, zero rows** (e.g. an empty date range) -> returns an **empty DataFrame with the right columns/schema**, never raises.
+- **Transport / protocol / auth failure** -> the specific exception below.
+
 | Exception | Raised when |
 |-----------|-------------|
 | `SessionError` | Session token is missing or invalid |
+| `NotFoundError` | A well-formed but non-existent entity was looked up (unknown ticker, CVM, broker, indicator). Exposes `.identifier` and `.kind` |
 | `ContentProxyError` | ContentProxy HTTP endpoint returned an error status |
 | `ProtocolError` | Binary SOH response is malformed or contains an error |
 | `DDEError` | DDE connection failed or request timed out |
 | `DDEAdviseError` | DDE advise (subscription) failed for a specific item (subclass of `DDEError`) |
-| `ValidationError` | Input parameter validation failed (also a `ValueError`) |
+| `ValidationError` | Input parameter was malformed (also a `ValueError`); also ambiguous indicator names |
 | `FileNotFoundError` | Instrument database not found (`bcsys32` never ran) |
 
 **Structured exception attributes:**

@@ -22,13 +22,13 @@ O terminal expoe **cinco canais de dados** consumidos pela lib:
 ```mermaid
 graph LR
     subgraph "py_bcast (this library)"
-        CLIENT["realtime/client.py<br/>BroadcastClient, bdp, bdps"]
+        CLIENT["realtime/client.py<br/>BroadcastClient, bdp"]
         HIST["historical/<br/>bdh, bdh_ohlcv, bdi, bdt"]
         MACRO["macro/indicators.py<br/>bmacro, bdi_cdi, breturn,<br/>bvolume, binflation"]
         FUND["fundamental/consensus.py<br/>bconsensus"]
         REF["fundamental/reference.py<br/>bcompany, bindices, bsectors,<br/>bquote, btickers, bshares,<br/>bindicators, bindicator_meta"]
         EVT["fundamental/events.py<br/>bcalendar, bdividends, bdy,<br/>bportfolios, bportfolio"]
-        NEWS["news/api.py<br/>bnews, bnews_latest,<br/>bnews_search"]
+        NEWS["news/api.py<br/>bnews, bnews_recent,<br/>bnews_multimedia"]
         INST["instruments/db.py<br/>InstrumentDB, bsearch"]
     end
 
