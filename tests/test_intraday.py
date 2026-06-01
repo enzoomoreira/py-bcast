@@ -10,19 +10,32 @@ from py_bcast import bdi
 pytestmark = pytest.mark.legacy_session
 
 
+def _recent_trading_day() -> str:
+    """Most recent weekday as YYYYMMDD.
+
+    Intraday endpoints have no data on weekends, so tests use this instead of
+    ``date.today()`` to stay green when run on a Saturday or Sunday (today if a
+    weekday, otherwise stepping back to the preceding Friday).
+    """
+    d = datetime.date.today()
+    while d.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+        d -= datetime.timedelta(days=1)
+    return d.strftime("%Y%m%d")
+
+
 class TestBdi:
     """Test HistoricoIntraday endpoint via bdi()."""
 
     def test_petr4_today(self):
         """PETR4 intraday returns bars for today."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("PETR4", today)
         assert isinstance(df, pd.DataFrame)
         assert len(df) > 0
 
     def test_bar_fields(self):
         """Each bar has expected OHLCV fields."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("PETR4", today)
         assert len(df) > 0
         expected_cols = {"open", "high", "low", "close", "volume", "trades"}
@@ -30,7 +43,7 @@ class TestBdi:
 
     def test_chronological_order(self):
         """Bars are sorted oldest-first."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("PETR4", today)
         if len(df) >= 2:
             valid = df[df.index.notna()]
@@ -47,7 +60,7 @@ class TestBdi:
 
     def test_international_usdbrl(self):
         """USDBRL intraday works."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("USDBRL", today)
         assert len(df) > 0
         # FX has decimal precision
@@ -55,13 +68,13 @@ class TestBdi:
 
     def test_international_gold(self):
         """GOLD intraday works."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("GOLD", today)
         assert len(df) > 0
 
     def test_session_type(self):
         """Bars include session_type field."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("PETR4", today)
         assert len(df) > 0
         assert "session_type" in df.columns
@@ -70,7 +83,7 @@ class TestBdi:
 
     def test_numeric_values(self):
         """OHLCV values are numeric."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("PETR4", today)
         assert len(df) > 0
         for field in ["open", "high", "low", "close"]:
@@ -78,20 +91,20 @@ class TestBdi:
 
     def test_vale3(self):
         """VALE3 (B3 stock) works for intraday."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("VALE3", today)
         assert len(df) > 0
 
     def test_single_has_ticker_column(self):
         """Single-symbol call now carries a ticker column."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi("PETR4", today)
         assert "ticker" in df.columns
         assert df["ticker"].iloc[0] == "PETR4"
 
     def test_multiple(self):
         """A list returns one flat frame covering every symbol."""
-        today = datetime.date.today().strftime("%Y%m%d")
+        today = _recent_trading_day()
         df = bdi(["PETR4", "VALE3"], today)
         assert isinstance(df, pd.DataFrame)
         assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
