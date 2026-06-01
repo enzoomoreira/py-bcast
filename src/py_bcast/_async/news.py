@@ -6,6 +6,8 @@ import asyncio
 import json
 from typing import Optional
 
+import httpx
+
 from .._core.constants import BASE_URL
 from .._core.http import get_async_http_client
 from .._core.logging import get_logger
@@ -17,7 +19,7 @@ _CONTENT_PATH = "/CentralMultimidia/Default.aspx/GetVideoContent"
 _HANDLER_PATH = "/CentralMultimidia/Handlers/MultimediaCenterHandler.ashx"
 
 
-def _decode_json(r) -> dict:
+def _decode_json(r: httpx.Response) -> dict:
     """Decode JSON from response, handling latin-1 encoded bodies."""
     try:
         return r.json()
@@ -80,12 +82,12 @@ async def abnews_recent(count: int = 10) -> list[dict]:
             range(nid, max(nid - batch_size, nid - (count - len(results)) - 20), -1)
         )
         tasks = [abnews(bid) for bid in batch_ids]
-        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+        # No return_exceptions: a real transport error propagates (matching the
+        # sync scan) instead of being silently counted as a missing id. A
+        # non-existent id is not an error here — abnews returns an empty dict.
+        batch_results = await asyncio.gather(*tasks)
 
         for bid, article in zip(batch_ids, batch_results):
-            if isinstance(article, Exception):
-                miss_count += 1
-                continue
             if article:
                 article["id"] = bid
                 results.append(article)
@@ -153,16 +155,14 @@ async def _async_find_latest_id() -> Optional[int]:
     while hi - lo > 1:
         mid = (lo + hi) // 2
         await rate_limit_async()
-        try:
-            r = await s.post(
-                f"{BASE_URL}{_CONTENT_PATH}",
-                json={"videoId": str(mid)},
-                headers={"Content-Type": "application/json"},
-                timeout=5,
-            )
-        except Exception:
-            hi = mid
-            continue
+        # Transport errors propagate rather than being misread as "id above the
+        # ceiling"; only a 200-with-no-title or a non-200 narrows the bound.
+        r = await s.post(
+            f"{BASE_URL}{_CONTENT_PATH}",
+            json={"videoId": str(mid)},
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+        )
         if r.status_code == 200:
             d = _decode_json(r).get("d")
             if d and d.get("Title"):

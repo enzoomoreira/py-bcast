@@ -234,11 +234,10 @@ def _find_latest_id() -> Optional[int]:
 
     while hi - lo > 1:
         mid = (lo + hi) // 2
-        try:
-            r = _news_fetch_content(s, mid)
-        except Exception:
-            hi = mid
-            continue
+        # Transport errors propagate (after @http_retry exhausts) rather than
+        # being misread as "id above the ceiling"; only a 200-with-no-title or a
+        # non-200 status narrows the upper bound.
+        r = _news_fetch_content(s, mid)
         if r.status_code == 200:
             d = _decode_json(r).get("d")
             if d and d.get("Title"):
