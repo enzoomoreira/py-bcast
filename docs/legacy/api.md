@@ -31,6 +31,13 @@ batch = bdp(["PETR4", "VALE3", "ITUB4"], ["ULT", "VAR"])
 > and returns a dict keyed by ticker. Numeric values are parsed to `float`
 > (Brazilian-formatted strings like `"1.234,56"` become `1234.56`).
 
+> **Contract note:** `bdp` is the **one deliberate exception** to the library's
+> "every tabular function returns a flat DataFrame with a `ticker` column" rule.
+> Like Bloomberg's `BDP`, it is a scalar/point lookup and returns a scalar, a
+> dict of fields, or a dict-of-dicts keyed by ticker — never a DataFrame. Every
+> other public data function (`bdh`, `bmacro`, `bconsensus`, …) follows the
+> DataFrame+`ticker` contract.
+
 ### `BroadcastClient`
 
 Full-featured client with streaming support.
@@ -673,6 +680,15 @@ data = asyncio.run(async_api.abdh("PETR4", "20260501", "20260520"))
 | `abquote` | `bquote` | `_async.fundamental` |
 | `abtickers` | `btickers` | `_async.fundamental` | accepts ticker or CVM code |
 | `abshares` | `bshares` | `_async.fundamental` |
+| `abindices` | `bindices` | `_async.fundamental` |
+| `absectors` | `bsectors` | `_async.fundamental` |
+| `abindicators` | `bindicators` | `_async.fundamental` | accepts ticker or CVM code |
+| `abindicator_meta` | `bindicator_meta` | `_async.fundamental` |
+| `abcalendar` | `bcalendar` | `_async.events` |
+| `abdividends` | `bdividends` | `_async.events` |
+| `abdy` | `bdy` | `_async.events` |
+| `abportfolios` | `bportfolios` | `_async.events` |
+| `abportfolio` | `bportfolio` | `_async.events` |
 | `abnews` | `bnews` | `_async.news` |
 | `abnews_recent` | `bnews_recent` | `_async.news` |
 | `abnews_multimedia` | `bnews_multimedia` | `_async.news` |

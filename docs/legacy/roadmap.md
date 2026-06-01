@@ -6,6 +6,41 @@ Ver [`endpoints.md`](./endpoints.md) para o catalogo completo com status de cada
 
 ---
 
+## Reformulacao de API planejada (deferida para um release deliberado)
+
+O 0.6.0 conformou o **contrato** (DataFrame achatado + coluna `ticker`, multi-ticker,
+`NotFoundError` vs vazio-com-schema, parse BR -> float, paridade sync/async completa). Ficou
+**deferida** uma camada de reformulacao puramente nominal/estrutural, que e *breaking* e por
+isso merece um release proprio (ex.: 0.7.0). Nenhum item abaixo corrige bug — sao melhorias de
+clareza/ergonomia.
+
+| # | Mudanca | Estado atual | Proposta | Risco |
+|---|---------|--------------|----------|-------|
+| 1 | **Naming de historico** | `bdh` retorna so close+settle; `bdh_ohlcv` retorna OHLCV de 1 dia | Ver "Decisao em aberto" abaixo | Breaking nominal |
+| 2 | **Fundir `bdi_cdi` em `bmacro`** | endpoint/funcao separada (`DiCetipAcumulado`) | rotear `bmacro("CDI", ...)` internamente; remover `bdi_cdi` do `__all__` | Breaking nominal |
+| 3 | **Unificar `bportfolios`/`bportfolio`** | duas funcoes | `bportfolio(broker=None)` (lista quando `None`), padrao de `bcompany(cvm=None)` | Breaking nominal |
+| 4 | **Decorator `@accepts_ticker_or_cvm`** | 4 copias do check `isinstance(int) or isdigit() -> resolve_cvm` em `btickers`/`bdividends`/`bdy`/`bindicators` | extrair para `_core/resolve.py` | Interno, nao-breaking |
+| 5 | **Renomear colunas cripticas** | algumas colunas seguem nomes do servidor | nomes finance-standard onde ainda ha residuo | Breaking nominal |
+| 6 | **`@http_retry` no caminho async** | os helpers async (`async_content_proxy_get`, `async_aetp_request`, `abdh` inline) nao tem retry | decorator async equivalente a tenacity, ou `AsyncRetrying` | Interno, nao-breaking |
+
+### Decisao em aberto — naming de historico (item 1)
+
+O `PLAN.md` original (gitignorado) propunha **`bdh` -> `bclose`** e **`bdh_ohlcv` -> `bdh`**.
+A intencao mais recente e **unificar num `bhistory` multi-dia** (um historico OHLCV com range de
+datas, em vez de `bdh_ohlcv` ser single-day). As duas direcoes sao incompativeis e precisam ser
+reconciliadas **antes** de executar:
+
+- **Opcao A (renomeio simples):** `bdh -> bclose`, `bdh_ohlcv -> bdh`. Honesto com Bloomberg
+  (BDH = historico), baixo esforco, mas mantem `bdh_ohlcv` como single-day.
+- **Opcao B (unificacao, recomendada):** introduzir `bhistory(tickers, start, end, fields=...)`
+  cobrindo close-only e OHLCV multi-dia num so ponto; manter `bclose` como atalho. Resolve a
+  limitacao single-day do `bdh_ohlcv` de uma vez, ao custo de mais desenho.
+
+Recomendacao: **Opcao B**, num release 0.7.0 dedicado, com periodo de deprecation curto (o repo
+nao tem consumidores externos, entao o churn e so interno + docs + tests).
+
+---
+
 ## Prioridade Alta (parser ja existe, so mapear campos)
 
 Todos os endpoints abaixo usam o binary SOH ou XML — os decoders ja estao implementados em `src/py_bcast/`. O trabalho e apenas mapear os campos de resposta e expor a funcao publica.
