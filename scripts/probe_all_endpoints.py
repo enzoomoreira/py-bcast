@@ -7,7 +7,7 @@ import json
 import time
 import httpx
 
-from py_bcast._core.session import get_session_token
+from py_bcast._legacy.session import get_session_token
 
 BASE = "http://cp.ae.com.br:44780"
 SESSION = get_session_token()

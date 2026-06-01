@@ -68,9 +68,9 @@ from .ticker import Ticker
 from . import accessor as _accessor  # noqa: F401 — registers the .bcast DataFrame accessor
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
 from .news import bnews, bnews_recent, bnews_multimedia, MULTIMEDIA_CATEGORIES
-from ._core.session import discover_session_token, clear_token_cache
+from ._legacy.session import discover_session_token, clear_token_cache
 from ._plus.session import discover_plus_token, clear_plus_token_cache
-from ._core.resolve import resolve_cvm, resolve_indicator
+from ._legacy.resolve import resolve_cvm, resolve_indicator
 from ._core.exceptions import (
     PyBcastError,
     SessionError,

@@ -13,34 +13,43 @@ py_bcast suporta dois backends independentes que rodam em paralelo:
 | **Endpoints** | [`legacy/endpoints.md`](./legacy/endpoints.md) | [`plus/endpoints.md`](./plus/endpoints.md) |
 | **API publica** | [`legacy/api.md`](./legacy/api.md) | [`plus/api.md`](./plus/api.md) |
 
-Zero sobreposicao de endpoints entre os dois servidores. Cada backend tem seu subpacote (`src/py_bcast/` para Legacy, `src/py_bcast/_plus/` para Plus) e compartilha o `_core/` com o outro.
+Zero sobreposicao de endpoints entre os dois servidores. O backend Legacy concentra o stack de protocolo (DDE, AETP, ContentProxy HTTP, parsing e construcao de DataFrame) em `src/py_bcast/_legacy/`, com os pacotes de dominio (`historical/`, `macro/`, `fundamental/`, ...) no topo de `src/py_bcast/`; o backend Plus vive em `src/py_bcast/_plus/`. Os dois compartilham apenas a infraestrutura backend-agnostica de `src/py_bcast/_core/` — o Plus nunca importa de `_legacy/`.
 
 ```mermaid
 graph LR
     subgraph "py_bcast"
-        CORE["_core/<br/>config, cache, ratelimit,<br/>retry, validation, http"]
+        CORE["_core/ (backend-agnostico)<br/>config, constants, exceptions,<br/>cache, ratelimit, retry,<br/>validation, dates, normalize,<br/>routing, memory, logging"]
 
         subgraph "Legacy (bcsys32.exe)"
+            L_PROTO["_legacy/ (protocolo)<br/>dde, aetp, binary, xml_helpers,<br/>http, session, resolve,<br/>columns, output, multi"]
             L_RT["realtime/<br/>bdp, BroadcastClient"]
             L_HIST["historical/<br/>bdh, bdi, bdt"]
             L_MACRO["macro/"]
             L_FUND["fundamental/"]
             L_NEWS["news/"]
             L_INST["instruments/"]
+            L_ASYNC["_async/<br/>(gemeos async)"]
         end
 
         subgraph "Plus (Broadcast+.exe)"
             P_SESS["_plus/session.py<br/>get_plus_token"]
             P_HTTP["_plus/http.py<br/>plus_request"]
+            P_RT["_plus/realtime.py<br/>BroadcastPlusClient"]
+            P_INTRA["_plus/intraday.py<br/>btrades"]
         end
 
-        CORE --> L_RT
-        CORE --> L_HIST
-        CORE --> L_MACRO
-        CORE --> L_FUND
-        CORE --> L_NEWS
+        CORE --> L_PROTO
+        L_PROTO --> L_RT
+        L_PROTO --> L_HIST
+        L_PROTO --> L_MACRO
+        L_PROTO --> L_FUND
+        L_PROTO --> L_NEWS
+        L_PROTO --> L_ASYNC
+        CORE --> L_INST
         CORE --> P_SESS
         CORE --> P_HTTP
+        CORE --> P_RT
+        CORE --> P_INTRA
     end
 
     L_RT -->|"DDE"| BCSYS["bcsys32.exe<br/>cp.ae.com.br:44780"]
@@ -48,15 +57,19 @@ graph LR
     L_MACRO -->|"HTTP/XML"| BCSYS
     L_FUND -->|"HTTP/SOH"| BCSYS
     L_NEWS -->|"HTTP/JSON"| BCSYS
+    L_ASYNC -->|"HTTP async"| BCSYS
     P_SESS -->|"ECDH login"| PLUS["Broadcast+.exe<br/>svc.aebroadcast.com.br:44761"]
     P_HTTP -->|"Bearer JWT"| PLUS
+    P_RT -->|"WebSocket"| PLUS
+    P_INTRA -->|"Bearer JWT"| PLUS
 ```
 
 ---
 
 ## Shared Core (`_core/`)
 
-Infraestrutura interna compartilhada pelos dois backends:
+Infraestrutura backend-agnostica — usada pelos dois backends (o Plus so importa `retry`).
+Nenhum modulo aqui conhece protocolo Legacy ou Plus:
 
 | Modulo | Proposito |
 |--------|-----------|
@@ -65,12 +78,34 @@ Infraestrutura interna compartilhada pelos dois backends:
 | `memory.py` | Win32 helpers compartilhados: `find_process_pid(image_name)` via `tasklist` e `scan_process_memory(pid, pattern)` com `ReadProcessMemory`. Usado pelos dois backends para extrair tokens. |
 | `exceptions.py` | Hierarquia de excecoes: `PyBcastError` -> `SessionError`, `ContentProxyError`, `ProtocolError`, `DDEError`, `BroadcastPlusError`, `BroadcastPlusAuthError`. |
 | `logging.py` | `get_logger(name)` factory; NullHandler por padrao. |
-| `http.py` | Singleton `httpx.Client` e `httpx.AsyncClient` com connection pooling (Legacy ContentProxy). |
 | `cache.py` | Cache de dois backends. `"memory"` usa dict TTL thread-safe; `"disk"` usa `diskcache`. |
 | `ratelimit.py` | Token-bucket rate limiter. `rate_limit()` (sync) e `rate_limit_async()` (async). |
 | `retry.py` | `@http_retry` decorator via Tenacity. Retries em HTTP 5xx e erros de conexao. |
-| `validation.py` | Tipos Pydantic (`Ticker`, `DateParam`, `CvmCode`, ...) e `@validate_params` decorator. |
+| `validation.py` | Tipos Pydantic (`Ticker`, `DateParam`, `CvmCode`, ...) e `@validate_params` decorator (async-aware). |
+| `dates.py` | Fonte unica de coercao de datas: `to_date_str()` / `to_datetime_str()` (`validation.py` delega aqui). |
+| `normalize.py` | Normalizacao de identificadores/valores compartilhada entre backends. |
 | `constants.py` | Constantes de ambos os backends: `PLUS_BASE_URL`, `PLUS_WS_URL`, `PLUS_VERSION`, `PLUS_APP_ID`. Inclui `PLUS_EXCHANGE_NAME_TO_CODE` + `normalize_exchange()`. |
+
+---
+
+## Legacy protocol (`_legacy/`)
+
+Stack de protocolo do Terminal Antigo (`bcsys32.exe`). Importado pelos pacotes de dominio Legacy
+(`historical/`, `macro/`, `fundamental/`, `news/`, `realtime/`) e pelos gemeos `_async/`; nunca pelo
+Plus. Depende de `_core/` para infraestrutura, nunca o contrario.
+
+| Modulo | Proposito |
+|--------|-----------|
+| `dde.py` | Cliente DDEML (Windows DDEML) para tempo real (`bdp` / `BroadcastClient`). |
+| `aetp.py` | Protocolo AETP binario: `aetp_request()`, `rows_to_dicts()`. |
+| `binary.py` | Parser de resposta binaria SOH: `parse_binary_response()`. |
+| `xml_helpers.py` | ContentProxy HTTP + parsing XML: `content_proxy_get()`, `parse_ticks()`, `raise_for_content_proxy_status()` (politica de erro de dois eixos). |
+| `http.py` | Singleton `httpx.Client` / `httpx.AsyncClient` com connection pooling para a ContentProxy Legacy. |
+| `session.py` | Descoberta e cache do BCAA session token (tag `10039`) via memoria do `bcsys32.exe`. |
+| `resolve.py` | Resolucao ticker -> codigo CVM / indicador: `resolve_cvm()`, `aresolve_cvm()`, `resolve_indicator()`. |
+| `columns.py` | Schemas de coluna e renomeacao dos outputs Legacy (`CONTENT_PROXY_RENAME`, `VOLUME_RENAME`, ...). |
+| `output.py` | Construtores de DataFrame achatado: `to_dataframe()`, `to_reference_dataframe()`, `to_record_dataframe()`, `empty_bdh_frame()`. |
+| `multi.py` | Fan-out multi-ticker: `vectorize()` / `vectorize_async()` (concatena por `ticker`, propaga o primeiro erro). |
 
 ---
 

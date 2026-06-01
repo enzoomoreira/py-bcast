@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from .._core.aetp import _aetp_identifier
-from .._core.binary import parse_binary_response
+from .._legacy.aetp import _aetp_identifier
+from .._legacy.binary import parse_binary_response
 from .._core.cache import cache_get, cache_set
 from .._core.config import get_settings
 from .._core.constants import BASE_URL
 from .._core.exceptions import NotFoundError, ProtocolError, is_no_records
-from .._core.http import base_params, get_async_http_client, get_session_token
+from .._legacy.http import base_params, get_async_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.ratelimit import rate_limit_async
 from .._core.retry import http_retry
-from .._core.xml_helpers import raise_for_content_proxy_status
+from .._legacy.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
 

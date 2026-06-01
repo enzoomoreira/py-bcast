@@ -6,15 +6,15 @@ import datetime
 
 import pandas as pd
 
-from .._core.aetp import rows_to_dicts
-from .._core.binary import parse_binary_response
-from .._core.columns import CONSENSUS_FIELDS, CONSENSUS_SCHEMA
+from .._legacy.aetp import rows_to_dicts
+from .._legacy.binary import parse_binary_response
+from .._legacy.columns import CONSENSUS_FIELDS, CONSENSUS_SCHEMA
 from .._core.constants import BASE_URL
 from .._core.exceptions import ProtocolError, is_no_records
-from .._core.http import get_http_client, get_session_token
+from .._legacy.http import get_http_client, get_session_token
 from .._core.logging import get_logger
-from .._core.multi import vectorize
-from .._core.output import to_record_dataframe
+from .._legacy.multi import vectorize
+from .._legacy.output import to_record_dataframe
 from .._core.retry import http_retry
 from .._core.validation import TickerList, validate_params
 

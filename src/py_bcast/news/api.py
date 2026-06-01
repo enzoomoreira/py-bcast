@@ -9,7 +9,7 @@ from typing import Optional
 import httpx
 
 from .._core.constants import BASE_URL
-from .._core.http import get_http_client
+from .._legacy.http import get_http_client
 from .._core.logging import get_logger
 from .._core.retry import http_retry
 

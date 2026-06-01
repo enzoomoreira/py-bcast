@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.columns import (
+from .._legacy.columns import (
     CALENDAR_FIELDS,
     CALENDAR_SCHEMA,
     DIVIDEND_FIELDS,
@@ -15,12 +15,12 @@ from .._core.columns import (
     PORTFOLIO_LIST_FIELDS,
     PORTFOLIO_LIST_SCHEMA,
 )
-from .._core.aetp import rows_to_dicts
+from .._legacy.aetp import rows_to_dicts
 from .._core.dates import DateLike, to_date_str
-from .._core.multi import vectorize_async
+from .._legacy.multi import vectorize_async
 from .._core.normalize import ensure_list, ensure_str
-from .._core.output import to_reference_dataframe
-from .._core.resolve import aresolve_cvm
+from .._legacy.output import to_reference_dataframe
+from .._legacy.resolve import aresolve_cvm
 from .._core.validation import CvmCode, DateParam, validate_params
 from ._helpers import async_aetp_request
 

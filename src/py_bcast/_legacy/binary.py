@@ -10,8 +10,8 @@ Protocol structure (SOH=0x01 separated records, NULL=0x00 separated fields):
 
 from __future__ import annotations
 
-from .exceptions import ProtocolError
-from .logging import get_logger
+from .._core.exceptions import ProtocolError
+from .._core.logging import get_logger
 
 logger = get_logger(__name__)
 

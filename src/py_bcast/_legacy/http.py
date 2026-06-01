@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import httpx
 
-from .config import get_settings
+from .._core.config import get_settings
 from .session import get_session_token  # noqa: F401 — re-exported
 
 _sync_client: httpx.Client | None = None

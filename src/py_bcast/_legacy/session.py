@@ -10,9 +10,9 @@ from __future__ import annotations
 import os
 import re
 
-from .exceptions import SessionError
-from .logging import get_logger
-from .memory import find_process_pid, scan_process_memory
+from .._core.exceptions import SessionError
+from .._core.logging import get_logger
+from .._core.memory import find_process_pid, scan_process_memory
 
 logger = get_logger(__name__)
 

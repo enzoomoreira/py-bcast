@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 import pandas as pd
 
-from .._core.columns import (
+from .._legacy.columns import (
     DAILY_OHLCV_SCHEMA,
     INTRADAY_BAR_SCHEMA,
     TICK_SCHEMA,
@@ -15,15 +15,15 @@ from .._core.columns import (
 from .._core.constants import BASE_URL
 from .._core.dates import business_days, default_end_date, to_date_str, to_datetime_str
 from .._core.exceptions import ContentProxyError
-from .._core.http import base_params, get_async_http_client, get_session_token
+from .._legacy.http import base_params, get_async_http_client, get_session_token
 from .._core.logging import get_logger
-from .._core.multi import vectorize_async
+from .._legacy.multi import vectorize_async
 from .._core.normalize import ensure_list
-from .._core.output import empty_bdh_frame, to_dataframe
+from .._legacy.output import empty_bdh_frame, to_dataframe
 from .._core.ratelimit import rate_limit_async
 from .._core.retry import http_retry
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
-from .._core.xml_helpers import parse_ticks, raise_for_content_proxy_status
+from .._legacy.xml_helpers import parse_ticks, raise_for_content_proxy_status
 from ._helpers import async_content_proxy_get
 
 logger = get_logger(__name__)

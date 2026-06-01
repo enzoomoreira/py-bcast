@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 from py_bcast._core.exceptions import NotFoundError
-from py_bcast._core.multi import vectorize_async
+from py_bcast._legacy.multi import vectorize_async
 
 
 def test_multi_input_concat_and_ticker_column():

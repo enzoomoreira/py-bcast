@@ -6,8 +6,8 @@ import unicodedata
 
 import pandas as pd
 
-from .exceptions import NotFoundError, ValidationError
-from .logging import get_logger
+from .._core.exceptions import NotFoundError, ValidationError
+from .._core.logging import get_logger
 
 logger = get_logger(__name__)
 

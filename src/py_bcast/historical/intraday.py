@@ -7,11 +7,11 @@ import datetime
 import pandas as pd
 
 from .._core.dates import to_date_str, to_datetime_str
-from .._core.columns import INTRADAY_BAR_SCHEMA, TICK_SCHEMA
-from .._core.multi import vectorize
-from .._core.output import to_dataframe
+from .._legacy.columns import INTRADAY_BAR_SCHEMA, TICK_SCHEMA
+from .._legacy.multi import vectorize
+from .._legacy.output import to_dataframe
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
-from .._core.xml_helpers import content_proxy_get, parse_ticks
+from .._legacy.xml_helpers import content_proxy_get, parse_ticks
 
 
 def _bdt_one(

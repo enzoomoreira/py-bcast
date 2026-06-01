@@ -6,18 +6,18 @@ import xml.etree.ElementTree as ET
 
 import pandas as pd
 
-from .._core.columns import DAILY_OHLCV_SCHEMA
+from .._legacy.columns import DAILY_OHLCV_SCHEMA
 from .._core.constants import BASE_URL
 from .._core.dates import business_days, default_end_date, to_date_str
 from .._core.exceptions import ContentProxyError
-from .._core.http import base_params, get_http_client, get_session_token
+from .._legacy.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
-from .._core.multi import vectorize
+from .._legacy.multi import vectorize
 from .._core.normalize import ensure_list
-from .._core.output import empty_bdh_frame, to_dataframe
+from .._legacy.output import empty_bdh_frame, to_dataframe
 from .._core.retry import http_retry
 from .._core.validation import DateParam, TickerList, validate_params
-from .._core.xml_helpers import raise_for_content_proxy_status
+from .._legacy.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
 

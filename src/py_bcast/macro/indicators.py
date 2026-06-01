@@ -5,9 +5,9 @@ from __future__ import annotations
 import pandas as pd
 
 from .._core.dates import to_date_str
-from .._core.multi import vectorize
-from .._core.output import to_dataframe, to_reference_dataframe
-from .._core.columns import (
+from .._legacy.multi import vectorize
+from .._legacy.output import to_dataframe, to_reference_dataframe
+from .._legacy.columns import (
     CDI_SCHEMA,
     CONTENT_PROXY_RENAME,
     INFLATION_SCHEMA,
@@ -17,7 +17,7 @@ from .._core.columns import (
     VOLUME_SCHEMA,
 )
 from .._core.validation import DateParam, TickerList, validate_params
-from .._core.xml_helpers import content_proxy_get, parse_ticks
+from .._legacy.xml_helpers import content_proxy_get, parse_ticks
 
 
 def _bmacro_one(

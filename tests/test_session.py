@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from py_bcast._core.session import get_session_token, discover_session_token
+from py_bcast._legacy.session import get_session_token, discover_session_token
 from py_bcast._core.memory import find_process_pid
 from py_bcast._core.exceptions import SessionError
 
@@ -26,11 +26,11 @@ class TestGetSessionToken:
     def test_auto_discovery_when_no_env(self, monkeypatch):
         """Falls back to auto-discovery when no env var set."""
         monkeypatch.delenv("BROADCAST_SESSION", raising=False)
-        import py_bcast._core.session as _sess
+        import py_bcast._legacy.session as _sess
 
         monkeypatch.setattr(_sess, "_cached_token", None)
         with patch(
-            "py_bcast._core.session.discover_session_token",
+            "py_bcast._legacy.session.discover_session_token",
             return_value="AUTO_DISCOVERED",
         ):
             token = get_session_token()
@@ -39,11 +39,11 @@ class TestGetSessionToken:
     def test_auto_discovery_error_propagates(self, monkeypatch):
         """SessionError from discovery propagates to caller."""
         monkeypatch.delenv("BROADCAST_SESSION", raising=False)
-        import py_bcast._core.session as _sess
+        import py_bcast._legacy.session as _sess
 
         monkeypatch.setattr(_sess, "_cached_token", None)
         with patch(
-            "py_bcast._core.session.discover_session_token",
+            "py_bcast._legacy.session.discover_session_token",
             side_effect=SessionError("not running"),
         ):
             with pytest.raises(SessionError, match="not running"):
@@ -70,39 +70,39 @@ class TestDiscoverSessionToken:
 
     def test_raises_when_terminal_not_running(self):
         """Clear error when bcsys32.exe is not found."""
-        with patch("py_bcast._core.session.find_process_pid", return_value=None):
+        with patch("py_bcast._legacy.session.find_process_pid", return_value=None):
             with pytest.raises(SessionError, match="not running"):
                 discover_session_token()
 
     def test_raises_when_memory_unreadable(self):
         """Clear error when process memory cannot be read."""
-        with patch("py_bcast._core.session.find_process_pid", return_value=12345):
-            with patch("py_bcast._core.session.scan_process_memory", return_value=[]):
+        with patch("py_bcast._legacy.session.find_process_pid", return_value=12345):
+            with patch("py_bcast._legacy.session.scan_process_memory", return_value=[]):
                 with pytest.raises(SessionError, match="Could not read"):
                     discover_session_token()
 
     def test_raises_when_no_valid_token(self):
         """Clear error when candidates don't validate."""
-        with patch("py_bcast._core.session.find_process_pid", return_value=12345):
+        with patch("py_bcast._legacy.session.find_process_pid", return_value=12345):
             with patch(
-                "py_bcast._core.session.scan_process_memory",
+                "py_bcast._legacy.session.scan_process_memory",
                 return_value=["A" * 33],
             ):
                 with patch(
-                    "py_bcast._core.session._validate_token", return_value=False
+                    "py_bcast._legacy.session._validate_token", return_value=False
                 ):
                     with pytest.raises(SessionError, match="none validated"):
                         discover_session_token()
 
     def test_returns_first_valid_token(self):
         """Returns first candidate that validates."""
-        with patch("py_bcast._core.session.find_process_pid", return_value=12345):
+        with patch("py_bcast._legacy.session.find_process_pid", return_value=12345):
             with patch(
-                "py_bcast._core.session.scan_process_memory",
+                "py_bcast._legacy.session.scan_process_memory",
                 return_value=["A" * 33, "Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
             ):
                 with patch(
-                    "py_bcast._core.session._validate_token",
+                    "py_bcast._legacy.session._validate_token",
                     side_effect=lambda t: t == "Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 ):
                     token = discover_session_token()

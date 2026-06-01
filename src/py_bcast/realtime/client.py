@@ -24,7 +24,7 @@ from .._core.constants import (
 from .._core.exceptions import DDEError, DDEAdviseError
 from .._core.logging import get_logger
 from .._core.normalize import parse_br_number
-from .._core.dde import (
+from .._legacy.dde import (
     APPCMD_CLIENTONLY,
     CF_TEXT,
     CP_WINUNICODE,

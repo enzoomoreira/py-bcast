@@ -6,9 +6,9 @@ import datetime
 
 import pandas as pd
 
-from .._core.aetp import rows_to_dicts
-from .._core.binary import parse_binary_response
-from .._core.columns import (
+from .._legacy.aetp import rows_to_dicts
+from .._legacy.binary import parse_binary_response
+from .._legacy.columns import (
     COMPANY_DETAIL_FIELDS,
     COMPANY_LIST_FIELDS,
     COMPANY_LIST_SCHEMA,
@@ -31,13 +31,13 @@ from .._core.columns import (
 from .._core.constants import BASE_URL
 from .._core.dates import DateLike, to_date_str
 from .._core.exceptions import ProtocolError, is_no_records
-from .._core.http import get_async_http_client, get_session_token
+from .._legacy.http import get_async_http_client, get_session_token
 from .._core.logging import get_logger
-from .._core.multi import vectorize_async
+from .._legacy.multi import vectorize_async
 from .._core.normalize import ensure_id_list, ensure_list, ensure_str
-from .._core.output import to_record_dataframe, to_reference_dataframe
+from .._legacy.output import to_record_dataframe, to_reference_dataframe
 from .._core.ratelimit import rate_limit_async
-from .._core.resolve import aresolve_cvm, aresolve_indicator
+from .._legacy.resolve import aresolve_cvm, aresolve_indicator
 from .._core.retry import http_retry
 from .._core.validation import TickerList, validate_params
 from ._helpers import async_aetp_request
