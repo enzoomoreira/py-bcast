@@ -135,12 +135,12 @@ class BroadcastClient:
         item = f"{ticker}.{field}"
         try:
             data = self._conv_cot.Request(item)
-            if data and "NOK" not in data and data != "N/A" and data.strip():
-                return parse_br_number(data.strip())
-            return None
-        except Exception as exc:
+        except dde.error as exc:
             logger.debug("DDE request failed for %s: %s", item, exc)
             return None
+        if data and "NOK" not in data and data != "N/A" and data.strip():
+            return parse_br_number(data.strip())
+        return None
 
     def snapshot(self, ticker: str) -> dict[str, str]:
         """
@@ -156,10 +156,10 @@ class BroadcastClient:
 
         try:
             raw = self._conv_ativo.Request(ticker)
-            if not raw or "N/A" == raw.strip():
-                return {}
-        except Exception as exc:
+        except dde.error as exc:
             logger.debug("DDE snapshot failed for %s: %s", ticker, exc)
+            return {}
+        if not raw or "N/A" == raw.strip():
             return {}
 
         parts = raw.split("\t")
