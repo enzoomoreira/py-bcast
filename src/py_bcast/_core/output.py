@@ -131,24 +131,6 @@ def to_dataframe(
     return _apply_rename(df, rename)
 
 
-def to_multi_dataframe(
-    data: dict[str, list[dict[str, str]]],
-    date_col: str = "dat",
-) -> dict[str, pd.DataFrame]:
-    """Convert multi-ticker results to dict of DataFrames.
-
-    Args:
-        data: Dict mapping symbol -> list of row dicts.
-        date_col: Name of the date column.
-
-    Returns:
-        Dict mapping symbol -> DataFrame with DatetimeIndex.
-    """
-    return {
-        symbol: to_dataframe(rows, date_col=date_col) for symbol, rows in data.items()
-    }
-
-
 def to_reference_dataframe(
     rows: list[dict[str, str]],
     rename: dict[str, str | None] | None = None,
