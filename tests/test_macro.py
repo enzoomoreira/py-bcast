@@ -100,14 +100,14 @@ class TestBvolume:
         df = bvolume("PETR4")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        # B6: symbol is a regular column (it repeats per averaging window),
-        # not a non-unique index.
-        assert "symbol" in df.columns
-        assert any("PETR4" in s for s in df["symbol"])
+        # ticker is a regular column (it repeats per averaging window, so it
+        # cannot be a unique index) — unified with the rest of the library.
+        assert "ticker" in df.columns
+        assert any("PETR4" in s for s in df["ticker"])
 
     def test_multiple(self):
         df = bvolume(["PETR4", "VALE3"])
-        assert df["symbol"].nunique() >= 2
+        assert df["ticker"].nunique() >= 2
 
 
 class TestBinflation:
