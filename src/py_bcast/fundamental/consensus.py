@@ -13,38 +13,19 @@ from .._core.constants import BASE_URL
 from .._core.exceptions import ProtocolError, is_no_records
 from .._core.http import get_http_client, get_session_token
 from .._core.logging import get_logger
+from .._core.multi import vectorize
 from .._core.output import to_record_dataframe
 from .._core.retry import http_retry
-from .._core.validation import Ticker, validate_params
+from .._core.validation import TickerList, validate_params
 
 logger = get_logger(__name__)
 
 
-@validate_params
-def bconsensus(
-    ticker: Ticker,
+def _bconsensus_one(
+    ticker: str,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Get analyst consensus data for a stock.
-
-    Uses aefundamental/consenso endpoint. Provides buy/hold/sell
-    recommendation counts and target price statistics.
-
-    Args:
-        ticker: Stock ticker (e.g., "PETR4", "VALE3", "ITUB4")
-        session_token: BCAA session token
-
-    Returns:
-        One-row DataFrame with columns: ticker, buy, hold, sell,
-        total_analysts, target_low, target_high, target_mean,
-        target_median, upside_pct. Empty DataFrame with that schema when no
-        consensus exists (e.g. a small cap with no analyst coverage).
-
-    Example:
-        >>> df = bconsensus("PETR4")
-        >>> print(f"Buy: {df['buy'].iloc[0]}, Target: {df['target_mean'].iloc[0]}")
-    """
+    """Get analyst consensus for a single ticker (soft: no coverage -> empty)."""
     token = get_session_token(session_token)
     s = get_http_client()
 
@@ -68,6 +49,34 @@ def bconsensus(
     return to_record_dataframe(
         record, rename=CONSENSUS_FIELDS, schema=CONSENSUS_SCHEMA, ticker=ticker
     )
+
+
+@validate_params
+def bconsensus(
+    ticker: TickerList,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Get analyst consensus data for one or more stocks.
+
+    Uses aefundamental/consenso endpoint. Provides buy/hold/sell
+    recommendation counts and target price statistics.
+
+    Args:
+        ticker: Single ticker or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with columns: ticker, buy, hold, sell, total_analysts,
+        target_low, target_high, target_mean, target_median, upside_pct (one
+        row per covered ticker). A ticker with no analyst coverage contributes
+        an empty block (it is a valid stock with no consensus, not an error).
+
+    Example:
+        >>> df = bconsensus("PETR4")
+        >>> print(f"Buy: {df['buy'].iloc[0]}, Target: {df['target_mean'].iloc[0]}")
+    """
+    return vectorize(ticker, lambda t: _bconsensus_one(t, session_token))
 
 
 @http_retry

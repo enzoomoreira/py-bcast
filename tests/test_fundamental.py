@@ -30,6 +30,19 @@ class TestBconsensus:
         assert len(df) == 1
         assert "buy" in df.columns
         assert "target_mean" in df.columns
+        assert df["ticker"].iloc[0] == "PETR4"
+
+    def test_multiple(self):
+        """A list returns one flat frame covering every covered ticker."""
+        df = bconsensus(["PETR4", "VALE3"])
+        assert isinstance(df, pd.DataFrame)
+        assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
+
+    def test_multiple_with_bogus_is_soft(self):
+        """bconsensus is soft: a bogus entry yields an empty block, not a raise."""
+        df = bconsensus(["PETR4", "XXXXX99"])
+        assert isinstance(df, pd.DataFrame)
+        assert "PETR4" in set(df["ticker"].unique())
 
     def test_all_fields_present(self):
         """Response includes all expected fields plus the ticker column."""
