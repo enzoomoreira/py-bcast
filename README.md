@@ -38,13 +38,11 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 ## Installation
 
 ```bash
-pip install -e ".[dde]"
-```
-
-Or for HTTP-only usage (no pywin32 needed):
-```bash
 pip install -e .
 ```
+
+Todas as dependências (incluindo `pywin32`, necessário para DDE) são instaladas
+automaticamente.
 
 ## Quick Start
 
@@ -135,7 +133,7 @@ with BroadcastPlusClient() as client:
 
 ```
 src/py_bcast/
-├── __init__.py         # Public API (~45 exported symbols + async_api namespace)
+├── __init__.py         # Public API (57 exported symbols + async_api namespace)
 ├── _core/              # Shared infrastructure (both backends)
 │   ├── config.py       # Settings dataclass + configure() (incl. terminal=, plus_login=, plus_password=)
 │   ├── routing.py      # get_active_terminal() — picks legacy vs plus per call
