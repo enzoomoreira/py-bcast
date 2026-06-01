@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 import pandas as pd
 
-from .._core.columns import BDH_DATA_SCHEMA, DAILY_OHLCV_SCHEMA
+from .._core.columns import DAILY_OHLCV_SCHEMA
 from .._core.constants import BASE_URL
 from .._core.dates import business_days, default_end_date, to_date_str
 from .._core.exceptions import ContentProxyError
@@ -14,19 +14,12 @@ from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.multi import vectorize
 from .._core.normalize import ensure_list
-from .._core.output import to_dataframe
+from .._core.output import empty_bdh_frame, to_dataframe
 from .._core.retry import http_retry
 from .._core.validation import DateParam, TickerList, validate_params
 from .._core.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
-
-
-def _empty_bdh() -> pd.DataFrame:
-    """Empty flat bdh frame: ticker column + OHLC schema on a DatetimeIndex."""
-    df = to_dataframe([], date_col="dat", schema=BDH_DATA_SCHEMA)
-    df.insert(0, "ticker", pd.Series(dtype="object"))
-    return df
 
 
 @validate_params
@@ -63,7 +56,7 @@ def bdh(
 
     dates = business_days(start_str, end_str)
     if not dates:
-        return _empty_bdh()
+        return empty_bdh_frame()
 
     s = get_http_client()
     results: dict[str, list[dict[str, str]]] = {}
@@ -87,14 +80,9 @@ def bdh(
                 f"bdh: malformed XML response: {exc}",
                 endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
             ) from exc
-        if root.findtext("STATUS") != "success":
-            msg = root.findtext("MESSAGE") or "Unknown error"
-            logger.error("bdh ContentProxy error: %s", msg)
-            raise ContentProxyError(
-                f"ContentProxy error on HistoricoFechamentos: {msg}",
-                endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
-                server_message=msg,
-            )
+        raise_for_content_proxy_status(
+            root, "BaseHistoricaNumerica/HistoricoFechamentos", params
+        )
 
         for tick in root.findall(".//TICK"):
             sym = tick.findtext("SYMBOL") or ""
@@ -122,7 +110,7 @@ def bdh(
         frames.append(df)
 
     if not frames:
-        return _empty_bdh()
+        return empty_bdh_frame()
     return pd.concat(frames)
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .columns import CONTENT_PROXY_RENAME
+from .columns import BDH_DATA_SCHEMA, CONTENT_PROXY_RENAME
 
 
 def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -58,6 +58,16 @@ def _apply_rename(
 def _empty_frame(schema: dict[str, str] | None) -> pd.DataFrame:
     """Build a typed empty DataFrame from a column -> dtype schema."""
     return pd.DataFrame({col: pd.Series(dtype=dt) for col, dt in schema.items()})
+
+
+def empty_bdh_frame() -> pd.DataFrame:
+    """Empty flat bdh frame: ticker column + OHLC schema on a DatetimeIndex.
+
+    Shared by the sync and async ``bdh`` so the empty contract is defined once.
+    """
+    df = to_dataframe([], date_col="dat", schema=BDH_DATA_SCHEMA)
+    df.insert(0, "ticker", pd.Series(dtype="object"))
+    return df
 
 
 def to_dataframe(

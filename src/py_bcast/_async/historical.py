@@ -8,7 +8,6 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 
 from .._core.columns import (
-    BDH_DATA_SCHEMA,
     DAILY_OHLCV_SCHEMA,
     INTRADAY_BAR_SCHEMA,
     TICK_SCHEMA,
@@ -20,20 +19,13 @@ from .._core.http import base_params, get_async_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.multi import vectorize_async
 from .._core.normalize import ensure_list
-from .._core.output import to_dataframe
+from .._core.output import empty_bdh_frame, to_dataframe
 from .._core.ratelimit import rate_limit_async
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
 from .._core.xml_helpers import parse_ticks, raise_for_content_proxy_status
 from ._helpers import async_content_proxy_get
 
 logger = get_logger(__name__)
-
-
-def _empty_bdh() -> pd.DataFrame:
-    """Empty flat bdh frame: ticker column + OHLC schema on a DatetimeIndex."""
-    df = to_dataframe([], date_col="dat", schema=BDH_DATA_SCHEMA)
-    df.insert(0, "ticker", pd.Series(dtype="object"))
-    return df
 
 
 @validate_params
@@ -56,7 +48,7 @@ async def abdh(
 
     dates = business_days(start_str, end_str)
     if not dates:
-        return _empty_bdh()
+        return empty_bdh_frame()
 
     s = get_async_http_client()
     results: dict[str, list[dict[str, str]]] = {}
@@ -83,14 +75,9 @@ async def abdh(
                 f"abdh: malformed XML response: {exc}",
                 endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
             ) from exc
-        if root.findtext("STATUS") != "success":
-            msg = root.findtext("MESSAGE") or "Unknown error"
-            logger.error("abdh ContentProxy error: %s", msg)
-            raise ContentProxyError(
-                f"ContentProxy error on HistoricoFechamentos: {msg}",
-                endpoint="BaseHistoricaNumerica/HistoricoFechamentos",
-                server_message=msg,
-            )
+        raise_for_content_proxy_status(
+            root, "BaseHistoricaNumerica/HistoricoFechamentos", params
+        )
 
         for tick in root.findall(".//TICK"):
             sym = tick.findtext("SYMBOL") or ""
@@ -118,7 +105,7 @@ async def abdh(
         frames.append(df)
 
     if not frames:
-        return _empty_bdh()
+        return empty_bdh_frame()
     return pd.concat(frames)
 
 
