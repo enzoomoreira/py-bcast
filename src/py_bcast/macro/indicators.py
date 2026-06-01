@@ -2,17 +2,10 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
-
 import pandas as pd
 
-from .._core.constants import BASE_URL
 from .._core.dates import to_date_str
-from .._core.exceptions import ContentProxyError
-from .._core.http import base_params, get_http_client, get_session_token
-from .._core.logging import get_logger
 from .._core.multi import vectorize
-from .._core.normalize import ensure_list
 from .._core.output import to_dataframe, to_reference_dataframe
 from .._core.columns import (
     CDI_SCHEMA,
@@ -20,13 +13,11 @@ from .._core.columns import (
     INFLATION_SCHEMA,
     MACRO_SCHEMA,
     RETURN_SCHEMA,
+    VOLUME_RENAME,
     VOLUME_SCHEMA,
 )
-from .._core.retry import http_retry
 from .._core.validation import DateParam, TickerList, validate_params
 from .._core.xml_helpers import content_proxy_get, parse_ticks
-
-logger = get_logger(__name__)
 
 
 def _bmacro_one(
@@ -187,53 +178,23 @@ def bvolume(
         session_token: BCAA session token
 
     Returns:
-        Flat DataFrame (RangeIndex), one row per (symbol, averaging window).
-        Columns: symbol, avg_volume, avg_turnover, avg_trades, months, dat.
+        Flat DataFrame (RangeIndex), one row per (ticker, averaging window).
+        Columns: ticker, avg_volume, avg_turnover, avg_trades, months, dat.
 
     Example:
         >>> df = bvolume(["PETR4", "VALE3"])
-        >>> df[df["symbol"] == "PETR4.BVMF"]
+        >>> df[df["ticker"] == "PETR4.BVMF"]
     """
-    token = get_session_token(session_token)
-    s = get_http_client()
-    tickers = ensure_list(tickers)
-
-    params = base_params(token)
-    params["10113"] = ";".join(tickers)
-
-    logger.debug("bvolume: fetching volumes for %s", tickers)
-    r = _bvolume_fetch(s, params)
-
-    root = ET.fromstring(r.text)
-    if root.findtext("STATUS") != "success":
-        msg = root.findtext("MESSAGE") or "Unknown error"
-        logger.error("bvolume ContentProxy error: %s", msg)
-        raise ContentProxyError(
-            f"ContentProxy error on VolumesMedios: {msg}",
-            endpoint="BaseHistoricaNumerica/VolumesMedios",
-            server_message=msg,
-        )
-
-    rows = [
-        {child.tag.lower(): (child.text or "") for child in tick}
-        for tick in root.findall(".//TICK")
-    ]
-    # Flat frame: one row per (symbol, averaging window) — symbol stays a
-    # column because it repeats per window (1m/2m/3m/6m), so it cannot be a
-    # unique index.
-    return to_reference_dataframe(
-        rows, rename=CONTENT_PROXY_RENAME, schema=VOLUME_SCHEMA
-    )
-
-
-@http_retry
-def _bvolume_fetch(s, params: dict):
-    """Isolated HTTP call for retry."""
-    return s.get(
-        f"{BASE_URL}/BaseHistoricaNumerica/VolumesMedios",
-        params=params,
+    root = content_proxy_get(
+        "BaseHistoricaNumerica/VolumesMedios",
+        {"10113": ";".join(tickers)},
+        session_token=session_token,
         timeout=15,
     )
+    rows = parse_ticks(root)
+    # Flat frame: one row per (ticker, averaging window) — ticker stays a column
+    # because it repeats per window (1m/2m/3m/6m), so it cannot be a unique index.
+    return to_reference_dataframe(rows, rename=VOLUME_RENAME, schema=VOLUME_SCHEMA)
 
 
 def binflation(

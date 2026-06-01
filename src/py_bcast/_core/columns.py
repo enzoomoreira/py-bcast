@@ -50,6 +50,12 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
 }
 
 
+# bvolume: the shared rename plus symbol -> ticker (the queried key). binflation
+# deliberately keeps `symbol` (a list of distinct indices, not a per-entity
+# lookup key), so the rename is scoped to bvolume rather than shared.
+VOLUME_RENAME: dict[str, str | None] = {**CONTENT_PROXY_RENAME, "symbol": "ticker"}
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Group B: AETP binary endpoints — per-endpoint tag-to-name maps
 # ─────────────────────────────────────────────────────────────────────
@@ -324,7 +330,7 @@ INFLATION_SCHEMA: dict[str, str] = {
     "return_ytd": "float64",
 }
 VOLUME_SCHEMA: dict[str, str] = {
-    "symbol": "object",
+    "ticker": "object",
     "avg_volume": "float64",
     "avg_turnover": "float64",
     "avg_trades": "float64",
