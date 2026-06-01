@@ -55,21 +55,6 @@ def _apply_rename(
     return df
 
 
-def _apply_rename_series(
-    s: pd.Series, rename: dict[str, str | None] | None
-) -> pd.Series:
-    """Rename and drop index entries based on a mapping."""
-    if rename is None:
-        return s
-    drop_keys = [k for k in s.index if rename.get(k) is None and k in rename]
-    if drop_keys:
-        s = s.drop(labels=drop_keys)
-    name_map = {k: v for k, v in rename.items() if v is not None and k in s.index}
-    if name_map:
-        s = s.rename(index=name_map)
-    return s
-
-
 def _empty_frame(schema: dict[str, str] | None) -> pd.DataFrame:
     """Build a typed empty DataFrame from a column -> dtype schema."""
     return pd.DataFrame({col: pd.Series(dtype=dt) for col, dt in schema.items()})
@@ -162,29 +147,6 @@ def to_multi_dataframe(
     return {
         symbol: to_dataframe(rows, date_col=date_col) for symbol, rows in data.items()
     }
-
-
-def to_series(
-    record: dict[str, str],
-    rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
-) -> pd.Series:
-    """Convert a single-record dict to a pandas Series with numeric coercion.
-
-    Args:
-        record: Dict of field_name -> string value.
-        rename: Rename mapping (same semantics as to_dataframe).
-                Default: CONTENT_PROXY_RENAME. Pass None to skip.
-
-    Returns:
-        Series with values coerced to numeric where possible.
-        Returns empty Series if record is empty.
-    """
-    if not record:
-        return pd.Series(dtype="object")
-    s = pd.Series(record)
-    # Try numeric coercion per-element
-    s = s.apply(pd.to_numeric, errors="coerce").fillna(s)
-    return _apply_rename_series(s, rename)
 
 
 def to_reference_dataframe(
