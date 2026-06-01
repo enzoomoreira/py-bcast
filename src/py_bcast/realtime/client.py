@@ -390,23 +390,32 @@ class BroadcastClient:
 
 
 def bdp(
-    ticker: str, fields: str | list[str]
-) -> str | float | None | dict[str, str | float | None]:
-    """Bloomberg-style bdp (Broadcast Data Point). One-shot request.
+    ticker: str | list[str],
+    fields: str | list[str],
+) -> (
+    str
+    | float
+    | None
+    | dict[str, str | float | None]
+    | dict[str, str | float | None | dict[str, str | float | None]]
+):
+    """Bloomberg-style bdp (Broadcast Data Point). One-shot DDE request.
+
+    Polymorphic on both axes:
+        - one ticker, one field   -> a scalar value
+        - one ticker, many fields -> dict keyed by field
+        - many tickers            -> dict keyed by ticker, each value following
+                                     the single-ticker rules above
 
     Numeric values (prices, percentages) come back as float; counts, codes,
     and text stay strings. None for unavailable fields.
+
+    Example:
+        >>> bdp("PETR4", "ULT")                  # 42.46
+        >>> bdp("PETR4", ["ULT", "VAR"])         # {"ULT": 42.46, "VAR": 0.81}
+        >>> bdp(["PETR4", "VALE3"], "ULT")       # {"PETR4": 42.46, "VALE3": 61.2}
     """
     with BroadcastClient("PyBDP") as bc:
-        return bc.request(ticker, fields)
-
-
-def bdps(
-    tickers: list[str], fields: list[str]
-) -> dict[str, dict[str, str | float | None]]:
-    """Batch request: multiple tickers, multiple fields."""
-    with BroadcastClient("PyBDPS") as bc:
-        result: dict[str, dict[str, str | float | None]] = {}
-        for ticker in tickers:
-            result[ticker] = bc.request(ticker, fields)
-        return result
+        if isinstance(ticker, str):
+            return bc.request(ticker, fields)
+        return {t: bc.request(t, fields) for t in ticker}
