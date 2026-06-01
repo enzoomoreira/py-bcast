@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unicodedata
 
+import pandas as pd
+
 from .exceptions import NotFoundError, ValidationError
 from .logging import get_logger
 
@@ -27,7 +29,7 @@ def resolve_cvm(ticker: str, session_token: str | None = None) -> int:
         CVM numeric code (e.g., 9512 for PETR4).
 
     Raises:
-        ValidationError: If the ticker cannot be resolved.
+        NotFoundError: If the ticker cannot be resolved.
     """
     key = ticker.strip().upper()
     if key in _cvm_cache:
@@ -37,6 +39,28 @@ def resolve_cvm(ticker: str, session_token: str | None = None) -> int:
     from ..fundamental.reference import _quote_one
 
     quote = _quote_one(key, session_token=session_token)
+    return _cvm_from_quote(key, quote)
+
+
+async def aresolve_cvm(ticker: str, session_token: str | None = None) -> int:
+    """Async version of ``resolve_cvm`` (shares the same process cache).
+
+    Mirrors the sync resolver but awaits the async quote primitive, so the
+    event loop is never blocked on a synchronous HTTP call.
+    """
+    key = ticker.strip().upper()
+    if key in _cvm_cache:
+        return _cvm_cache[key]
+
+    # Lazy import to avoid circular dependency
+    from .._async.fundamental import _abquote_one
+
+    quote = await _abquote_one(key, session_token=session_token)
+    return _cvm_from_quote(key, quote)
+
+
+def _cvm_from_quote(key: str, quote: pd.DataFrame) -> int:
+    """Extract and cache the CVM code from a one-row quote frame."""
     if quote.empty or "cvm_code" not in quote.columns:
         raise NotFoundError(key, kind="ticker")
     cvm_raw = quote["cvm_code"].iloc[0]
@@ -92,13 +116,49 @@ def resolve_indicator(name_or_id: str | int, session_token: str | None = None) -
     if _indicator_meta_cache is None:
         from ..fundamental.reference import bindicator_meta
 
-        meta_df = bindicator_meta(session_token=session_token)
-        _indicator_meta_cache = [
-            {"id": int(row["indicator_id"]), "name": row["name"]}
-            for _, row in meta_df.iterrows()
-            if row.get("active") == "S"
-        ]
+        _indicator_meta_cache = _build_indicator_cache(
+            bindicator_meta(session_token=session_token)
+        )
 
+    return _match_indicator(s)
+
+
+async def aresolve_indicator(
+    name_or_id: str | int, session_token: str | None = None
+) -> int:
+    """Async version of ``resolve_indicator`` (shares the same process cache)."""
+    if isinstance(name_or_id, int):
+        return name_or_id
+    s = str(name_or_id).strip()
+    if s.isdigit():
+        return int(s)
+
+    global _indicator_meta_cache
+    if _indicator_meta_cache is None:
+        from .._async.fundamental import abindicator_meta
+
+        _indicator_meta_cache = _build_indicator_cache(
+            await abindicator_meta(session_token=session_token)
+        )
+
+    return _match_indicator(s)
+
+
+def _build_indicator_cache(meta_df: pd.DataFrame) -> list[dict]:
+    """Project the indicator metadata frame to the active (id, name) cache."""
+    return [
+        {"id": int(row["indicator_id"]), "name": row["name"]}
+        for _, row in meta_df.iterrows()
+        if row.get("active") == "S"
+    ]
+
+
+def _match_indicator(s: str) -> int:
+    """Fuzzy-match a name against the loaded indicator cache.
+
+    Priority: exact > startswith > contains. Case- and accent-insensitive.
+    Assumes ``_indicator_meta_cache`` is already populated.
+    """
     query = _strip_accents(s.lower())
 
     # Priority 1: exact match

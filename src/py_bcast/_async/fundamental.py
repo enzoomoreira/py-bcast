@@ -14,13 +14,22 @@ from .._core.columns import (
     COMPANY_LIST_SCHEMA,
     CONSENSUS_FIELDS,
     CONSENSUS_SCHEMA,
+    INDEX_FIELDS,
+    INDEX_SCHEMA,
+    INDICATOR_HISTORY_FIELDS,
+    INDICATOR_HISTORY_SCHEMA,
+    INDICATOR_META_FIELDS,
+    INDICATOR_META_SCHEMA,
     QUOTE_FIELDS,
     QUOTE_SCHEMA,
+    SECTOR_FIELDS,
+    SECTOR_SCHEMA,
     SHARES_FIELDS,
     SHARES_SCHEMA,
     TICKER_FIELDS,
 )
 from .._core.constants import BASE_URL
+from .._core.dates import DateLike, to_date_str
 from .._core.exceptions import ProtocolError, is_no_records
 from .._core.http import get_async_http_client, get_session_token
 from .._core.logging import get_logger
@@ -28,7 +37,7 @@ from .._core.multi import vectorize_async
 from .._core.normalize import ensure_id_list, ensure_list, ensure_str
 from .._core.output import to_record_dataframe, to_reference_dataframe
 from .._core.ratelimit import rate_limit_async
-from .._core.resolve import resolve_cvm
+from .._core.resolve import aresolve_cvm, aresolve_indicator
 from .._core.validation import TickerList, validate_params
 from ._helpers import async_aetp_request
 
@@ -148,7 +157,7 @@ async def _abtickers_one(
     if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
         cvm_code = int(ticker_or_cvm)
     else:
-        cvm_code = resolve_cvm(str(ticker_or_cvm), session_token)
+        cvm_code = await aresolve_cvm(str(ticker_or_cvm), session_token)
     parsed = await async_aetp_request(
         "fundamental/ativo/simbolo",
         {"13004": str(cvm_code)},
@@ -199,4 +208,82 @@ async def abshares(
     """
     return await vectorize_async(
         ensure_list(ticker), lambda t: _abshares_one(t, session_token)
+    )
+
+
+async def abindices(session_token: str | None = None) -> pd.DataFrame:
+    """Async version of ``bindices``. List of B3 market indices."""
+    parsed = await async_aetp_request("ativos/indice", {}, session_token)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed), rename=INDEX_FIELDS, schema=INDEX_SCHEMA
+    )
+
+
+async def absectors(session_token: str | None = None) -> pd.DataFrame:
+    """Async version of ``bsectors``. B3 sector/subsector/segment classification."""
+    parsed = await async_aetp_request("fundamental/setor", {}, session_token)
+    return to_reference_dataframe(
+        rows_to_dicts(parsed), rename=SECTOR_FIELDS, schema=SECTOR_SCHEMA
+    )
+
+
+async def abindicator_meta(session_token: str | None = None) -> pd.DataFrame:
+    """Async version of ``bindicator_meta``. Metadata for all indicators."""
+    parsed = await async_aetp_request(
+        "fundamental/indicador/metadado", {}, session_token
+    )
+    return to_reference_dataframe(
+        rows_to_dicts(parsed),
+        rename=INDICATOR_META_FIELDS,
+        schema=INDICATOR_META_SCHEMA,
+    )
+
+
+async def _abindicators_one(
+    ticker_or_cvm: str | int,
+    indicator: str | int,
+    start_date: DateLike,
+    end_date: DateLike,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Fetch daily indicator history for one company (by CVM or ticker)."""
+    if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
+        cvm_code = int(ticker_or_cvm)
+    else:
+        cvm_code = await aresolve_cvm(str(ticker_or_cvm), session_token)
+
+    indicator_id = await aresolve_indicator(indicator, session_token)
+
+    parsed = await async_aetp_request(
+        "fundamental/indicador/historico-diario",
+        {
+            "13004": str(cvm_code),
+            "13760": str(indicator_id),
+            "10057": to_date_str(start_date),
+            "10058": to_date_str(end_date),
+        },
+        session_token,
+    )
+    rows = rows_to_dicts(parsed)
+    return to_reference_dataframe(
+        rows, rename=INDICATOR_HISTORY_FIELDS, schema=INDICATOR_HISTORY_SCHEMA
+    )
+
+
+async def abindicators(
+    ticker_or_cvm: str | int | list[str | int],
+    indicator: str | int,
+    start_date: DateLike,
+    end_date: DateLike,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bindicators``.
+
+    Flat DataFrame with a DatetimeIndex, daily indicator values, and a
+    ``ticker`` column holding each input identifier.
+    """
+    items = ensure_id_list(ticker_or_cvm)
+    return await vectorize_async(
+        items,
+        lambda x: _abindicators_one(x, indicator, start_date, end_date, session_token),
     )

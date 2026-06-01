@@ -18,7 +18,18 @@ Usage::
 
 from .historical import abdh, abdh_ohlcv, abdi, abdt
 from .macro import abmacro, abdi_cdi, abreturn, abvolume, abinflation
-from .fundamental import abconsensus, abcompany, abquote, abtickers, abshares
+from .fundamental import (
+    abconsensus,
+    abcompany,
+    abquote,
+    abtickers,
+    abshares,
+    abindices,
+    absectors,
+    abindicators,
+    abindicator_meta,
+)
+from .events import abcalendar, abdividends, abdy, abportfolios, abportfolio
 from .news import abnews, abnews_recent, abnews_multimedia
 
 __all__ = [
@@ -36,6 +47,15 @@ __all__ = [
     "abquote",
     "abtickers",
     "abshares",
+    "abindices",
+    "absectors",
+    "abindicators",
+    "abindicator_meta",
+    "abcalendar",
+    "abdividends",
+    "abdy",
+    "abportfolios",
+    "abportfolio",
     "abnews",
     "abnews_recent",
     "abnews_multimedia",
