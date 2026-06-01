@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+from .._core.aetp import _aetp_identifier
+from .._core.binary import parse_binary_response
 from .._core.cache import cache_get, cache_set
 from .._core.config import get_settings
 from .._core.constants import BASE_URL
-from .._core.exceptions import ContentProxyError
+from .._core.exceptions import NotFoundError, ProtocolError, is_no_records
 from .._core.http import base_params, get_async_http_client, get_session_token
-from .._core.binary import parse_binary_response
 from .._core.logging import get_logger
 from .._core.ratelimit import rate_limit_async
+from .._core.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
 
@@ -22,7 +24,13 @@ async def async_content_proxy_get(
     session_token: str | None = None,
     timeout: int = 30,
 ) -> ET.Element:
-    """Async version of content_proxy_get."""
+    """Async version of ``content_proxy_get``.
+
+    Mirrors the sync error policy: ``raise_for_content_proxy_status`` maps the
+    server STATUS to NotFoundError (unknown symbol), a benign no-op (valid
+    query, zero rows), or ContentProxyError (anything else). Caching behavior
+    is preserved.
+    """
     token = get_session_token(session_token)
     s = get_async_http_client()
 
@@ -34,7 +42,7 @@ async def async_content_proxy_get(
     if cached is not None:
         return cached
 
-    logger.debug("Async ContentProxy GET %s", endpoint)
+    logger.debug("Async ContentProxy GET %s params=%s", endpoint, params)
     await rate_limit_async()
 
     r = await s.get(
@@ -44,14 +52,9 @@ async def async_content_proxy_get(
     )
 
     root = ET.fromstring(r.text)
-    if root.findtext("STATUS") != "success":
-        msg = root.findtext("MESSAGE") or "Unknown error"
-        raise ContentProxyError(
-            f"ContentProxy error on {endpoint}: {msg}",
-            endpoint=endpoint,
-            server_message=msg,
-        )
+    raise_for_content_proxy_status(root, endpoint, params)
 
+    # Store in cache
     cache_set(endpoint, merged, root, get_settings().cache_ttl)
     return root
 
@@ -60,8 +63,15 @@ async def async_aetp_request(
     path: str,
     params: dict[str, str],
     session_token: str | None = None,
+    *,
+    empty_ok: bool = True,
 ) -> dict:
-    """Async version of aetp_request."""
+    """Async version of ``aetp_request``.
+
+    Mirrors the sync ``empty_ok`` policy: a no_records ProtocolError yields an
+    empty parsed result (``{"fields": [], "rows": []}``) when ``empty_ok`` is
+    True, else raises NotFoundError with the looked-up identifier/kind.
+    """
     token = get_session_token(session_token)
     s = get_async_http_client()
 
@@ -73,7 +83,11 @@ async def async_aetp_request(
     if cached is not None:
         return cached
 
-    logger.debug("Async AETP request: %s", path)
+    logger.debug(
+        "Async AETP request: %s params=%s",
+        path,
+        {k: v for k, v in params.items() if k != "10039"},
+    )
     await rate_limit_async()
 
     r = await s.get(
@@ -82,6 +96,15 @@ async def async_aetp_request(
         timeout=30,
     )
 
-    result = parse_binary_response(r.content)
+    try:
+        result = parse_binary_response(r.content)
+    except ProtocolError as exc:
+        if not is_no_records(exc.error_tag):
+            raise
+        if not empty_ok:
+            identifier, kind = _aetp_identifier(params)
+            raise NotFoundError(identifier, kind=kind) from exc
+        result = {"fields": [], "rows": []}
+
     cache_set(cache_key_endpoint, params, result, get_settings().cache_ttl)
     return result
