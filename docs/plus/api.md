@@ -54,7 +54,7 @@ Campos default do handshake `initialData`: `COD, ULT, VAR, ABE, MAX, MIN, HOR, N
 | `run_async(duration=None)` | Inicia em thread daemon. Retorna o `Thread`. |
 | `stop()` | Para o stream e fecha o WebSocket. |
 
-A callback recebe um dict com os campos do tick — incluindo o codigo do ticker em `data["COD"]`, util quando subscribed em multiplos tickers com a mesma callback.
+A callback recebe um dict com os campos do tick — incluindo o codigo do ticker em `data["COD"]`, util quando subscribed em multiplos tickers com a mesma callback. Valores numericos (precos, percentuais) vem parseados como `float`; codigos, nomes e horarios ficam string.
 
 ---
 
@@ -82,7 +82,9 @@ print(df[["last", "size", "tendency"]].head())
 | `sequence` | Numero de sequencia do servidor |
 | `is_trade` | True para trade real (vs. quote) |
 | `ask_price` / `ask_size` | Melhor venda no momento do trade |
+| `ask_exchange_id` | Codigo da venue da venda (string identificador) |
 | `bid_price` / `bid_size` | Melhor compra no momento do trade |
+| `bid_exchange_id` | Codigo da venue da compra (string identificador) |
 
 Sem trades retorna `pd.DataFrame()` vazio. API limita a 500 trades por chamada (mais recentes); ordenado em ordem cronologica (oldest first) no DataFrame.
 
