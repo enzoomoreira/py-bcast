@@ -33,7 +33,7 @@ import websocket
 from .._core.constants import PLUS_VERSION, PLUS_WS_URL
 from .._core.exceptions import BroadcastPlusAuthError
 from .._core.logging import get_logger
-from .._core.normalize import ensure_list
+from .._core.normalize import ensure_list, parse_br_number
 from .session import get_plus_token, refresh_plus_token
 
 logger = get_logger(__name__)
@@ -280,6 +280,12 @@ class BroadcastPlusClient:
             if not data:
                 return
             cod = data.get("COD") or data.get("ATIVO") or data.get("CODG", "")
+            # Values arrive BR-formatted ("42,08", "0,19%"); parse numerics to
+            # float, leave codes/names/times as strings.
+            data = {
+                k: parse_br_number(v) if isinstance(v, str) else v
+                for k, v in data.items()
+            }
             with self._lock:
                 cb = self._subscriptions.get(cod) or self._global_callback
             if cb:

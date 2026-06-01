@@ -40,10 +40,12 @@ def btrades(
             tendency    — price tendency (0 = unchanged, 1 = up, -1 = down)
             sequence    — server sequence number
             is_trade    — True for actual trades (vs quotes)
-            ask_price   — best ask at trade time
-            ask_size    — ask quantity
-            bid_price   — best bid at trade time
-            bid_size    — bid quantity
+            ask_price       — best ask at trade time
+            ask_size        — ask quantity
+            ask_exchange_id — venue code for the ask (string identifier)
+            bid_price       — best bid at trade time
+            bid_size        — bid quantity
+            bid_exchange_id — venue code for the bid (string identifier)
         Empty DataFrame if no trades found.
 
     Raises:
@@ -83,8 +85,10 @@ def btrades(
                 "is_trade": row.get("isTrade", True),
                 "ask_price": ask.get("price"),
                 "ask_size": ask.get("size"),
+                "ask_exchange_id": ask.get("exchangeId"),
                 "bid_price": bid.get("price"),
                 "bid_size": bid.get("size"),
+                "bid_exchange_id": bid.get("exchangeId"),
             }
         )
 
@@ -96,9 +100,11 @@ def btrades(
     ).dt.tz_convert("America/Sao_Paulo")
     df.index.name = None
 
-    # Coerce numeric columns
+    # Coerce numeric columns. is_trade is bool; exchange IDs are venue codes
+    # (identifiers, not quantities), so they stay strings.
+    _non_numeric = {"is_trade", "ask_exchange_id", "bid_exchange_id"}
     for col in df.columns:
-        if col != "is_trade":
+        if col not in _non_numeric:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     # API returns newest-first; sort ascending (oldest first, chronological)

@@ -16,6 +16,9 @@ class TestParseBrNumber:
             ("1.234.567", 1234567.0),  # multiple groups
             ("-0,5", -0.5),  # negative
             ("42,40", 42.4),
+            ("0,19%", 0.19),  # WS percentage (percent points, % stripped)
+            ("1,0952%", 1.0952),  # percentage with more decimals
+            ("50%", 50.0),  # bare-integer percentage: % overrides date guard
         ],
     )
     def test_br_numbers_become_float(self, raw, expected):
