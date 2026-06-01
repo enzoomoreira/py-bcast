@@ -64,7 +64,13 @@ def to_datetime_str(value: DateLike) -> str:
         ValueError: If the input cannot be interpreted as a valid datetime.
     """
     if isinstance(value, str):
-        clean = value.replace("-", "").replace("/", "").replace(":", "").replace(" ", "").replace("T", "")
+        clean = (
+            value.replace("-", "")
+            .replace("/", "")
+            .replace(":", "")
+            .replace(" ", "")
+            .replace("T", "")
+        )
         if len(clean) == 8:
             clean += "000000"
         if len(clean) != 14 or not clean.isdigit():
@@ -78,7 +84,9 @@ def to_datetime_str(value: DateLike) -> str:
     if isinstance(value, datetime.datetime):
         return value.strftime("%Y%m%d%H%M%S")
     if isinstance(value, datetime.date):
-        return datetime.datetime.combine(value, datetime.time()).strftime("%Y%m%d%H%M%S")
+        return datetime.datetime.combine(value, datetime.time()).strftime(
+            "%Y%m%d%H%M%S"
+        )
     raise TypeError(f"Cannot convert {type(value).__name__} to datetime string.")
 
 

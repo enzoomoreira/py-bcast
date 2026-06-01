@@ -30,22 +30,43 @@ HSZ = ctypes.c_ssize_t
 # Function prototypes
 # ─────────────────────────────────────────────────────────────────────────────
 
-_user32.DdeGetData.argtypes = [HDDEDATA, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD]
+_user32.DdeGetData.argtypes = [
+    HDDEDATA,
+    ctypes.c_void_p,
+    wintypes.DWORD,
+    wintypes.DWORD,
+]
 _user32.DdeGetData.restype = wintypes.DWORD
 
-_user32.DdeQueryStringW.argtypes = [wintypes.DWORD, HSZ, ctypes.c_wchar_p, wintypes.DWORD, ctypes.c_int]
+_user32.DdeQueryStringW.argtypes = [
+    wintypes.DWORD,
+    HSZ,
+    ctypes.c_wchar_p,
+    wintypes.DWORD,
+    ctypes.c_int,
+]
 _user32.DdeQueryStringW.restype = wintypes.DWORD
 
 _user32.DdeCreateStringHandleW.restype = HSZ
-_user32.DdeCreateStringHandleW.argtypes = [wintypes.DWORD, ctypes.c_wchar_p, ctypes.c_int]
+_user32.DdeCreateStringHandleW.argtypes = [
+    wintypes.DWORD,
+    ctypes.c_wchar_p,
+    ctypes.c_int,
+]
 
 _user32.DdeConnect.restype = HCONV
 _user32.DdeConnect.argtypes = [wintypes.DWORD, HSZ, HSZ, ctypes.c_void_p]
 
 _user32.DdeClientTransaction.restype = HDDEDATA
 _user32.DdeClientTransaction.argtypes = [
-    ctypes.c_void_p, wintypes.DWORD, HCONV, HSZ,
-    wintypes.UINT, wintypes.UINT, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+    ctypes.c_void_p,
+    wintypes.DWORD,
+    HCONV,
+    HSZ,
+    wintypes.UINT,
+    wintypes.UINT,
+    wintypes.DWORD,
+    ctypes.POINTER(wintypes.DWORD),
 ]
 
 _user32.DdeFreeStringHandle.argtypes = [wintypes.DWORD, HSZ]
@@ -57,9 +78,14 @@ _user32.DdeDisconnect.argtypes = [HCONV]
 
 DDECALLBACK = ctypes.WINFUNCTYPE(
     ctypes.c_ssize_t,
-    ctypes.c_uint, ctypes.c_uint,
-    ctypes.c_ssize_t, ctypes.c_ssize_t, ctypes.c_ssize_t,
-    ctypes.c_ssize_t, ctypes.c_ssize_t, ctypes.c_ssize_t,
+    ctypes.c_uint,
+    ctypes.c_uint,
+    ctypes.c_ssize_t,
+    ctypes.c_ssize_t,
+    ctypes.c_ssize_t,
+    ctypes.c_ssize_t,
+    ctypes.c_ssize_t,
+    ctypes.c_ssize_t,
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

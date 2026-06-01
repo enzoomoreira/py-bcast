@@ -1,4 +1,5 @@
 """Proof of concept: find BCAA session token in bcsys32.exe process memory."""
+
 import ctypes
 import ctypes.wintypes as wt
 import re
@@ -28,9 +29,11 @@ class MEMORY_BASIC_INFORMATION(ctypes.Structure):
 def find_bcsys32_pid() -> int | None:
     """Find PID of bcsys32.exe using Windows API."""
     import subprocess
+
     result = subprocess.run(
         ["tasklist", "/FI", "IMAGENAME eq bcsys32.exe", "/FO", "CSV", "/NH"],
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
     for line in result.stdout.strip().splitlines():
         parts = line.strip('"').split('","')
@@ -41,7 +44,9 @@ def find_bcsys32_pid() -> int | None:
 
 def scan_process_memory(pid: int) -> list[str]:
     """Scan process memory for session token candidates."""
-    handle = kernel32.OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, False, pid)
+    handle = kernel32.OpenProcess(
+        PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, False, pid
+    )
     if not handle:
         raise OSError(f"Cannot open process {pid}: error {ctypes.get_last_error()}")
 
@@ -77,7 +82,11 @@ def scan_process_memory(pid: int) -> list[str]:
                     bytes_read = ctypes.c_size_t(0)
                     read_addr = base + offset
                     success = kernel32.ReadProcessMemory(
-                        handle, ctypes.c_void_p(read_addr), buf, chunk_size, ctypes.byref(bytes_read)
+                        handle,
+                        ctypes.c_void_p(read_addr),
+                        buf,
+                        chunk_size,
+                        ctypes.byref(bytes_read),
                     )
                     if success and bytes_read.value > 0:
                         data = buf.raw[: bytes_read.value]
@@ -98,10 +107,17 @@ def scan_process_memory(pid: int) -> list[str]:
 def validate_token(token: str) -> bool:
     """Test if a token is a valid BCAA session by making a lightweight HTTP call."""
     import httpx
+
     try:
         r = httpx.get(
             "http://cp.ae.com.br:44780/BaseHistoricaNumerica/HistoricoFechamentos",
-            params={"10023": "4", "10039": token, "10113": "PETR4", "DatasTolerancia": "20260519", "TipoResposta": "xml"},
+            params={
+                "10023": "4",
+                "10039": token,
+                "10113": "PETR4",
+                "DatasTolerancia": "20260519",
+                "TipoResposta": "xml",
+            },
             headers={"User-Agent": "bcsys32/7.0"},
             timeout=5,
             verify=False,
@@ -113,6 +129,7 @@ def validate_token(token: str) -> bool:
 
 if __name__ == "__main__":
     import urllib3
+
     urllib3.disable_warnings()
 
     pid = find_bcsys32_pid()

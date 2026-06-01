@@ -24,7 +24,9 @@ def get_logger(name: str) -> logging.Logger:
         from py_bcast._core.logging import get_logger
         logger = get_logger(__name__)
     """
-    return logging.getLogger(f"{_LIB_ROOT}.{name}" if not name.startswith(_LIB_ROOT) else name)
+    return logging.getLogger(
+        f"{_LIB_ROOT}.{name}" if not name.startswith(_LIB_ROOT) else name
+    )
 
 
 def configure_logging(
@@ -44,7 +46,10 @@ def configure_logging(
     root.setLevel(level)
 
     # Avoid adding duplicate handlers on repeated calls
-    if not any(isinstance(h, logging.StreamHandler) and h.stream is sys.stderr for h in root.handlers):
+    if not any(
+        isinstance(h, logging.StreamHandler) and h.stream is sys.stderr
+        for h in root.handlers
+    ):
         handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(logging.Formatter(fmt))
         root.addHandler(handler)
