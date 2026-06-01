@@ -43,11 +43,13 @@ async def abnews(news_id: int | str) -> dict:
 
     files = []
     for f in data.get("FileCollection") or []:
-        files.append({
-            "filename": f.get("FileName", ""),
-            "extension": f.get("Extension", ""),
-            "url": f.get("Url") or f.get("FilePath", ""),
-        })
+        files.append(
+            {
+                "filename": f.get("FileName", ""),
+                "extension": f.get("Extension", ""),
+                "url": f.get("Url") or f.get("FilePath", ""),
+            }
+        )
 
     return {
         "title": data.get("Title", ""),
@@ -56,8 +58,8 @@ async def abnews(news_id: int | str) -> dict:
     }
 
 
-async def abnews_latest(count: int = 10) -> list[dict]:
-    """Async version of ``bnews_latest``.
+async def abnews_recent(count: int = 10) -> list[dict]:
+    """Async version of ``bnews_recent``.
 
     Uses asyncio.gather for parallel fetches — significantly faster
     than the sequential sync version.
@@ -74,7 +76,9 @@ async def abnews_latest(count: int = 10) -> list[dict]:
     nid = ceiling
 
     while len(results) < count and miss_count < 20:
-        batch_ids = list(range(nid, max(nid - batch_size, nid - (count - len(results)) - 20), -1))
+        batch_ids = list(
+            range(nid, max(nid - batch_size, nid - (count - len(results)) - 20), -1)
+        )
         tasks = [abnews(bid) for bid in batch_ids]
         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -98,14 +102,21 @@ async def abnews_latest(count: int = 10) -> list[dict]:
     return results[:count]
 
 
-async def abnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dict]:
-    """Async version of ``bnews_search``."""
+async def abnews_multimedia(
+    category: int, days_ago: int = 60, limit: int = 20
+) -> list[dict]:
+    """Async version of ``bnews_multimedia``."""
     import re
+
     s = get_async_http_client()
     await rate_limit_async()
     r = await s.get(
         f"{BASE_URL}{_HANDLER_PATH}",
-        params={"category": str(category), "daysAgo": str(days_ago), "limit": str(limit)},
+        params={
+            "category": str(category),
+            "daysAgo": str(days_ago),
+            "limit": str(limit),
+        },
         timeout=10,
     )
     r.raise_for_status()

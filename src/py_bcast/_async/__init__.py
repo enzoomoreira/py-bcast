@@ -19,7 +19,7 @@ Usage::
 from .historical import abdh, abdh_ohlcv, abdi, abdt
 from .macro import abmacro, abdi_cdi, abreturn, abvolume, abinflation
 from .fundamental import abconsensus, abcompany, abquote, abtickers, abshares
-from .news import abnews, abnews_latest, abnews_search
+from .news import abnews, abnews_recent, abnews_multimedia
 
 __all__ = [
     "abdh",
@@ -37,6 +37,6 @@ __all__ = [
     "abtickers",
     "abshares",
     "abnews",
-    "abnews_latest",
-    "abnews_search",
+    "abnews_recent",
+    "abnews_multimedia",
 ]

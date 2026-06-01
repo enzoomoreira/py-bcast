@@ -83,11 +83,13 @@ def bnews(news_id: int | str) -> dict:
 
     files = []
     for f in data.get("FileCollection") or []:
-        files.append({
-            "filename": f.get("FileName", ""),
-            "extension": f.get("Extension", ""),
-            "url": f.get("Url") or f.get("FilePath", ""),
-        })
+        files.append(
+            {
+                "filename": f.get("FileName", ""),
+                "extension": f.get("Extension", ""),
+                "url": f.get("Url") or f.get("FilePath", ""),
+            }
+        )
 
     return {
         "title": data.get("Title", ""),
@@ -96,7 +98,7 @@ def bnews(news_id: int | str) -> dict:
     }
 
 
-def bnews_latest(count: int = 10) -> list[dict]:
+def bnews_recent(count: int = 10) -> list[dict]:
     """
     Fetch the most recent news articles by scanning backwards from the
     current ID ceiling.
@@ -113,8 +115,8 @@ def bnews_latest(count: int = 10) -> list[dict]:
 
     Example
     -------
-    >>> from py_bcast import bnews_latest
-    >>> for article in bnews_latest(5):
+    >>> from py_bcast import bnews_recent
+    >>> for article in bnews_recent(5):
     ...     print(f"[{article['id']}] {article['title'][:60]}")
     """
     count = min(count, 100)
@@ -138,7 +140,7 @@ def bnews_latest(count: int = 10) -> list[dict]:
     return results
 
 
-def bnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dict]:
+def bnews_multimedia(category: int, days_ago: int = 60, limit: int = 20) -> list[dict]:
     """
     List multimedia/podcast content from a specific category.
 
@@ -157,14 +159,14 @@ def bnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dic
 
     Example
     -------
-    >>> from py_bcast import bnews_search, MULTIMEDIA_CATEGORIES
-    >>> items = bnews_search(748)  # Podcasts
+    >>> from py_bcast import bnews_multimedia, MULTIMEDIA_CATEGORIES
+    >>> items = bnews_multimedia(748)  # Podcasts
     >>> for item in items[:3]:
     ...     print(f"[{item['id']}] {item['date']} {item['title'][:50]}")
     """
     s = get_http_client()
-    logger.debug("bnews_search: category=%d days_ago=%d", category, days_ago)
-    r = _news_search_fetch(s, category, days_ago, limit)
+    logger.debug("bnews_multimedia: category=%d days_ago=%d", category, days_ago)
+    r = _news_multimedia_fetch(s, category, days_ago, limit)
     r.raise_for_status()
 
     results = []
@@ -175,12 +177,14 @@ def bnews_search(category: int, days_ago: int = 60, limit: int = 20) -> list[dic
         r.text,
     )
     for fid, title, date, time_ in items:
-        results.append({
-            "id": int(fid),
-            "title": title,
-            "date": date,
-            "time": time_,
-        })
+        results.append(
+            {
+                "id": int(fid),
+                "title": title,
+                "date": date,
+                "time": time_,
+            }
+        )
 
     return results
 
@@ -197,7 +201,7 @@ def _news_fetch_content(s, news_id):
 
 
 @http_retry
-def _news_search_fetch(s, category: int, days_ago: int, limit: int):
+def _news_multimedia_fetch(s, category: int, days_ago: int, limit: int):
     """Isolated HTTP call for retry."""
     return s.get(
         f"{BASE_URL}{_HANDLER_PATH}",

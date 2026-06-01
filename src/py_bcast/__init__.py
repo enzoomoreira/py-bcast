@@ -9,7 +9,7 @@ A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - Corporate events (bcalendar, bdividends, bdy)
 - Reference data (bindices, bsectors, bquote, btickers, bshares)
 - Broker portfolios (bportfolios, bportfolio)
-- News and multimedia (bnews, bnews_latest, bnews_search)
+- News and multimedia (bnews, bnews_recent, bnews_multimedia)
 - Instrument database search (bsearch, InstrumentDB)
 
 Quick Start:
@@ -35,9 +35,9 @@ Quick Start:
     divs = bdividends("PETR4")
 
     # News articles (no auth required!)
-    from py_bcast import bnews, bnews_latest
+    from py_bcast import bnews, bnews_recent
     article = bnews(56134402)
-    latest = bnews_latest(5)
+    latest = bnews_recent(5)
 
     # Search 600K+ instruments
     bsearch("PETR", exchange="BVMF")
@@ -65,7 +65,7 @@ from .fundamental import (
 )
 from .instruments import InstrumentDB, bsearch
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
-from .news import bnews, bnews_latest, bnews_search, MULTIMEDIA_CATEGORIES
+from .news import bnews, bnews_recent, bnews_multimedia, MULTIMEDIA_CATEGORIES
 from ._core.session import discover_session_token, clear_token_cache
 from ._plus.session import discover_plus_token, clear_plus_token_cache
 from ._core.resolve import resolve_cvm, resolve_indicator
@@ -124,8 +124,8 @@ __all__ = [
     "bportfolio",
     # News / Multimedia
     "bnews",
-    "bnews_latest",
-    "bnews_search",
+    "bnews_recent",
+    "bnews_multimedia",
     "MULTIMEDIA_CATEGORIES",
     "discover_session_token",
     "clear_token_cache",
