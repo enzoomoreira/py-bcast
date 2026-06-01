@@ -178,7 +178,7 @@ async def abdh_ohlcv(
     NotFoundError for an unknown ticker.
     """
     return await vectorize_async(
-        ensure_list(ticker), lambda t: _abdh_ohlcv_one(t, date, session_token)
+        ticker, lambda t: _abdh_ohlcv_one(t, date, session_token)
     )
 
 
@@ -222,7 +222,7 @@ async def abdt(
     (one block per symbol).
     """
     return await vectorize_async(
-        ensure_list(ticker), lambda t: _abdt_one(t, start, end, session_token)
+        ticker, lambda t: _abdt_one(t, start, end, session_token)
     )
 
 
@@ -262,5 +262,5 @@ async def abdi(
     (one block per symbol).
     """
     return await vectorize_async(
-        ensure_list(ticker), lambda t: _abdi_one(t, start_date, session_token)
+        ticker, lambda t: _abdi_one(t, start_date, session_token)
     )

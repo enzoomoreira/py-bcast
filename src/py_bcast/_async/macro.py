@@ -63,7 +63,7 @@ async def abmacro(
     symbol).
     """
     return await vectorize_async(
-        ensure_list(ticker),
+        ticker,
         lambda t: _abmacro_one(t, start_date, end_date, session_token),
     )
 
@@ -117,7 +117,7 @@ async def abreturn(
     symbol).
     """
     return await vectorize_async(
-        ensure_list(ticker),
+        ticker,
         lambda t: _abreturn_one(t, start_date, end_date, session_token),
     )
 
