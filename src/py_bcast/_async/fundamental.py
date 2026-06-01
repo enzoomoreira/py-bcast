@@ -38,10 +38,26 @@ from .._core.normalize import ensure_id_list, ensure_list, ensure_str
 from .._core.output import to_record_dataframe, to_reference_dataframe
 from .._core.ratelimit import rate_limit_async
 from .._core.resolve import aresolve_cvm, aresolve_indicator
+from .._core.retry import http_retry
 from .._core.validation import TickerList, validate_params
 from ._helpers import async_aetp_request
 
 logger = get_logger(__name__)
+
+
+@http_retry
+async def _abconsensus_fetch(s, ticker: str, token: str, today: str):
+    """Isolated async HTTP call for retry."""
+    return await s.get(
+        f"{BASE_URL}/aefundamental/{ticker}/consenso",
+        params={
+            "10023": "4",
+            "10039": token,
+            "10068": ticker,
+            "13004": today,
+        },
+        timeout=15,
+    )
 
 
 async def abcompany(
@@ -81,11 +97,7 @@ async def _abconsensus_one(
     today = datetime.date.today().strftime("%Y%m%d")
 
     await rate_limit_async()
-    r = await s.get(
-        f"{BASE_URL}/aefundamental/{ticker}/consenso",
-        params={"10023": "4", "10039": token, "10068": ticker, "13004": today},
-        timeout=15,
-    )
+    r = await _abconsensus_fetch(s, ticker, token, today)
 
     try:
         parsed = parse_binary_response(r.content)

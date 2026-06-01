@@ -13,9 +13,22 @@ from .._core.exceptions import NotFoundError, ProtocolError, is_no_records
 from .._core.http import base_params, get_async_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.ratelimit import rate_limit_async
+from .._core.retry import http_retry
 from .._core.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
+
+
+@http_retry
+async def _async_content_proxy_fetch(s, endpoint: str, params: dict, timeout: int):
+    """Isolated async HTTP call for retry decoration (ContentProxy)."""
+    return await s.get(f"{BASE_URL}/{endpoint}", params=params, timeout=timeout)
+
+
+@http_retry
+async def _async_aetp_fetch(s, path: str, params: dict):
+    """Isolated async HTTP call for retry decoration (aetp/output)."""
+    return await s.get(f"{BASE_URL}/aetp/output/{path}", params=params, timeout=30)
 
 
 async def async_content_proxy_get(
@@ -44,12 +57,7 @@ async def async_content_proxy_get(
 
     logger.debug("Async ContentProxy GET %s params=%s", endpoint, params)
     await rate_limit_async()
-
-    r = await s.get(
-        f"{BASE_URL}/{endpoint}",
-        params=merged,
-        timeout=timeout,
-    )
+    r = await _async_content_proxy_fetch(s, endpoint, merged, timeout)
 
     root = ET.fromstring(r.text)
     raise_for_content_proxy_status(root, endpoint, params)
@@ -89,12 +97,7 @@ async def async_aetp_request(
         {k: v for k, v in params.items() if k != "10039"},
     )
     await rate_limit_async()
-
-    r = await s.get(
-        f"{BASE_URL}/aetp/output/{path}",
-        params=params,
-        timeout=30,
-    )
+    r = await _async_aetp_fetch(s, path, params)
 
     try:
         result = parse_binary_response(r.content)

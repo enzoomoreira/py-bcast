@@ -12,11 +12,39 @@ from .._core.constants import BASE_URL
 from .._core.http import get_async_http_client
 from .._core.logging import get_logger
 from .._core.ratelimit import rate_limit_async
+from .._core.retry import http_retry
 
 logger = get_logger(__name__)
 
 _CONTENT_PATH = "/CentralMultimidia/Default.aspx/GetVideoContent"
 _HANDLER_PATH = "/CentralMultimidia/Handlers/MultimediaCenterHandler.ashx"
+
+
+@http_retry
+async def _anews_fetch_content(s, news_id: int | str) -> httpx.Response:
+    """Isolated async HTTP call for retry."""
+    return await s.post(
+        f"{BASE_URL}{_CONTENT_PATH}",
+        json={"videoId": str(news_id)},
+        headers={"Content-Type": "application/json"},
+        timeout=10,
+    )
+
+
+@http_retry
+async def _anews_multimedia_fetch(
+    s, category: int, days_ago: int, limit: int
+) -> httpx.Response:
+    """Isolated async HTTP call for retry."""
+    return await s.get(
+        f"{BASE_URL}{_HANDLER_PATH}",
+        params={
+            "category": str(category),
+            "daysAgo": str(days_ago),
+            "limit": str(limit),
+        },
+        timeout=10,
+    )
 
 
 def _decode_json(r: httpx.Response) -> dict:
@@ -32,12 +60,7 @@ async def abnews(news_id: int | str) -> dict:
     """Async version of ``bnews``. Fetch a single news article."""
     s = get_async_http_client()
     await rate_limit_async()
-    r = await s.post(
-        f"{BASE_URL}{_CONTENT_PATH}",
-        json={"videoId": str(news_id)},
-        headers={"Content-Type": "application/json"},
-        timeout=10,
-    )
+    r = await _anews_fetch_content(s, news_id)
     r.raise_for_status()
     data = _decode_json(r).get("d")
     if not data or not data.get("Title"):
@@ -112,15 +135,7 @@ async def abnews_multimedia(
 
     s = get_async_http_client()
     await rate_limit_async()
-    r = await s.get(
-        f"{BASE_URL}{_HANDLER_PATH}",
-        params={
-            "category": str(category),
-            "daysAgo": str(days_ago),
-            "limit": str(limit),
-        },
-        timeout=10,
-    )
+    r = await _anews_multimedia_fetch(s, category, days_ago, limit)
     r.raise_for_status()
 
     results = []
@@ -140,12 +155,7 @@ async def _async_find_latest_id() -> Optional[int]:
     lo, hi = 56_100_000, 56_500_000
 
     await rate_limit_async()
-    r = await s.post(
-        f"{BASE_URL}{_CONTENT_PATH}",
-        json={"videoId": str(lo)},
-        headers={"Content-Type": "application/json"},
-        timeout=5,
-    )
+    r = await _anews_fetch_content(s, lo)
     if r.status_code != 200:
         return None
     data = _decode_json(r).get("d")
@@ -157,12 +167,7 @@ async def _async_find_latest_id() -> Optional[int]:
         await rate_limit_async()
         # Transport errors propagate rather than being misread as "id above the
         # ceiling"; only a 200-with-no-title or a non-200 narrows the bound.
-        r = await s.post(
-            f"{BASE_URL}{_CONTENT_PATH}",
-            json={"videoId": str(mid)},
-            headers={"Content-Type": "application/json"},
-            timeout=5,
-        )
+        r = await _anews_fetch_content(s, mid)
         if r.status_code == 200:
             d = _decode_json(r).get("d")
             if d and d.get("Title"):

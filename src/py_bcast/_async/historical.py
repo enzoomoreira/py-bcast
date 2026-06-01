@@ -21,11 +21,32 @@ from .._core.multi import vectorize_async
 from .._core.normalize import ensure_list
 from .._core.output import empty_bdh_frame, to_dataframe
 from .._core.ratelimit import rate_limit_async
+from .._core.retry import http_retry
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
 from .._core.xml_helpers import parse_ticks, raise_for_content_proxy_status
 from ._helpers import async_content_proxy_get
 
 logger = get_logger(__name__)
+
+
+@http_retry
+async def _abdh_fetch(s, params: dict):
+    """Isolated async HTTP call for retry."""
+    return await s.get(
+        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoFechamentos",
+        params=params,
+        timeout=30,
+    )
+
+
+@http_retry
+async def _abdh_ohlcv_fetch(s, params: dict):
+    """Isolated async HTTP call for retry."""
+    return await s.get(
+        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoData",
+        params=params,
+        timeout=15,
+    )
 
 
 @validate_params
@@ -61,11 +82,7 @@ async def abdh(
         params["DatasTolerancia"] = ";".join(chunk_dates)
 
         await rate_limit_async()
-        r = await s.get(
-            f"{BASE_URL}/BaseHistoricaNumerica/HistoricoFechamentos",
-            params=params,
-            timeout=30,
-        )
+        r = await _abdh_fetch(s, params)
 
         try:
             root = ET.fromstring(r.text)
@@ -125,11 +142,7 @@ async def _abdh_ohlcv_one(
     params["Precisao"] = "2"
 
     await rate_limit_async()
-    r = await s.get(
-        f"{BASE_URL}/BaseHistoricaNumerica/HistoricoData",
-        params=params,
-        timeout=15,
-    )
+    r = await _abdh_ohlcv_fetch(s, params)
 
     try:
         root = ET.fromstring(r.text)
