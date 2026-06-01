@@ -11,64 +11,69 @@ pytestmark = pytest.mark.legacy_session
 class TestBconsensus:
     """Test aefundamental/consenso endpoint via bconsensus()."""
 
+    _NUMERIC = {
+        "buy",
+        "hold",
+        "sell",
+        "total_analysts",
+        "target_low",
+        "target_high",
+        "target_mean",
+        "target_median",
+        "upside_pct",
+    }
+
     def test_petr4(self):
         """PETR4 returns consensus data."""
-        data = bconsensus("PETR4")
-        assert isinstance(data, pd.Series)
-        assert not data.empty
-        assert "buy" in data.index
-        assert "target_mean" in data.index
+        df = bconsensus("PETR4")
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 1
+        assert "buy" in df.columns
+        assert "target_mean" in df.columns
 
     def test_all_fields_present(self):
-        """Response includes all expected fields."""
-        data = bconsensus("PETR4")
-        expected = {
-            "buy",
-            "hold",
-            "sell",
-            "total_analysts",
-            "target_low",
-            "target_high",
-            "target_mean",
-            "target_median",
-            "upside_pct",
-        }
-        assert expected == set(data.index)
+        """Response includes all expected fields plus the ticker column."""
+        df = bconsensus("PETR4")
+        assert self._NUMERIC <= set(df.columns)
+        assert "ticker" in df.columns
 
     def test_numeric_values(self):
-        """All values are numeric."""
-        data = bconsensus("PETR4")
-        for val in data.values:
-            float(val)  # Should not raise
+        """All consensus values are numeric."""
+        df = bconsensus("PETR4")
+        for col in self._NUMERIC:
+            float(df[col].iloc[0])  # Should not raise
 
     def test_analysts_add_up(self):
         """buy + hold + sell == total_analysts."""
-        data = bconsensus("PETR4")
-        total = int(data["buy"]) + int(data["hold"]) + int(data["sell"])
-        assert total == int(data["total_analysts"])
+        df = bconsensus("PETR4")
+        total = (
+            int(df["buy"].iloc[0]) + int(df["hold"].iloc[0]) + int(df["sell"].iloc[0])
+        )
+        assert total == int(df["total_analysts"].iloc[0])
 
     def test_vale3(self):
         """VALE3 returns consensus."""
-        data = bconsensus("VALE3")
-        assert not data.empty
-        assert float(data["target_mean"]) > 0
+        df = bconsensus("VALE3")
+        assert not df.empty
+        assert float(df["target_mean"].iloc[0]) > 0
 
     def test_itub4(self):
         """ITUB4 (bank stock) returns consensus."""
-        data = bconsensus("ITUB4")
-        assert not data.empty
-        assert int(data["total_analysts"]) > 0
+        df = bconsensus("ITUB4")
+        assert not df.empty
+        assert int(df["total_analysts"].iloc[0]) > 0
 
     def test_nonexistent_ticker(self):
-        """Unknown ticker returns empty Series (no crash)."""
-        data = bconsensus("XXXXX99")
-        assert isinstance(data, pd.Series)
-        assert data.empty
+        """Unknown ticker returns an empty DataFrame with schema (no crash)."""
+        df = bconsensus("XXXXX99")
+        assert isinstance(df, pd.DataFrame)
+        assert df.empty
+        assert "target_mean" in df.columns  # schema preserved
 
     def test_target_range_valid(self):
         """target_low <= target_mean <= target_high."""
-        data = bconsensus("PETR4")
-        low = float(data["target_low"])
-        mean = float(data["target_mean"])
-        high = float(data["target_high"])
+        df = bconsensus("PETR4")
+        low = float(df["target_low"].iloc[0])
+        mean = float(df["target_mean"].iloc[0])
+        high = float(df["target_high"].iloc[0])
         assert low <= mean <= high

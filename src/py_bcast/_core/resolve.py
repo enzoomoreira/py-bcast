@@ -37,9 +37,9 @@ def resolve_cvm(ticker: str, session_token: str | None = None) -> int:
     from ..fundamental.reference import bquote
 
     quote = bquote(key, session_token=session_token)
-    if quote.empty:
+    if quote.empty or "cvm_code" not in quote.columns:
         raise NotFoundError(key, kind="ticker")
-    cvm_raw = quote.get("cvm_code")
+    cvm_raw = quote["cvm_code"].iloc[0]
     if cvm_raw is None or (
         isinstance(cvm_raw, float) and cvm_raw != cvm_raw
     ):  # NaN check

@@ -336,3 +336,35 @@ CALENDAR_SCHEMA = _object_schema(CALENDAR_FIELDS)
 DIVIDEND_SCHEMA = _object_schema(DIVIDEND_FIELDS)
 DY_SCHEMA = _object_schema(DY_FIELDS)
 PORTFOLIO_LIST_SCHEMA = _object_schema(PORTFOLIO_LIST_FIELDS)
+
+# Single-entity snapshots returned as a one-row DataFrame (RangeIndex)
+QUOTE_SCHEMA = _object_schema(QUOTE_FIELDS)
+SHARES_SCHEMA = _object_schema(SHARES_FIELDS)
+CONSENSUS_SCHEMA: dict[str, str] = {
+    "ticker": "object",
+    **{name: "float64" for name in CONSENSUS_FIELDS.values()},
+}
+
+# bdh_ohlcv — one trading day of OHLCV (DatetimeIndex; ticker added by caller)
+DAILY_OHLCV_SCHEMA: dict[str, str] = {
+    "close": "float64",
+    "settle": "float64",
+    "settle_rate": "float64",
+    "low": "float64",
+    "high": "float64",
+    "open": "float64",
+    "trades": "float64",
+    "volume": "float64",
+    "turnover": "float64",
+    "open_interest": "float64",
+    "vwap": "float64",
+    "cum_trades": "float64",
+}
+
+# bdh — daily close history, flat/long (DatetimeIndex; ticker added by caller)
+BDH_DATA_SCHEMA: dict[str, str] = {
+    "close": "float64",
+    "settle": "float64",
+    "settle_rate": "float64",
+    "yield": "float64",
+}

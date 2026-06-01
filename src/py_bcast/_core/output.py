@@ -215,3 +215,36 @@ def to_reference_dataframe(
 
     df = coerce_numeric_columns(df)
     return _apply_rename(df, rename)
+
+
+def to_record_dataframe(
+    record: dict[str, str],
+    rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
+    schema: dict[str, str] | None = None,
+    ticker: str | None = None,
+) -> pd.DataFrame:
+    """Convert a single server record to a one-row DataFrame (RangeIndex).
+
+    Single-entity reference endpoints (quote, shares, consensus) return one
+    record; this materializes it as a one-row DataFrame so every tabular
+    endpoint speaks the same type.
+
+    Args:
+        record: Dict of field -> string value (one entity).
+        rename: Column rename mapping (same semantics as to_dataframe).
+        schema: Column → dtype map used only when ``record`` is empty.
+        ticker: If given and the record carries no ``ticker`` column, insert
+                it as the first column (so the entity key is explicit).
+
+    Returns:
+        One-row DataFrame, or an empty DataFrame (with schema if given) when
+        the record is empty.
+    """
+    if not record:
+        return pd.DataFrame() if schema is None else _empty_frame(schema)
+    df = pd.DataFrame([record])
+    df = coerce_numeric_columns(df)
+    df = _apply_rename(df, rename)
+    if ticker is not None and "ticker" not in df.columns:
+        df.insert(0, "ticker", ticker)
+    return df

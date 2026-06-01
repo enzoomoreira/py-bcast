@@ -6,17 +6,26 @@ import xml.etree.ElementTree as ET
 
 import pandas as pd
 
+from .._core.columns import BDH_DATA_SCHEMA, DAILY_OHLCV_SCHEMA
 from .._core.constants import BASE_URL
-from .._core.dates import DateLike, business_days, default_end_date, to_date_str
+from .._core.dates import business_days, default_end_date, to_date_str
 from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.normalize import ensure_list
-from .._core.output import to_dataframe, to_series
+from .._core.output import to_dataframe
 from .._core.retry import http_retry
 from .._core.validation import DateParam, Ticker, TickerList, validate_params
+from .._core.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
+
+
+def _empty_bdh() -> pd.DataFrame:
+    """Empty flat bdh frame: ticker column + OHLC schema on a DatetimeIndex."""
+    df = to_dataframe([], date_col="dat", schema=BDH_DATA_SCHEMA)
+    df.insert(0, "ticker", pd.Series(dtype="object"))
+    return df
 
 
 @validate_params
@@ -25,7 +34,7 @@ def bdh(
     start_date: DateParam,
     end_date: DateParam | None = None,
     session_token: str | None = None,
-) -> dict[str, pd.DataFrame]:
+) -> pd.DataFrame:
     """
     Fetch historical closing prices for one or more tickers.
 
@@ -38,12 +47,13 @@ def bdh(
         session_token: BCAA session token (or set BROADCAST_SESSION env var)
 
     Returns:
-        Dict mapping "SYMBOL.EXCHANGE" -> DataFrame with DatetimeIndex.
-        Columns: close, settle, settle_rate, yield (numeric where applicable).
+        Flat (long) DataFrame with a DatetimeIndex and a ``ticker`` column
+        (one block of rows per symbol). Columns: ticker, close, settle,
+        settle_rate, yield. Empty DataFrame with that schema if no data.
 
     Example:
-        >>> data = bdh("PETR4", "20260501", "20260519")
-        >>> data["PETR4.BVMF"]["close"].plot()
+        >>> df = bdh(["PETR4", "VALE3"], "20260501", "20260519")
+        >>> df[df["ticker"] == "PETR4.BVMF"]["close"].plot()
     """
     token = get_session_token(session_token)
     tickers = ensure_list(tickers)
@@ -52,7 +62,7 @@ def bdh(
 
     dates = business_days(start_str, end_str)
     if not dates:
-        return {}
+        return _empty_bdh()
 
     s = get_http_client()
     results: dict[str, list[dict[str, str]]] = {}
@@ -100,13 +110,19 @@ def bdh(
     for sym in results:
         results[sym].sort(key=lambda r: r["dat"])
 
-    out: dict[str, pd.DataFrame] = {}
-    for sym, rows in results.items():
-        df = to_dataframe(rows)
+    frames = []
+    for sym in sorted(results):
+        df = to_dataframe(results[sym])
         # Drop tolerance rows with no actual trade data (NaT index)
         df = df[df.index.notna()]
-        out[sym] = df
-    return out
+        if df.empty:
+            continue
+        df.insert(0, "ticker", sym)
+        frames.append(df)
+
+    if not frames:
+        return _empty_bdh()
+    return pd.concat(frames)
 
 
 @http_retry
@@ -124,7 +140,7 @@ def bdh_ohlcv(
     ticker: Ticker,
     date: DateParam,
     session_token: str | None = None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Get full OHLCV data for a single ticker on a single date.
 
@@ -136,12 +152,14 @@ def bdh_ohlcv(
         session_token: BCAA session token
 
     Returns:
-        Series with numeric values: close, settle, low, high, open, trades,
-        volume, turnover, open_interest, vwap, cum_trades. Empty Series if no data.
+        One-row DataFrame with a DatetimeIndex and columns: ticker, close,
+        settle, settle_rate, low, high, open, trades, volume, turnover,
+        open_interest, vwap, cum_trades. Empty DataFrame with that schema if
+        there is no data for the date; NotFoundError for an unknown ticker.
 
     Example:
-        >>> s = bdh_ohlcv("PETR4", "20260519")
-        >>> print(s["close"], s["high"])
+        >>> df = bdh_ohlcv("PETR4", "20260519")
+        >>> print(df["close"].iloc[0], df["high"].iloc[0])
     """
     token = get_session_token(session_token)
     s = get_http_client()
@@ -163,15 +181,17 @@ def bdh_ohlcv(
             f"bdh_ohlcv: malformed XML response: {exc}",
             endpoint="BaseHistoricaNumerica/HistoricoData",
         ) from exc
-    if root.findtext("STATUS") != "success":
-        return pd.Series(dtype="object")
+    raise_for_content_proxy_status(root, "BaseHistoricaNumerica/HistoricoData", params)
 
     tick = root.find(".//TICK")
-    if tick is None:
-        return pd.Series(dtype="object")
-
-    record = {child.tag.lower(): (child.text or "") for child in tick}
-    return to_series(record)
+    rows = (
+        [{child.tag.lower(): (child.text or "") for child in tick}]
+        if tick is not None
+        else []
+    )
+    df = to_dataframe(rows, date_col="dat", schema=DAILY_OHLCV_SCHEMA)
+    df.insert(0, "ticker", ticker)
+    return df
 
 
 @http_retry

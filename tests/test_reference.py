@@ -47,13 +47,17 @@ class TestBsectors:
 class TestBquote:
     def test_petr4(self):
         q = bquote("PETR4")
-        assert isinstance(q, pd.Series)
-        assert not q.empty
+        assert isinstance(q, pd.DataFrame)
+        assert len(q) == 1
+        assert q["ticker"].iloc[0] == "PETR4"
 
     def test_unknown_returns_empty(self):
+        # bquote is the soft resolution primitive: unknown -> empty (with
+        # schema), which resolve_cvm turns into NotFoundError.
         q = bquote("ZZZZZ99")
-        assert isinstance(q, pd.Series)
+        assert isinstance(q, pd.DataFrame)
         assert q.empty
+        assert "cvm_code" in q.columns
 
 
 class TestBtickers:
@@ -67,8 +71,9 @@ class TestBtickers:
 class TestBshares:
     def test_petr4(self):
         data = bshares("PETR4")
-        assert isinstance(data, pd.Series)
-        assert not data.empty
+        assert isinstance(data, pd.DataFrame)
+        assert len(data) == 1
+        assert data["ticker"].iloc[0] == "PETR4"
 
 
 class TestBindicators:

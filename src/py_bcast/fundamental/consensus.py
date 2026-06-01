@@ -6,37 +6,25 @@ import datetime
 
 import pandas as pd
 
-from .._core.constants import BASE_URL
-from .._core.exceptions import ProtocolError
-from .._core.http import get_http_client, get_session_token
+from .._core.aetp import rows_to_dicts
 from .._core.binary import parse_binary_response
+from .._core.columns import CONSENSUS_FIELDS, CONSENSUS_SCHEMA
+from .._core.constants import BASE_URL
+from .._core.exceptions import ProtocolError, is_no_records
+from .._core.http import get_http_client, get_session_token
 from .._core.logging import get_logger
-from .._core.output import to_series
+from .._core.output import to_record_dataframe
 from .._core.retry import http_retry
 from .._core.validation import Ticker, validate_params
 
 logger = get_logger(__name__)
 
 
-# Consenso field tag mapping
-_CONSENSO_FIELDS = {
-    "13019": "buy",
-    "13020": "hold",
-    "13021": "sell",
-    "13022": "total_analysts",
-    "13023": "target_low",
-    "13024": "target_high",
-    "13025": "target_mean",
-    "13026": "target_median",
-    "13027": "upside_pct",
-}
-
-
 @validate_params
 def bconsensus(
     ticker: Ticker,
     session_token: str | None = None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Get analyst consensus data for a stock.
 
@@ -48,13 +36,14 @@ def bconsensus(
         session_token: BCAA session token
 
     Returns:
-        Series with numeric values: buy, hold, sell, total_analysts,
-        target_low, target_high, target_mean, target_median, upside_pct.
-        Empty Series if no consensus data available.
+        One-row DataFrame with columns: ticker, buy, hold, sell,
+        total_analysts, target_low, target_high, target_mean,
+        target_median, upside_pct. Empty DataFrame with that schema when no
+        consensus exists (e.g. a small cap with no analyst coverage).
 
     Example:
-        >>> s = bconsensus("PETR4")
-        >>> print(f"Buy: {s['buy']}, Target: {s['target_mean']}")
+        >>> df = bconsensus("PETR4")
+        >>> print(f"Buy: {df['buy'].iloc[0]}, Target: {df['target_mean'].iloc[0]}")
     """
     token = get_session_token(session_token)
     s = get_http_client()
@@ -66,22 +55,19 @@ def bconsensus(
 
     try:
         parsed = parse_binary_response(r.content)
-    except ProtocolError:
-        logger.warning("bconsensus: no data for %s", ticker)
-        return pd.Series(dtype="object")
+    except ProtocolError as exc:
+        # No coverage for this (valid) ticker reads as an empty result, not a
+        # missing entity — small caps simply have no analyst consensus.
+        if is_no_records(exc.error_tag):
+            logger.debug("bconsensus: no consensus for %s", ticker)
+            return to_record_dataframe({}, schema=CONSENSUS_SCHEMA)
+        raise
 
-    if not parsed["rows"]:
-        return pd.Series(dtype="object")
-
-    # Map field tags to friendly names
-    result = {}
-    row = parsed["rows"][0]
-    for i, tag in enumerate(parsed["fields"]):
-        if i < len(row):
-            name = _CONSENSO_FIELDS.get(tag, tag)
-            result[name] = row[i]
-
-    return to_series(result, rename=None)
+    rows = rows_to_dicts(parsed)
+    record = rows[0] if rows else {}
+    return to_record_dataframe(
+        record, rename=CONSENSUS_FIELDS, schema=CONSENSUS_SCHEMA, ticker=ticker
+    )
 
 
 @http_retry

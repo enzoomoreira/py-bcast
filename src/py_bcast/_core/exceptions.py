@@ -37,6 +37,9 @@ _NOT_FOUND_MARKERS = (
 _NO_RECORDS_MARKERS = (
     "não foram encontrados registros",
     "registro não encontrado",
+    # Range entirely before the instrument's history start: a valid query
+    # over a window with no data, not a bad symbol or a transport failure.
+    "data de início do histórico",
 )
 
 

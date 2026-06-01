@@ -10,51 +10,51 @@ pytestmark = pytest.mark.legacy_session
 
 class TestBdh:
     def test_single_ticker(self):
-        data = bdh("PETR4", "20260512", "20260519")
-        assert "PETR4.BVMF" in data
-        df = data["PETR4.BVMF"]
+        df = bdh("PETR4", "20260512", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
+        assert "PETR4.BVMF" in df["ticker"].values
         assert "close" in df.columns
         assert pd.notna(df["close"].iloc[0])
 
     def test_multiple_tickers(self):
-        data = bdh(["PETR4", "VALE3"], "20260515", "20260519")
-        assert "PETR4.BVMF" in data
-        assert "VALE3.BVMF" in data
+        df = bdh(["PETR4", "VALE3"], "20260515", "20260519")
+        tickers = set(df["ticker"].unique())
+        assert "PETR4.BVMF" in tickers
+        assert "VALE3.BVMF" in tickers
 
     def test_fx(self):
-        data = bdh("USDBRL", "20260512", "20260519")
-        assert any("USDBRL" in k for k in data.keys())
+        df = bdh("USDBRL", "20260512", "20260519")
+        assert any("USDBRL" in t for t in df["ticker"].unique())
 
     def test_sorted_chronologically(self):
-        data = bdh("PETR4", "20260501", "20260519")
-        df = data.get("PETR4.BVMF", pd.DataFrame())
-        if not df.empty:
-            # Drop NaT (tolerance rows with no actual date) before checking order
-            valid = df[df.index.notna()]
-            assert valid.index.is_monotonic_increasing
+        df = bdh("PETR4", "20260501", "20260519")
+        petr = df[df["ticker"] == "PETR4.BVMF"]
+        if not petr.empty:
+            assert petr.index.is_monotonic_increasing
 
     def test_empty_range(self):
-        data = bdh("PETR4", "20260518", "20260510")  # end < start
-        assert data == {}
+        df = bdh("PETR4", "20260518", "20260510")  # end < start
+        assert isinstance(df, pd.DataFrame)
+        assert df.empty
+        assert "ticker" in df.columns  # schema preserved
 
 
 class TestBdhOhlcv:
     def test_single_date(self):
-        data = bdh_ohlcv("PETR4", "20260519")
-        assert isinstance(data, pd.Series)
-        assert not data.empty
-        assert "close" in data.index
-        assert "high" in data.index
-        assert "low" in data.index
-        assert "open" in data.index
+        df = bdh_ohlcv("PETR4", "20260519")
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 1
+        assert df["ticker"].iloc[0] == "PETR4"
+        for col in ("close", "high", "low", "open"):
+            assert col in df.columns
 
     def test_no_data_returns_empty(self):
-        # Very old date where no data should exist
-        data = bdh_ohlcv("PETR4", "19000101")
-        assert isinstance(data, pd.Series)
-        assert data.empty
+        # Very old date (before history start) -> valid query, no rows
+        df = bdh_ohlcv("PETR4", "19000101")
+        assert isinstance(df, pd.DataFrame)
+        assert df.empty
+        assert "close" in df.columns  # schema preserved
 
 
 class TestBdt:

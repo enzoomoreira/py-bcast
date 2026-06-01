@@ -16,16 +16,17 @@ from .._core.columns import (
     INDICATOR_META_FIELDS,
     INDICATOR_META_SCHEMA,
     QUOTE_FIELDS,
+    QUOTE_SCHEMA,
     SECTOR_FIELDS,
     SECTOR_SCHEMA,
     SHARES_FIELDS,
+    SHARES_SCHEMA,
     TICKER_FIELDS,
 )
 from .._core.dates import DateLike, to_date_str
-from .._core.exceptions import ProtocolError
 from .._core.logging import get_logger
 from .._core.normalize import ensure_str
-from .._core.output import to_reference_dataframe, to_series
+from .._core.output import to_record_dataframe, to_reference_dataframe
 from .._core.resolve import resolve_cvm, resolve_indicator
 
 logger = get_logger(__name__)
@@ -126,38 +127,31 @@ def bsectors(
 def bquote(
     ticker: str,
     session_token: str | None = None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Fetch current quote (price, volume) for a symbol via aetp.
 
-    Uses aetp/output/fundamental/AtivoCotacao.
+    Uses aetp/output/fundamental/AtivoCotacao. This is also the ticker → CVM
+    resolution primitive, so it stays "soft": an unknown ticker yields an
+    empty DataFrame (resolve_cvm turns that into NotFoundError) rather than
+    raising here.
 
     Args:
         ticker: Symbol (e.g., "PETR4", "VALE3")
         session_token: BCAA session token
 
     Returns:
-        Series with quote fields (price, volume, quantity, etc.).
-        Empty Series if not found.
+        One-row DataFrame with quote fields (ticker, close, volume, etc.).
+        Empty DataFrame with that schema if the symbol has no quote.
 
     Example:
         >>> q = bquote("PETR4")
-        >>> print(q["close"])
+        >>> print(q["close"].iloc[0])
     """
-    try:
-        parsed = aetp_request(
-            "fundamental/ativo/cotacao",
-            {"10068": ticker},
-            session_token,
-        )
-    except ProtocolError:
-        logger.warning("bquote: no data for %s", ticker)
-        return pd.Series(dtype="object")
-
+    parsed = aetp_request("fundamental/ativo/cotacao", {"10068": ticker}, session_token)
     rows = rows_to_dicts(parsed)
-    return (
-        to_series(rows[0], rename=QUOTE_FIELDS) if rows else pd.Series(dtype="object")
-    )
+    record = rows[0] if rows else {}
+    return to_record_dataframe(record, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA)
 
 
 def btickers(
@@ -197,7 +191,7 @@ def btickers(
 def bshares(
     ticker: str,
     session_token: str | None = None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Fetch shares outstanding for a ticker.
 
@@ -208,11 +202,12 @@ def bshares(
         session_token: BCAA session token
 
     Returns:
-        Series with shares data. Empty Series if not found.
+        One-row DataFrame with shares data (ticker, total/float/treasury
+        shares, etc.). Raises NotFoundError for an unknown ticker.
 
     Example:
-        >>> s = bshares("PETR4")
-        >>> print(s)
+        >>> df = bshares("PETR4")
+        >>> print(df["total_shares"].iloc[0])
     """
     parsed = aetp_request(
         "fundamental/ativo/quantidade",
@@ -222,9 +217,8 @@ def bshares(
     )
 
     rows = rows_to_dicts(parsed)
-    return (
-        to_series(rows[0], rename=SHARES_FIELDS) if rows else pd.Series(dtype="object")
-    )
+    record = rows[0] if rows else {}
+    return to_record_dataframe(record, rename=SHARES_FIELDS, schema=SHARES_SCHEMA)
 
 
 def bindicators(
