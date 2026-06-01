@@ -34,9 +34,9 @@ def resolve_cvm(ticker: str, session_token: str | None = None) -> int:
         return _cvm_cache[key]
 
     # Lazy import to avoid circular dependency
-    from ..fundamental.reference import bquote
+    from ..fundamental.reference import _quote_one
 
-    quote = bquote(key, session_token=session_token)
+    quote = _quote_one(key, session_token=session_token)
     if quote.empty or "cvm_code" not in quote.columns:
         raise NotFoundError(key, kind="ticker")
     cvm_raw = quote["cvm_code"].iloc[0]

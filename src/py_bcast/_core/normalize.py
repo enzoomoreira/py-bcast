@@ -50,6 +50,17 @@ def ensure_list(value: str | list[str]) -> list[str]:
     return list(value)
 
 
+def ensure_id_list(value: str | int | list[str | int]) -> list[str | int]:
+    """Coerce a scalar-or-list of ticker-or-cvm identifiers to a list.
+
+    Like ``ensure_list`` but tolerant of bare ``int`` CVM codes (which are not
+    iterable), so a single ``9512`` stays ``[9512]`` instead of raising.
+    """
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
 def ensure_str(value: str | int) -> str:
     """Coerce an int-or-string argument to string.
 

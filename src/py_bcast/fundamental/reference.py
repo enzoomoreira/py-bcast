@@ -25,7 +25,8 @@ from .._core.columns import (
 )
 from .._core.dates import DateLike, to_date_str
 from .._core.logging import get_logger
-from .._core.normalize import ensure_str
+from .._core.multi import vectorize
+from .._core.normalize import ensure_id_list, ensure_list, ensure_str
 from .._core.output import to_record_dataframe, to_reference_dataframe
 from .._core.resolve import resolve_cvm, resolve_indicator
 
@@ -124,29 +125,15 @@ def bsectors(
     )
 
 
-def bquote(
+def _quote_one(
     ticker: str,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Fetch current quote (price, volume) for a symbol via aetp.
+    """Fetch the quote for a single symbol (one row, or empty with schema).
 
-    Uses aetp/output/fundamental/AtivoCotacao. This is also the ticker → CVM
-    resolution primitive, so it stays "soft": an unknown ticker yields an
-    empty DataFrame (resolve_cvm turns that into NotFoundError) rather than
-    raising here.
-
-    Args:
-        ticker: Symbol (e.g., "PETR4", "VALE3")
-        session_token: BCAA session token
-
-    Returns:
-        One-row DataFrame with quote fields (ticker, close, volume, etc.).
-        Empty DataFrame with that schema if the symbol has no quote.
-
-    Example:
-        >>> q = bquote("PETR4")
-        >>> print(q["close"].iloc[0])
+    Scalar core shared by the vectorized ``bquote`` and ``resolve_cvm``;
+    ``resolve_cvm`` requires exactly one row, so it must never depend on the
+    list-returning public ``bquote``.
     """
     parsed = aetp_request("fundamental/ativo/cotacao", {"10068": ticker}, session_token)
     rows = rows_to_dicts(parsed)
@@ -154,27 +141,40 @@ def bquote(
     return to_record_dataframe(record, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA)
 
 
-def btickers(
-    ticker_or_cvm: str | int,
+def bquote(
+    ticker: str | list[str],
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch all tickers (stocks/units) for a company.
+    Fetch current quote (price, volume) for one or more symbols via aetp.
 
-    Accepts either a CVM code (int) or a ticker string (auto-resolves CVM).
-    Uses aetp/output/fundamental/AtivoSimbolo.
+    Uses aetp/output/fundamental/AtivoCotacao. This is also the ticker → CVM
+    resolution primitive (via the scalar ``_quote_one`` core), so it stays
+    "soft": an unknown ticker yields an empty block (resolve_cvm turns that
+    into NotFoundError) rather than raising here.
 
     Args:
-        ticker_or_cvm: CVM numeric code (int, e.g. 9512) or ticker (str, e.g. "PETR4").
+        ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
         session_token: BCAA session token
 
     Returns:
-        DataFrame with ticker information.
+        Flat DataFrame with quote fields (one row per symbol), each block
+        tagged with a ``ticker`` column. Empty DataFrame with that schema if
+        no symbol has a quote.
 
     Example:
-        >>> df = btickers("PETR4")  # resolves CVM, returns PETR3+PETR4
-        >>> df = btickers(9512)     # direct CVM code
+        >>> q = bquote("PETR4")
+        >>> print(q["close"].iloc[0])
     """
+    tickers = ensure_list(ticker)
+    return vectorize(tickers, lambda t: _quote_one(t, session_token))
+
+
+def _btickers_one(
+    ticker_or_cvm: str | int,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Fetch all tickers for one company (by CVM code or ticker)."""
     if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
         cvm_code = int(ticker_or_cvm)
     else:
@@ -188,27 +188,40 @@ def btickers(
     return to_reference_dataframe(rows_to_dicts(parsed), rename=TICKER_FIELDS)
 
 
-def bshares(
-    ticker: str,
+def btickers(
+    ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch shares outstanding for a ticker.
+    Fetch all tickers (stocks/units) for one or more companies.
 
-    Uses aetp/output/fundamental/AtivoQuantidade.
+    Accepts either a CVM code (int) or a ticker string (auto-resolves CVM),
+    or a list mixing both. Uses aetp/output/fundamental/AtivoSimbolo.
 
     Args:
-        ticker: Symbol (e.g., "PETR4")
+        ticker_or_cvm: CVM code (int, e.g. 9512), ticker (str, e.g. "PETR4"),
+            or a list mixing both.
         session_token: BCAA session token
 
     Returns:
-        One-row DataFrame with shares data (ticker, total/float/treasury
-        shares, etc.). Raises NotFoundError for an unknown ticker.
+        Flat DataFrame with ticker information. The endpoint emits its own
+        ``ticker`` column (the company's symbols, e.g. PETR3/PETR4 for a
+        Petrobras lookup), so that column is NOT the lookup identifier.
 
     Example:
-        >>> df = bshares("PETR4")
-        >>> print(df["total_shares"].iloc[0])
+        >>> df = btickers("PETR4")  # resolves CVM, returns PETR3+PETR4
+        >>> df = btickers(9512)     # direct CVM code
+        >>> df = btickers(["PETR4", 4170])  # mixed list
     """
+    items = ensure_id_list(ticker_or_cvm)
+    return vectorize(items, lambda x: _btickers_one(x, session_token))
+
+
+def _bshares_one(
+    ticker: str,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Fetch shares outstanding for a single ticker (raises if unknown)."""
     parsed = aetp_request(
         "fundamental/ativo/quantidade",
         {"10068": ticker},
@@ -221,35 +234,40 @@ def bshares(
     return to_record_dataframe(record, rename=SHARES_FIELDS, schema=SHARES_SCHEMA)
 
 
-def bindicators(
+def bshares(
+    ticker: str | list[str],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch shares outstanding for one or more tickers.
+
+    Uses aetp/output/fundamental/AtivoQuantidade.
+
+    Args:
+        ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with shares data (one row per ticker; ticker, total/
+        float/treasury shares, etc.). Raises NotFoundError if any ticker is
+        unknown (fail-fast).
+
+    Example:
+        >>> df = bshares("PETR4")
+        >>> print(df["total_shares"].iloc[0])
+    """
+    tickers = ensure_list(ticker)
+    return vectorize(tickers, lambda t: _bshares_one(t, session_token))
+
+
+def _bindicators_one(
     ticker_or_cvm: str | int,
     indicator: str | int,
     start_date: DateLike,
     end_date: DateLike,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Fetch daily indicator history for a company.
-
-    Uses aetp/output/fundamental/IndicadorHistoricoDiario.
-
-    Accepts ticker strings (auto-resolves CVM) or CVM codes directly.
-    Accepts indicator names (e.g. "EBITDA", "ROE") or numeric IDs.
-
-    Args:
-        ticker_or_cvm: Ticker (str, e.g. "PETR4") or CVM code (int, e.g. 9512).
-        indicator: Indicator name (str, e.g. "EBITDA") or ID (int, e.g. 11).
-        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
-        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
-        session_token: BCAA session token
-
-    Returns:
-        DataFrame with DatetimeIndex and daily indicator values.
-
-    Example:
-        >>> df = bindicators("PETR4", "EBITDA", "20260101", "20260519")
-        >>> df = bindicators(9512, 32, "20260101", "20260519")
-    """
+    """Fetch daily indicator history for one company (by CVM or ticker)."""
     # Resolve ticker → CVM
     if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
         cvm_code = int(ticker_or_cvm)
@@ -272,6 +290,46 @@ def bindicators(
     rows = rows_to_dicts(parsed)
     return to_reference_dataframe(
         rows, rename=INDICATOR_HISTORY_FIELDS, schema=INDICATOR_HISTORY_SCHEMA
+    )
+
+
+def bindicators(
+    ticker_or_cvm: str | int | list[str | int],
+    indicator: str | int,
+    start_date: DateLike,
+    end_date: DateLike,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch daily indicator history for one or more companies.
+
+    Uses aetp/output/fundamental/IndicadorHistoricoDiario.
+
+    Accepts ticker strings (auto-resolves CVM) or CVM codes directly, or a
+    list mixing both. Accepts indicator names (e.g. "EBITDA", "ROE") or
+    numeric IDs.
+
+    Args:
+        ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
+            or a list mixing both.
+        indicator: Indicator name (str, e.g. "EBITDA") or ID (int, e.g. 11).
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with DatetimeIndex, daily indicator values, and a
+        ``ticker`` column holding each input identifier.
+
+    Example:
+        >>> df = bindicators("PETR4", "EBITDA", "20260101", "20260519")
+        >>> df = bindicators(9512, 32, "20260101", "20260519")
+        >>> df = bindicators(["PETR4", "VALE3"], 32, "20260101", "20260519")
+    """
+    items = ensure_id_list(ticker_or_cvm)
+    return vectorize(
+        items,
+        lambda x: _bindicators_one(x, indicator, start_date, end_date, session_token),
     )
 
 
