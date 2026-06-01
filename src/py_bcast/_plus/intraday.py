@@ -13,6 +13,32 @@ logger = get_logger(__name__)
 
 _ENDPOINT = "/stock/v1/timesAndTrades"
 
+# Flat schema (column order) for the times & trades frame. ``ticker`` leads so
+# results from several symbols stack cleanly; exchange ids and ``is_trade`` are
+# non-numeric.
+_TRADE_COLUMNS = [
+    "ticker",
+    "last",
+    "size",
+    "tendency",
+    "sequence",
+    "is_trade",
+    "ask_price",
+    "ask_size",
+    "ask_exchange_id",
+    "bid_price",
+    "bid_size",
+    "bid_exchange_id",
+]
+
+
+def _empty_btrades(ticker: str) -> pd.DataFrame:
+    """Empty trades frame carrying the full schema and a tz-aware index."""
+    idx = pd.DatetimeIndex([], tz="America/Sao_Paulo", name=None)
+    return pd.DataFrame(
+        {col: pd.Series(dtype="object") for col in _TRADE_COLUMNS}, index=idx
+    )
+
 
 @validate_params
 def btrades(
@@ -35,6 +61,7 @@ def btrades(
 
     Returns:
         DataFrame with DatetimeIndex (America/Sao_Paulo timezone) and columns:
+            ticker      — instrument code (the queried symbol)
             last        — trade price
             size        — trade quantity
             tendency    — price tendency (0 = unchanged, 1 = up, -1 = down)
@@ -46,7 +73,7 @@ def btrades(
             bid_price       — best bid at trade time
             bid_size        — bid quantity
             bid_exchange_id — venue code for the bid (string identifier)
-        Empty DataFrame if no trades found.
+        Empty DataFrame (same columns + tz-aware index) if no trades found.
 
     Raises:
         BroadcastPlusAuthError: If authentication with Broadcast+ fails.
@@ -65,11 +92,11 @@ def btrades(
 
     data = r.json()
     if not isinstance(data, dict) or not data.get("data"):
-        return pd.DataFrame()
+        return _empty_btrades(ticker)
 
     rows = data["data"]
     if not rows:
-        return pd.DataFrame()
+        return _empty_btrades(ticker)
 
     records = []
     for row in rows:
@@ -106,6 +133,9 @@ def btrades(
     for col in df.columns:
         if col not in _non_numeric:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Tag with the queried symbol (after numeric coercion so it stays a string).
+    df.insert(0, "ticker", ticker)
 
     # API returns newest-first; sort ascending (oldest first, chronological)
     return df.sort_index()
