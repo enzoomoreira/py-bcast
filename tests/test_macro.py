@@ -49,6 +49,16 @@ class TestBmacro:
         assert isinstance(df, pd.DataFrame)
         assert df.empty
 
+    def test_multiple_all_empty(self):
+        # Multi input where every item is empty: one empty frame with schema
+        # (+ ticker column) and the DatetimeIndex preserved through concat.
+        df = bmacro(["USDBRL", "IBOV"], "20260518", "20260510")
+        assert isinstance(df, pd.DataFrame)
+        assert df.empty
+        assert "ticker" in df.columns
+        assert "close" in df.columns
+        assert isinstance(df.index, pd.DatetimeIndex)
+
 
 class TestBdiCdi:
     def test_recent(self):
