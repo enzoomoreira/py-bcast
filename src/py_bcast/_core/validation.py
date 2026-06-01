@@ -9,17 +9,18 @@ from __future__ import annotations
 
 import datetime
 import functools
+import inspect
 from typing import Annotated, Any, Union
 
 import pandas as pd
 from pydantic import (
     AfterValidator,
     BeforeValidator,
-    Field,
     validate_call,
 )
 from pydantic import ValidationError as PydanticValidationError
 
+from py_bcast._core.dates import to_date_str, to_datetime_str
 from py_bcast._core.exceptions import ValidationError
 
 # ---------------------------------------------------------------------------
@@ -28,37 +29,33 @@ from py_bcast._core.exceptions import ValidationError
 
 
 def _coerce_date(value: Any) -> str:
-    """Coerce flexible date inputs to YYYYMMDD string."""
-    if isinstance(value, pd.Timestamp):
-        return value.strftime("%Y%m%d")
-    if isinstance(value, datetime.datetime):
-        return value.strftime("%Y%m%d")
-    if isinstance(value, datetime.date):
-        return value.strftime("%Y%m%d")
-    if isinstance(value, str):
-        clean = value.replace("-", "").replace("/", "")
-        if len(clean) == 8 and clean.isdigit():
-            datetime.datetime.strptime(clean, "%Y%m%d")  # validate
-            return clean
-    raise ValueError(f"Invalid date: {value!r}. Expected YYYYMMDD, YYYY-MM-DD, date, or Timestamp.")
+    """Coerce flexible date inputs to YYYYMMDD string.
+
+    Delegates to ``to_date_str`` (single source of date parsing) and normalizes
+    its ValueError/TypeError into a ValueError so pydantic wraps it as a
+    ``ValidationError`` (pydantic does not convert a raw TypeError).
+    """
+    try:
+        return to_date_str(value)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"Invalid date: {value!r}. Expected YYYYMMDD, YYYY-MM-DD, date, or Timestamp."
+        ) from exc
 
 
 def _coerce_datetime(value: Any) -> str:
-    """Coerce flexible datetime inputs to YYYYMMDDHHMMSS string."""
-    if isinstance(value, pd.Timestamp):
-        return value.strftime("%Y%m%d%H%M%S")
-    if isinstance(value, datetime.datetime):
-        return value.strftime("%Y%m%d%H%M%S")
-    if isinstance(value, datetime.date):
-        return datetime.datetime.combine(value, datetime.time()).strftime("%Y%m%d%H%M%S")
-    if isinstance(value, str):
-        clean = value.replace("-", "").replace("/", "").replace(":", "").replace(" ", "").replace("T", "")
-        if len(clean) == 8:
-            clean += "000000"
-        if len(clean) == 14 and clean.isdigit():
-            datetime.datetime.strptime(clean, "%Y%m%d%H%M%S")  # validate
-            return clean
-    raise ValueError(f"Invalid datetime: {value!r}. Expected YYYYMMDDHHMMSS or datetime.")
+    """Coerce flexible datetime inputs to YYYYMMDDHHMMSS string.
+
+    Delegates to ``to_datetime_str`` (single source of datetime parsing) and
+    normalizes its ValueError/TypeError into a ValueError so pydantic wraps it
+    as a ``ValidationError``.
+    """
+    try:
+        return to_datetime_str(value)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"Invalid datetime: {value!r}. Expected YYYYMMDDHHMMSS or datetime."
+        ) from exc
 
 
 def _coerce_ticker_list(value: Any) -> list[str]:
@@ -77,7 +74,9 @@ def _coerce_cvm_code(value: Any) -> str:
     """Coerce int | str to a CVM code string."""
     s = str(value).strip()
     if not s or not s.isdigit():
-        raise ValueError(f"Invalid CVM code: {value!r}. Expected numeric string or int.")
+        raise ValueError(
+            f"Invalid CVM code: {value!r}. Expected numeric string or int."
+        )
     return s
 
 
@@ -93,11 +92,15 @@ def _validate_ticker(value: str) -> str:
 # Annotated types for use in function signatures
 # ---------------------------------------------------------------------------
 
-DateParam = Annotated[Union[str, datetime.date, datetime.datetime, pd.Timestamp], BeforeValidator(_coerce_date)]
+DateParam = Annotated[
+    Union[str, datetime.date, datetime.datetime, pd.Timestamp],
+    BeforeValidator(_coerce_date),
+]
 """Date-like parameter coerced to YYYYMMDD string."""
 
 DateTimeParam = Annotated[
-    Union[str, datetime.date, datetime.datetime, pd.Timestamp], BeforeValidator(_coerce_datetime)
+    Union[str, datetime.date, datetime.datetime, pd.Timestamp],
+    BeforeValidator(_coerce_datetime),
 ]
 """DateTime-like parameter coerced to YYYYMMDDHHMMSS string."""
 
@@ -109,9 +112,6 @@ TickerList = Annotated[Union[str, list[str]], BeforeValidator(_coerce_ticker_lis
 
 CvmCode = Annotated[Union[str, int], BeforeValidator(_coerce_cvm_code)]
 """CVM company code coerced to string."""
-
-PositiveInt = Annotated[int, Field(gt=0)]
-"""Positive integer (> 0)."""
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +134,20 @@ def validate_params(fn: Any = None, /) -> Any:
             validate_return=False,
             config={"arbitrary_types_allowed": True},
         )(func)
+
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Argument validation for a coroutine function happens when the
+                # returned coroutine is awaited, so the await must sit inside the
+                # try/except — otherwise pydantic's error escapes uncaught.
+                try:
+                    return await validated(*args, **kwargs)
+                except PydanticValidationError as exc:
+                    raise ValidationError(str(exc)) from exc
+
+            return async_wrapper
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
