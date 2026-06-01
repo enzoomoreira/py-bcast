@@ -74,6 +74,7 @@ class _DiskCache:
     def _ensure_open(self) -> Any:
         if self._cache is None:
             import diskcache
+
             cache_dir = _resolve_cache_dir()
             self._cache = diskcache.Cache(cache_dir)
             logger.debug("Disk cache opened at %s", cache_dir)
@@ -108,7 +109,7 @@ _memory_cache = _MemoryCache()
 _disk_cache = _DiskCache()
 
 
-def _get_backend():
+def _get_backend() -> _MemoryCache | _DiskCache:
     """Return the active cache backend based on settings."""
     settings = get_settings()
     if settings.cache_backend == "disk":
@@ -138,7 +139,9 @@ def cache_get(endpoint: str, params: dict[str, str]) -> Any | None:
     return result
 
 
-def cache_set(endpoint: str, params: dict[str, str], value: Any, ttl: int | None = None) -> None:
+def cache_set(
+    endpoint: str, params: dict[str, str], value: Any, ttl: int | None = None
+) -> None:
     """Store a response in the cache."""
     settings = get_settings()
     if not settings.cache_enabled:

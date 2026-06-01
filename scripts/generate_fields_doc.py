@@ -4,11 +4,15 @@ Generate comprehensive docs/legacy/fields.md from camposbc.tab.
 
 import csv
 import io
+import os
+import sys
 from pathlib import Path
 
-path = (
-    r"C:\Users\i455561\AppData\Roaming\Agencia Estado\Broadcast\DataFiles\camposbc.tab"
+_DEFAULT_PATH = os.path.join(
+    os.environ.get("APPDATA", ""),
+    r"Agencia Estado\Broadcast\DataFiles\camposbc.tab",
 )
+path = sys.argv[1] if len(sys.argv) > 1 else _DEFAULT_PATH
 data = open(path, "rb").read()
 text = data.decode("latin-1", errors="replace")
 

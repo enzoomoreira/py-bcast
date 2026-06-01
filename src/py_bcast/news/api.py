@@ -6,6 +6,8 @@ import json
 import re
 from typing import Optional
 
+import httpx
+
 from .._core.constants import BASE_URL
 from .._core.http import get_http_client
 from .._core.logging import get_logger
@@ -14,7 +16,7 @@ from .._core.retry import http_retry
 logger = get_logger(__name__)
 
 
-def _decode_json(r) -> dict:
+def _decode_json(r: httpx.Response) -> dict:
     """Decode JSON from response, handling latin-1 encoded bodies."""
     try:
         return r.json()
@@ -190,7 +192,7 @@ def bnews_multimedia(category: int, days_ago: int = 60, limit: int = 20) -> list
 
 
 @http_retry
-def _news_fetch_content(s, news_id):
+def _news_fetch_content(s: httpx.Client, news_id: int | str) -> httpx.Response:
     """Isolated HTTP call for retry."""
     return s.post(
         f"{BASE_URL}{_CONTENT_PATH}",
@@ -201,7 +203,9 @@ def _news_fetch_content(s, news_id):
 
 
 @http_retry
-def _news_multimedia_fetch(s, category: int, days_ago: int, limit: int):
+def _news_multimedia_fetch(
+    s: httpx.Client, category: int, days_ago: int, limit: int
+) -> httpx.Response:
     """Isolated HTTP call for retry."""
     return s.get(
         f"{BASE_URL}{_HANDLER_PATH}",

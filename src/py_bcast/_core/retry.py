@@ -6,6 +6,8 @@ network failures (timeouts, connection errors, HTTP 5xx).
 
 from __future__ import annotations
 
+from typing import Any, Callable
+
 import httpx
 from tenacity import (
     retry,
@@ -30,7 +32,7 @@ def _is_retryable(exc: BaseException) -> bool:
     return False
 
 
-def _make_retry():
+def _make_retry() -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Build the retry decorator reading current settings."""
     settings = get_settings()
     return retry(
