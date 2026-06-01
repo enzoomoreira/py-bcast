@@ -40,10 +40,7 @@ class Settings:
     cache_enabled: bool = True
     cache_backend: Literal["memory", "disk"] = "memory"
     cache_dir: str | None = None  # None = auto (APPDATA/py_bcast/cache)
-    cache_ttl: int = 300  # seconds — historical data
-    cache_ttl_reference: int = 3600  # seconds — reference/static data
-    cache_ttl_realtime: int = 5  # seconds — quotes
-    cache_ttl_news: int = 60  # seconds — news articles
+    cache_ttl: int = 300  # seconds
 
     # ── Rate Limiting ────────────────────────────────────────────────────────
     rate_limit_calls: int = 10  # max requests per period

@@ -5,8 +5,6 @@ Provides singleton httpx clients (sync + async) with connection pooling.
 
 from __future__ import annotations
 
-import warnings
-
 import httpx
 
 from .config import get_settings
@@ -59,21 +57,6 @@ def close_clients() -> None:
         _sync_client.close()
     _sync_client = None
     _async_client = None
-
-
-def create_http_session() -> httpx.Client:
-    """Create a pre-configured httpx.Client for ContentProxy.
-
-    .. deprecated::
-        Use ``get_http_client()`` instead. This function now returns the
-        shared singleton client rather than creating a new one each call.
-    """
-    warnings.warn(
-        "create_http_session() is deprecated, use get_http_client()",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return get_http_client()
 
 
 def base_params(session_token: str) -> dict[str, str]:

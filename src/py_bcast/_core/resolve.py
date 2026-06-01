@@ -143,10 +143,3 @@ def resolve_indicator(name_or_id: str | int, session_token: str | None = None) -
         kind="indicator",
         message=f"Indicator '{s}' not found. Use bindicator_meta() to list available indicators.",
     )
-
-
-def clear_resolve_cache() -> None:
-    """Clear all resolution caches (CVM and indicator)."""
-    global _indicator_meta_cache
-    _cvm_cache.clear()
-    _indicator_meta_cache = None

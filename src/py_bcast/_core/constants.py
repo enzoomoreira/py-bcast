@@ -8,16 +8,9 @@ DDE_SERVICE = "BC"
 DDE_TOPIC_REALTIME = "COT"
 DDE_TOPIC_SNAPSHOT = "ATIVO"
 
-# DDEML error codes (from ddeml.h)
+# DDEML error codes (from ddeml.h). DMLERR_ADVACKTIMEOUT is re-exported via the
+# package root; the rest are surfaced only through DMLERR_NAMES (by value).
 DMLERR_ADVACKTIMEOUT = 0x4009  # 16393 — server didn't ACK the advise
-DMLERR_NO_CONV_ESTABLISHED = 0x400A  # 16394 — no conversation found
-DMLERR_NOTPROCESSED = 0x4009  # alias (same value as ADVACKTIMEOUT)
-DMLERR_BUSY = 0x4001  # server busy
-DMLERR_DATAACKTIMEOUT = 0x4002  # data ack timeout
-DMLERR_EXECACKTIMEOUT = 0x4005  # execute ack timeout
-DMLERR_POKEACKTIMEOUT = 0x400B  # poke ack timeout
-DMLERR_SERVER_DIED = 0x400E  # server terminated
-DMLERR_UNADVACKTIMEOUT = 0x4010  # unadvise ack timeout
 
 DMLERR_NAMES: dict[int, str] = {
     0x4001: "DMLERR_BUSY",
@@ -29,31 +22,6 @@ DMLERR_NAMES: dict[int, str] = {
     0x400E: "DMLERR_SERVER_DIED",
     0x4010: "DMLERR_UNADVACKTIMEOUT",
 }
-
-FIELDS_REALTIME = [
-    "ATIVO",
-    "ULT",
-    "HOR",
-    "VAR",
-    "MAX",
-    "MIN",
-    "ABE",
-    "FEC",
-    "OCP",
-    "OVD",
-    "NEG",
-    "QUL",
-    "MED",
-    "VTT",
-    "QTT",
-    "DAT",
-    "QCP",
-    "QVD",
-    "EST",
-    "NOM",
-    "SIT",
-    "LOT",
-]
 
 # ATIVO topic returns 56 tab-separated columns in this order
 SNAPSHOT_FIELDS = [
@@ -120,8 +88,6 @@ SNAPSHOT_FIELDS = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 BASE_URL = "http://cp.ae.com.br:44780"
-HTTP_USER_AGENT = "bcsys32/7.0"
-HTTP_PLATFORM = "4"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Broadcast+ (new terminal — Broadcast+.exe v7.4.4)
