@@ -17,7 +17,8 @@ from .._core.columns import (
     PORTFOLIO_LIST_SCHEMA,
 )
 from .._core.dates import DateLike, to_date_str
-from .._core.normalize import ensure_str
+from .._core.multi import vectorize
+from .._core.normalize import ensure_list, ensure_str
 from .._core.output import to_reference_dataframe
 from .._core.resolve import resolve_cvm
 from .._core.validation import CvmCode, DateParam, validate_params
@@ -58,30 +59,12 @@ def bcalendar(
     )
 
 
-def bdividends(
+def _bdividends_one(
     ticker: str,
     cvm_code: str | int | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Fetch dividend/JCP history for a company.
-
-    Uses aetp/output/fundamental/EmpresaEventosJcpDividendos.
-
-    Args:
-        ticker: Ticker symbol (e.g., "PETR4"). Used directly and also
-            to resolve cvm_code if not provided.
-        cvm_code: CVM numeric code (e.g., 9512). If None, resolved
-            automatically from the ticker.
-        session_token: BCAA session token
-
-    Returns:
-        DataFrame with dividend events (date, type, value per share, etc.).
-
-    Example:
-        >>> df = bdividends("PETR4")
-        >>> df.tail()
-    """
+    """Fetch dividend/JCP history for a single company."""
     ticker = ticker.strip().upper()
     if cvm_code is None:
         cvm_code = resolve_cvm(ticker, session_token)
@@ -95,34 +78,47 @@ def bdividends(
     )
 
 
-def bdy(
+def bdividends(
+    ticker: str | list[str],
+    cvm_code: str | int | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch dividend/JCP history for one or more companies.
+
+    Uses aetp/output/fundamental/EmpresaEventosJcpDividendos.
+
+    Args:
+        ticker: Ticker symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+            Used directly and also to resolve cvm_code per ticker.
+        cvm_code: CVM numeric code (e.g., 9512). Only honored for a single
+            ticker; for a list, each ticker resolves its own CVM (a scalar
+            code cannot apply across multiple companies). If None, resolved
+            automatically.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with dividend events (date, type, value per share,
+        etc.) and a ``ticker`` column (one block per company).
+
+    Example:
+        >>> df = bdividends("PETR4")
+        >>> df.tail()
+        >>> df = bdividends(["PETR4", "VALE3"])
+    """
+    tickers = [t.strip().upper() for t in ensure_list(ticker)]
+    cvm = cvm_code if len(tickers) == 1 else None
+    return vectorize(tickers, lambda t: _bdividends_one(t, cvm, session_token))
+
+
+def _bdy_one(
     ticker: str,
     start_date: DateLike,
     end_date: DateLike,
     cvm_code: str | int | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Fetch dividend yield historical series for a company.
-
-    Uses aetp/output/fundamental/EmpresaEventosDy.
-
-    Args:
-        ticker: Ticker symbol (e.g., "PETR4"). Used directly and also
-            to resolve cvm_code if not provided.
-        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
-        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
-        cvm_code: CVM numeric code (e.g., 9512). If None, resolved
-            automatically from the ticker.
-        session_token: BCAA session token
-
-    Returns:
-        DataFrame with DatetimeIndex and DY values over time.
-
-    Example:
-        >>> df = bdy("PETR4", "20250101", "20260519")
-        >>> df.tail()
-    """
+    """Fetch the dividend yield series for a single company."""
     ticker = ticker.strip().upper()
     if cvm_code is None:
         cvm_code = resolve_cvm(ticker, session_token)
@@ -139,6 +135,45 @@ def bdy(
     )
     rows = rows_to_dicts(parsed)
     return to_reference_dataframe(rows, rename=DY_FIELDS, schema=DY_SCHEMA)
+
+
+def bdy(
+    ticker: str | list[str],
+    start_date: DateLike,
+    end_date: DateLike,
+    cvm_code: str | int | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch dividend yield historical series for one or more companies.
+
+    Uses aetp/output/fundamental/EmpresaEventosDy.
+
+    Args:
+        ticker: Ticker symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+            Used directly and also to resolve cvm_code per ticker.
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
+        cvm_code: CVM numeric code (e.g., 9512). Only honored for a single
+            ticker; for a list, each ticker resolves its own CVM. If None,
+            resolved automatically.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with DatetimeIndex, DY values over time, and a
+        ``ticker`` column (one block per company).
+
+    Example:
+        >>> df = bdy("PETR4", "20250101", "20260519")
+        >>> df.tail()
+        >>> df = bdy(["PETR4", "VALE3"], "20250101", "20260519")
+    """
+    tickers = [t.strip().upper() for t in ensure_list(ticker)]
+    cvm = cvm_code if len(tickers) == 1 else None
+    return vectorize(
+        tickers,
+        lambda t: _bdy_one(t, start_date, end_date, cvm, session_token),
+    )
 
 
 def bportfolios(

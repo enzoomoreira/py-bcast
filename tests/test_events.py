@@ -25,6 +25,14 @@ class TestBdividends:
         df = bdividends("PETR4")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
+        assert "ticker" in df.columns
+        assert df["ticker"].iloc[0] == "PETR4"
+
+    def test_multiple(self):
+        # List resolves each ticker's CVM independently.
+        df = bdividends(["PETR4", "VALE3"])
+        assert isinstance(df, pd.DataFrame)
+        assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
 
 
 class TestBdy:
@@ -33,6 +41,13 @@ class TestBdy:
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
         assert "_unused" not in df.columns  # B1: trailing filler tag dropped
+        assert "ticker" in df.columns
+        assert df["ticker"].iloc[0] == "PETR4"
+
+    def test_multiple(self):
+        df = bdy(["PETR4", "VALE3"], "20250101", "20260519")
+        assert isinstance(df, pd.DataFrame)
+        assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
 
 
 class TestBportfolios:
