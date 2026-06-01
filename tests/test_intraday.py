@@ -81,3 +81,17 @@ class TestBdi:
         today = datetime.date.today().strftime("%Y%m%d")
         df = bdi("VALE3", today)
         assert len(df) > 0
+
+    def test_single_has_ticker_column(self):
+        """Single-symbol call now carries a ticker column."""
+        today = datetime.date.today().strftime("%Y%m%d")
+        df = bdi("PETR4", today)
+        assert "ticker" in df.columns
+        assert df["ticker"].iloc[0] == "PETR4"
+
+    def test_multiple(self):
+        """A list returns one flat frame covering every symbol."""
+        today = datetime.date.today().strftime("%Y%m%d")
+        df = bdi(["PETR4", "VALE3"], today)
+        assert isinstance(df, pd.DataFrame)
+        assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())

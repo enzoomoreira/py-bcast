@@ -63,6 +63,13 @@ class TestBdt:
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
         assert "close" in df.columns
+        assert "ticker" in df.columns
+        assert df["ticker"].iloc[0] == "USDBRL"
+
+    def test_multiple(self):
+        df = bdt(["USDBRL", "EURUSD"], "20260519100000", "20260519101000")
+        assert isinstance(df, pd.DataFrame)
+        assert {"USDBRL", "EURUSD"} <= set(df["ticker"].unique())
 
     def test_chronological_order(self):
         df = bdt("USDBRL", "20260519100000", "20260519110000")
