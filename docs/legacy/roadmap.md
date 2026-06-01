@@ -19,7 +19,7 @@ clareza/ergonomia.
 | 1 | **Naming de historico** | `bdh` retorna so close+settle; `bdh_ohlcv` retorna OHLCV de 1 dia | Ver "Decisao em aberto" abaixo | Breaking nominal |
 | 2 | **Fundir `bdi_cdi` em `bmacro`** | endpoint/funcao separada (`DiCetipAcumulado`) | rotear `bmacro("CDI", ...)` internamente; remover `bdi_cdi` do `__all__` | Breaking nominal |
 | 3 | **Unificar `bportfolios`/`bportfolio`** | duas funcoes | `bportfolio(broker=None)` (lista quando `None`), padrao de `bcompany(cvm=None)` | Breaking nominal |
-| 4 | **Decorator `@accepts_ticker_or_cvm`** | 4 copias do check `isinstance(int) or isdigit() -> resolve_cvm` em `btickers`/`bdividends`/`bdy`/`bindicators` | extrair para `_core/resolve.py` | Interno, nao-breaking |
+| 4 | **Decorator `@accepts_ticker_or_cvm`** | 4 copias do check `isinstance(int) or isdigit() -> resolve_cvm` em `btickers`/`bdividends`/`bdy`/`bindicators` | extrair para `_legacy/resolve.py` | Interno, nao-breaking |
 | 5 | **Renomear colunas cripticas** | algumas colunas seguem nomes do servidor | nomes finance-standard onde ainda ha residuo | Breaking nominal |
 | 6 | **`@http_retry` no caminho async** | os helpers async (`async_content_proxy_get`, `async_aetp_request`, `abdh` inline) nao tem retry | decorator async equivalente a tenacity, ou `AsyncRetrying` | Interno, nao-breaking |
 

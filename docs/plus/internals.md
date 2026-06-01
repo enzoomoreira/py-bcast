@@ -313,23 +313,26 @@ webSocketKeepAliveInterval = 10000   // ms — WS ping interval
 
 ## 7. Reutilizacao do Core da Lib
 
-Analise de quais componentes do `_core/` sao reutilizaveis para o backend Plus:
+Analise de quais componentes sao reutilizaveis pelo backend Plus. A reorg que extraiu o protocolo
+Legacy para `_legacy/` materializou esta analise: o genuinamente compartilhado ficou em `_core/`; o
+acoplado ao ContentProxy/bcsys32 foi para `_legacy/` (o Plus nunca importa de la — usa seus proprios
+`_plus/http.py` e `_plus/session.py`).
 
 | Componente | Reutilizavel? | Observacoes |
 |---|---|---|
 | `_core/cache.py` | Sim | Cache TTL agnostico de protocolo |
 | `_core/ratelimit.py` | Sim | Rate limiter agnostico |
-| `_core/retry.py` | Sim | `@http_retry` funciona para qualquer httpx call |
+| `_core/retry.py` | Sim | `@http_retry` funciona para qualquer httpx call (unico `_core` que o Plus importa) |
 | `_core/logging.py` | Sim | `get_logger()` e generico |
 | `_core/validation.py` | Sim | `Ticker`, `DateParam`, etc. |
 | `_core/dates.py` | Sim | Conversoes de data |
-| `_core/output.py` | Sim | `to_dataframe()`, `to_record_dataframe()`, `to_reference_dataframe()` |
 | `_core/normalize.py` | Sim | `ensure_list()` etc. |
-| `_core/http.py` | Parcial | `get_http_client()` reutilizavel; `base_params()` especifico do ContentProxy |
-| `_core/session.py` | Nao | BCAA token discovery e especifico do bcsys32.exe |
 | `_core/config.py` | Expandido | `Settings` recebeu `plus_login`, `plus_password` (repr=False) |
-| `_core/binary.py` | Nao | Parser de binary SOH especifico do ContentProxy |
-| `_core/xml_helpers.py` | Nao | Parser XML especifico do ContentProxy |
+| `_legacy/output.py` | Nao | Construtores de DataFrame acoplados aos schemas Legacy (`columns.py`); o Plus monta o seu proprio em `btrades` |
+| `_legacy/http.py` | Nao | Cliente ContentProxy Legacy (`get_http_client`, `base_params`); o Plus usa `_plus/http.py` |
+| `_legacy/session.py` | Nao | BCAA token discovery especifico do bcsys32.exe |
+| `_legacy/binary.py` | Nao | Parser de binary SOH especifico do ContentProxy |
+| `_legacy/xml_helpers.py` | Nao | Parser XML especifico do ContentProxy |
 | `realtime/client.py` | Nao | DDE e exclusivo do bcsys32.exe |
 | `instruments/db.py` | Nao | `aetp_17.dat` e instalado pelo bcsys32 |
 | `_plus/session.py` | N/A | **Novo** — JWT auth chain (env var / mem scan / ECDH) |
