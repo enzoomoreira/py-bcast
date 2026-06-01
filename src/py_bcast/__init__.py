@@ -64,6 +64,8 @@ from .fundamental import (
     bportfolio,
 )
 from .instruments import InstrumentDB, bsearch
+from .ticker import Ticker
+from . import accessor as _accessor  # noqa: F401 — registers the .bcast DataFrame accessor
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
 from .news import bnews, bnews_recent, bnews_multimedia, MULTIMEDIA_CATEGORIES
 from ._core.session import discover_session_token, clear_token_cache
@@ -100,6 +102,7 @@ __all__ = [
     "bconsensus",
     "InstrumentDB",
     "bsearch",
+    "Ticker",
     # Macro / Fixed Income
     "bmacro",
     "bdi_cdi",

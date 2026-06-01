@@ -114,6 +114,39 @@ with BroadcastPlusClient() as client:
     client.run(duration=60)
 ```
 
+## DataFrame layout & `Ticker` objects
+
+Every tabular function returns a **flat/long DataFrame with a `ticker` column** —
+not a column MultiIndex like xbbg or `yfinance.download()`. Flat/long is the
+canonical layout: it makes `groupby("ticker")`, `concat`, and Parquet/SQL
+persistence trivial, and keeps the empty-result schema stable.
+
+If you prefer the **wide** layout (`df["PETR4"]` selects one instrument), use the
+opt-in `.bcast` accessor — it is a pure reshape, the default stays flat:
+
+```python
+df = bdh(["PETR4", "VALE3"], "20260501", "20260520")   # flat: ticker column
+wide = df.bcast.wide()          # column MultiIndex (ticker, field)
+wide["PETR4"]["close"]          # select one instrument
+wide.bcast.long()               # inverse, back to flat
+```
+
+`wide()` suits time-series frames (`bdh`, `bmacro`, `breturn`, ...) where each
+`(date, ticker)` pair is unique.
+
+For an object-oriented style (like yfinance's `Ticker`), `Ticker` is a thin
+facade over the `b*` functions — no new logic, just discoverability:
+
+```python
+from py_bcast import Ticker
+
+petr = Ticker("PETR4")
+petr.history("20260501", "20260520")   # -> bdh
+petr.dividends                          # -> bdividends
+petr.quote                              # -> bquote
+petr.indicators("EBITDA", "20260101", "20260520")  # -> bindicators
+```
+
 ## Supported Assets
 
 | Class | Examples | Real-time | Daily History | Tick Data |
@@ -133,7 +166,7 @@ with BroadcastPlusClient() as client:
 
 ```
 src/py_bcast/
-├── __init__.py         # Public API (57 exported symbols + async_api namespace)
+├── __init__.py         # Public API (58 exported symbols + async_api namespace)
 ├── _core/              # Shared infrastructure (both backends)
 │   ├── config.py       # Settings dataclass + configure() (incl. terminal=, plus_login=, plus_password=)
 │   ├── routing.py      # get_active_terminal() — picks legacy vs plus per call
