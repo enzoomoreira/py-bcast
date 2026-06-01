@@ -82,6 +82,7 @@ class TestBindicators:
         df = bindicators(9512, 32, "20260501", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
+        assert "_unused" not in df.columns  # B2: trailing filler tag dropped
 
     def test_beta(self):
         # indicator 52 = Beta

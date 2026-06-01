@@ -14,6 +14,9 @@ class TestBmacro:
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
         assert "close" in df.columns
+        # B5: redundant ref_date (dup of index) and empty hor are dropped
+        assert "ref_date" not in df.columns
+        assert "hor" not in df.columns
 
     def test_ibov(self):
         df = bmacro("IBOV", "20260512", "20260519")
@@ -73,11 +76,14 @@ class TestBvolume:
         df = bvolume("PETR4")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert any("PETR4" in idx for idx in df.index)
+        # B6: symbol is a regular column (it repeats per averaging window),
+        # not a non-unique index.
+        assert "symbol" in df.columns
+        assert any("PETR4" in s for s in df["symbol"])
 
     def test_multiple(self):
         df = bvolume(["PETR4", "VALE3"])
-        assert len(df) >= 2
+        assert df["symbol"].nunique() >= 2
 
 
 class TestBinflation:

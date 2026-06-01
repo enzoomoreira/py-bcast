@@ -12,11 +12,7 @@ from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._core.normalize import ensure_list
-from .._core.output import (
-    coerce_numeric_columns,
-    to_dataframe,
-    to_reference_dataframe,
-)
+from .._core.output import to_dataframe, to_reference_dataframe
 from .._core.columns import (
     CDI_SCHEMA,
     CONTENT_PROXY_RENAME,
@@ -164,11 +160,12 @@ def bvolume(
         session_token: BCAA session token
 
     Returns:
-        DataFrame with symbol as index and volume stats as columns.
+        Flat DataFrame (RangeIndex), one row per (symbol, averaging window).
+        Columns: symbol, avg_volume, avg_turnover, avg_trades, months, dat.
 
     Example:
         >>> df = bvolume(["PETR4", "VALE3"])
-        >>> df.loc["PETR4.BVMF"]
+        >>> df[df["symbol"] == "PETR4.BVMF"]
     """
     token = get_session_token(session_token)
     s = get_http_client()
@@ -190,36 +187,16 @@ def bvolume(
             server_message=msg,
         )
 
-    rows = []
-    for tick in root.findall(".//TICK"):
-        data = {child.tag.lower(): (child.text or "") for child in tick}
-        rows.append(data)
-
-    if not rows:
-        empty = pd.DataFrame({c: pd.Series(dtype=t) for c, t in VOLUME_SCHEMA.items()})
-        empty.index = pd.Index([], name="symbol")
-        return empty
-
-    df = pd.DataFrame(rows)
-    if "symbol" in df.columns:
-        df = df.set_index("symbol")
-    df = coerce_numeric_columns(df)
-    # Apply standard column renames
-    name_map = {
-        k: v
-        for k, v in CONTENT_PROXY_RENAME.items()
-        if v is not None and k in df.columns
-    }
-    drop_cols = [
-        k
-        for k in df.columns
-        if CONTENT_PROXY_RENAME.get(k) is None and k in CONTENT_PROXY_RENAME
+    rows = [
+        {child.tag.lower(): (child.text or "") for child in tick}
+        for tick in root.findall(".//TICK")
     ]
-    if drop_cols:
-        df = df.drop(columns=drop_cols)
-    if name_map:
-        df = df.rename(columns=name_map)
-    return df
+    # Flat frame: one row per (symbol, averaging window) — symbol stays a
+    # column because it repeats per window (1m/2m/3m/6m), so it cannot be a
+    # unique index.
+    return to_reference_dataframe(
+        rows, rename=CONTENT_PROXY_RENAME, schema=VOLUME_SCHEMA
+    )
 
 
 @http_retry

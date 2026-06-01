@@ -32,6 +32,7 @@ class TestBdy:
         df = bdy("PETR4", "20250101", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
+        assert "_unused" not in df.columns  # B1: trailing filler tag dropped
 
 
 class TestBportfolios:

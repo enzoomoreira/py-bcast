@@ -29,6 +29,7 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
     "tipo_intervalo": "session_type",
     "var": "change_pct",
     "dattol": None,  # drop: request artifact with no data value
+    "hor": None,  # drop: empty on daily series (consumed as time index intraday)
     "settle_rate": "settle_rate",  # keep (fixed-income only)
     "open_interest": "open_interest",  # keep (derivatives)
     "vwap": "vwap",  # keep (standard finance term)
@@ -45,7 +46,7 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
     # bdi_cdi
     "acum": "accumulated",
     # bmacro
-    "date_ref": "ref_date",
+    "date_ref": None,  # drop: empty / duplicates the DatetimeIndex
 }
 
 
@@ -152,7 +153,7 @@ SHARES_FIELDS: dict[str, str] = {
 }
 
 # bindicators(cvm, indicator_id, start, end)
-INDICATOR_HISTORY_FIELDS: dict[str, str] = {
+INDICATOR_HISTORY_FIELDS: dict[str, str | None] = {
     "13760": "indicator_id",
     "13762": "indicator_name",
     "13763": "label",
@@ -161,7 +162,7 @@ INDICATOR_HISTORY_FIELDS: dict[str, str] = {
     "13764": "frequency",
     "10068": "change_pct",
     "13788": "period_change_pct",
-    "13789": "_unused",
+    "13789": None,  # drop: trailing positional filler with no data value
 }
 
 # bindicator_meta()
@@ -214,7 +215,7 @@ DIVIDEND_FIELDS: dict[str, str] = {
 }
 
 # bdy(cvm, ticker, start, end)
-DY_FIELDS: dict[str, str] = {
+DY_FIELDS: dict[str, str | None] = {
     "10078": "date",
     "13893": "price",
     "13155": "ref_date",
@@ -222,7 +223,7 @@ DY_FIELDS: dict[str, str] = {
     "13895": "dy_pct",
     "13896": "dps_12m",
     "13897": "dy_12m_pct",
-    "13898": "_unused",
+    "13898": None,  # drop: trailing positional filler with no data value
 }
 
 # bportfolios()
@@ -275,9 +276,13 @@ PORTFOLIO_FIELDS: dict[str, str] = {
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _object_schema(fields: dict[str, str]) -> dict[str, str]:
-    """Empty-frame schema with every field-map column as object dtype."""
-    return {name: "object" for name in fields.values()}
+def _object_schema(fields: dict[str, str | None]) -> dict[str, str]:
+    """Empty-frame schema with every named field-map column as object dtype.
+
+    Fields mapped to None are dropped from the populated frame, so they are
+    excluded from the schema too.
+    """
+    return {name: "object" for name in fields.values() if name is not None}
 
 
 # Numeric time-series (paired with an empty DatetimeIndex)
@@ -319,6 +324,7 @@ INFLATION_SCHEMA: dict[str, str] = {
     "return_ytd": "float64",
 }
 VOLUME_SCHEMA: dict[str, str] = {
+    "symbol": "object",
     "avg_volume": "float64",
     "avg_turnover": "float64",
     "avg_trades": "float64",
