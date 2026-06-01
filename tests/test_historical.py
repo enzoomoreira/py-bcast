@@ -49,6 +49,11 @@ class TestBdhOhlcv:
         for col in ("close", "high", "low", "open"):
             assert col in df.columns
 
+    def test_multiple(self):
+        df = bdh_ohlcv(["PETR4", "VALE3"], "20260519")
+        assert isinstance(df, pd.DataFrame)
+        assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
+
     def test_no_data_returns_empty(self):
         # Very old date (before history start) -> valid query, no rows
         df = bdh_ohlcv("PETR4", "19000101")

@@ -12,10 +12,11 @@ from .._core.dates import business_days, default_end_date, to_date_str
 from .._core.exceptions import ContentProxyError
 from .._core.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
+from .._core.multi import vectorize
 from .._core.normalize import ensure_list
 from .._core.output import to_dataframe
 from .._core.retry import http_retry
-from .._core.validation import DateParam, Ticker, TickerList, validate_params
+from .._core.validation import DateParam, TickerList, validate_params
 from .._core.xml_helpers import raise_for_content_proxy_status
 
 logger = get_logger(__name__)
@@ -135,32 +136,12 @@ def _bdh_fetch(s, params: dict):
     )
 
 
-@validate_params
-def bdh_ohlcv(
-    ticker: Ticker,
-    date: DateParam,
+def _bdh_ohlcv_one(
+    ticker: str,
+    date: str,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Get full OHLCV data for a single ticker on a single date.
-
-    Uses HistoricoData endpoint.
-
-    Args:
-        ticker: Single ticker (e.g., "PETR4")
-        date: Date (str YYYYMMDD, date, datetime, or Timestamp)
-        session_token: BCAA session token
-
-    Returns:
-        One-row DataFrame with a DatetimeIndex and columns: ticker, close,
-        settle, settle_rate, low, high, open, trades, volume, turnover,
-        open_interest, vwap, cum_trades. Empty DataFrame with that schema if
-        there is no data for the date; NotFoundError for an unknown ticker.
-
-    Example:
-        >>> df = bdh_ohlcv("PETR4", "20260519")
-        >>> print(df["close"].iloc[0], df["high"].iloc[0])
-    """
+    """Get full OHLCV data for a single ticker on a single date."""
     token = get_session_token(session_token)
     s = get_http_client()
     date_str = to_date_str(date)
@@ -192,6 +173,36 @@ def bdh_ohlcv(
     df = to_dataframe(rows, date_col="dat", schema=DAILY_OHLCV_SCHEMA)
     df.insert(0, "ticker", ticker)
     return df
+
+
+@validate_params
+def bdh_ohlcv(
+    ticker: TickerList,
+    date: DateParam,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Get full OHLCV data for one or more tickers on a single date.
+
+    Uses HistoricoData endpoint.
+
+    Args:
+        ticker: Single ticker or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        date: Date (str YYYYMMDD, date, datetime, or Timestamp)
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one row
+        per ticker). Columns: ticker, close, settle, settle_rate, low, high,
+        open, trades, volume, turnover, open_interest, vwap, cum_trades.
+        Empty DataFrame with that schema if there is no data for the date;
+        NotFoundError for an unknown ticker.
+
+    Example:
+        >>> df = bdh_ohlcv("PETR4", "20260519")
+        >>> print(df["close"].iloc[0], df["high"].iloc[0])
+    """
+    return vectorize(ticker, lambda t: _bdh_ohlcv_one(t, date, session_token))
 
 
 @http_retry
