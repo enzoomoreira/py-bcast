@@ -39,6 +39,12 @@ class TestBdh:
         assert df.empty
         assert "ticker" in df.columns  # schema preserved
 
+    def test_close_is_float(self):
+        # A no-trade tolerance row carries an "n/d" sentinel; it must not
+        # poison numeric coercion and leave close as str/object.
+        df = bdh("PETR4", "20260501", "20260519")
+        assert pd.api.types.is_float_dtype(df["close"])
+
 
 class TestBdhOhlcv:
     def test_single_date(self):

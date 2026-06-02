@@ -10,6 +10,12 @@ import pandas as pd
 
 from .columns import BDH_DATA_SCHEMA, CONTENT_PROXY_RENAME
 
+# Server sentinels for "no value" that must not poison numeric coercion.
+# A column of numbers plus one of these (e.g. a no-trade tolerance row whose
+# value is "n/d") is still numeric; the sentinel cells become NaN. Matched
+# case-insensitively against the stripped cell value.
+MISSING_VALUE_SENTINELS: frozenset[str] = frozenset({"n/d", "n/a", "nd", "-", "--"})
+
 
 def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Coerce each wholly-numeric column to a numeric dtype, in place.
@@ -18,6 +24,12 @@ def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     number; its blank cells ('' or NA) then become NaN. If any non-blank cell
     fails to parse, the column is genuine text and is left untouched (blanks
     stay as the empty strings the server sent).
+
+    Known missing-value sentinels (``MISSING_VALUE_SENTINELS``, e.g. the "n/d"
+    a no-trade tolerance row carries) are treated as blanks, not coercion
+    failures, so a column that is all-numeric apart from those sentinels still
+    coerces (the sentinel cells become NaN). A column with genuine text stays
+    text.
 
     Replaces the old ``to_numeric(...).fillna(original)`` pattern, which
     restored blank strings into otherwise-numeric columns and forced the whole
@@ -28,7 +40,8 @@ def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     for col in df.columns:
         coerced = pd.to_numeric(df[col], errors="coerce")
         stripped = df[col].astype("string").str.strip()
-        blank = (stripped.isna() | (stripped == "")).fillna(True)
+        is_sentinel = stripped.str.lower().isin(MISSING_VALUE_SENTINELS)
+        blank = (stripped.isna() | (stripped == "") | is_sentinel).fillna(True)
         failed = coerced.isna() & ~blank
         if bool(failed.any()):
             continue
