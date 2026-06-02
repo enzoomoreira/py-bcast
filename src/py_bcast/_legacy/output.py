@@ -31,6 +31,12 @@ def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     coerces (the sentinel cells become NaN). A column with genuine text stays
     text.
 
+    Identifier columns whose tokens carry a significant leading zero (CNPJ,
+    CPF, zero-padded codes) are left as text even though they parse as numbers:
+    coercing them would drop the leading zero and corrupt the id. A genuine
+    quantity never starts with a zero before another digit, so "0.5"/"0" still
+    coerce; "08773135000100"/"00000000000000" do not.
+
     Replaces the old ``to_numeric(...).fillna(original)`` pattern, which
     restored blank strings into otherwise-numeric columns and forced the whole
     column back to ``object`` dtype (the binflation "all object" bug). Inputs
@@ -44,6 +50,16 @@ def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
         blank = (stripped.isna() | (stripped == "") | is_sentinel).fillna(True)
         failed = coerced.isna() & ~blank
         if bool(failed.any()):
+            continue
+        # A wholly-numeric column whose tokens carry a significant leading zero
+        # (CNPJ, CPF, zero-padded codes) is an identifier, not a quantity:
+        # coercing it drops the leading zero and corrupts the id (e.g.
+        # "08773135000100" -> 8773135000100.0, "00000000000000" -> 0.0). A real
+        # number never has a leading zero before another digit ("0.5"/"0" do
+        # not), so the guard is "leading 0 followed by a digit". Dates
+        # (YYYYMMDD) have no leading zero and still coerce to int — a known,
+        # non-corrupting limitation, not handled here.
+        if bool(stripped.str.match(r"0\d", na=False).any()):
             continue
         df[col] = coerced
     return df
