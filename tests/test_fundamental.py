@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from py_bcast import bconsensus
+from py_bcast import bconsensus, bsectors
 
 pytestmark = pytest.mark.legacy_session
 
@@ -90,3 +90,18 @@ class TestBconsensus:
         mean = float(df["target_mean"].iloc[0])
         high = float(df["target_high"].iloc[0])
         assert low <= mean <= high
+
+
+class TestBinaryEncoding:
+    """Accented Portuguese text from binary endpoints decodes as UTF-8."""
+
+    def test_sectors_accented_utf8(self):
+        """A sector name carries correctly decoded accented characters.
+
+        The server sends UTF-8; the binary parser must decode values as UTF-8
+        (not latin-1). 'Construção' contains 'ç' (U+00E7) and 'ã' (U+00E3) —
+        under the old latin-1 bug these surfaced as the four-codepoint mojibake
+        'Ã§Ã£' instead.
+        """
+        sectors = bsectors()["sector"].tolist()
+        assert any("Construção" in s for s in sectors)

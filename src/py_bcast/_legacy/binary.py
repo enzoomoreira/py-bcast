@@ -37,14 +37,16 @@ def parse_binary_response(data: bytes) -> dict:
 
     # Record 1 = metadata/status info
     error_fields = records[1].split(b"\x00")
-    first_field = error_fields[0].decode("latin-1") if error_fields else ""
+    first_field = (
+        error_fields[0].decode("utf-8", errors="replace") if error_fields else ""
+    )
 
     # Check for error: if 10037 tag exists anywhere, it's an error response
     if b"10037" in data:
         all_fields = data.split(b"\x00")
         msg = ""
         for i, f in enumerate(all_fields):
-            decoded = f.decode("latin-1", errors="replace")
+            decoded = f.decode("utf-8", errors="replace")
             if decoded == "10037" and i + 1 < len(all_fields):
                 msg = all_fields[i + 1].decode("utf-8", errors="replace")
                 break
@@ -57,7 +59,7 @@ def parse_binary_response(data: bytes) -> dict:
     # Record 2 = field definitions
     field_record = records[2].split(b"\x00")
     # First element is field count, rest are tag numbers, last may be empty
-    field_tags = [f.decode("latin-1") for f in field_record[1:] if f]
+    field_tags = [f.decode("utf-8", errors="replace") for f in field_record[1:] if f]
     n_fields = len(field_tags)
 
     # Record 3+ = data rows (before the ETX terminator record)
@@ -66,7 +68,7 @@ def parse_binary_response(data: bytes) -> dict:
         if rec == b"\x03" or rec == b"":
             break
         parts = rec.split(b"\x00")
-        values = [v.decode("latin-1", errors="replace") for v in parts]
+        values = [v.decode("utf-8", errors="replace") for v in parts]
         # Align positionally to the declared field count. Each data record
         # ends with a NULL terminator (trailing empty) which we drop; short
         # rows are padded. Interior empty fields are KEPT — filtering them
