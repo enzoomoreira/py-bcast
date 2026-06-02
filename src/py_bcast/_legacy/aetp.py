@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import httpx
+
 from .._core.cache import cache_get, cache_set
 from .._core.config import get_settings
 from .._core.constants import BASE_URL
@@ -91,7 +93,7 @@ def aetp_request(
 
 
 @http_retry
-def _aetp_fetch(s, path: str, params: dict):
+def _aetp_fetch(s: httpx.Client, path: str, params: dict) -> httpx.Response:
     """Isolated HTTP call for retry decoration."""
     return s.get(
         f"{BASE_URL}/aetp/output/{path}",

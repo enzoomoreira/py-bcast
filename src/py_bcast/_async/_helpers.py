@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+import httpx
+
 from .._legacy.aetp import _aetp_identifier
 from .._legacy.binary import parse_binary_response
 from .._core.cache import cache_get, cache_set
@@ -20,13 +22,17 @@ logger = get_logger(__name__)
 
 
 @http_retry
-async def _async_content_proxy_fetch(s, endpoint: str, params: dict, timeout: int):
+async def _async_content_proxy_fetch(
+    s: httpx.AsyncClient, endpoint: str, params: dict, timeout: int
+) -> httpx.Response:
     """Isolated async HTTP call for retry decoration (ContentProxy)."""
     return await s.get(f"{BASE_URL}/{endpoint}", params=params, timeout=timeout)
 
 
 @http_retry
-async def _async_aetp_fetch(s, path: str, params: dict):
+async def _async_aetp_fetch(
+    s: httpx.AsyncClient, path: str, params: dict
+) -> httpx.Response:
     """Isolated async HTTP call for retry decoration (aetp/output)."""
     return await s.get(f"{BASE_URL}/aetp/output/{path}", params=params, timeout=30)
 

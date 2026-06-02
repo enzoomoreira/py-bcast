@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 
+import httpx
 import pandas as pd
 
 from .._legacy.aetp import rows_to_dicts
@@ -46,7 +47,9 @@ logger = get_logger(__name__)
 
 
 @http_retry
-async def _abconsensus_fetch(s, ticker: str, token: str, today: str):
+async def _abconsensus_fetch(
+    s: httpx.AsyncClient, ticker: str, token: str, today: str
+) -> httpx.Response:
     """Isolated async HTTP call for retry."""
     return await s.get(
         f"{BASE_URL}/aefundamental/{ticker}/consenso",

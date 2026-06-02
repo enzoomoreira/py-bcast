@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+import httpx
+
 from .._core.cache import cache_get, cache_set
 from .._core.config import get_settings
 from .._core.constants import BASE_URL
@@ -99,7 +101,9 @@ def raise_for_content_proxy_status(
 
 
 @http_retry
-def _content_proxy_fetch(s, endpoint: str, params: dict, timeout: int):
+def _content_proxy_fetch(
+    s: httpx.Client, endpoint: str, params: dict, timeout: int
+) -> httpx.Response:
     """Isolated HTTP call for retry decoration."""
     return s.get(
         f"{BASE_URL}/{endpoint}",

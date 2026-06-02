@@ -21,7 +21,9 @@ _HANDLER_PATH = "/CentralMultimidia/Handlers/MultimediaCenterHandler.ashx"
 
 
 @http_retry
-async def _anews_fetch_content(s, news_id: int | str) -> httpx.Response:
+async def _anews_fetch_content(
+    s: httpx.AsyncClient, news_id: int | str
+) -> httpx.Response:
     """Isolated async HTTP call for retry."""
     return await s.post(
         f"{BASE_URL}{_CONTENT_PATH}",
@@ -33,7 +35,7 @@ async def _anews_fetch_content(s, news_id: int | str) -> httpx.Response:
 
 @http_retry
 async def _anews_multimedia_fetch(
-    s, category: int, days_ago: int, limit: int
+    s: httpx.AsyncClient, category: int, days_ago: int, limit: int
 ) -> httpx.Response:
     """Isolated async HTTP call for retry."""
     return await s.get(

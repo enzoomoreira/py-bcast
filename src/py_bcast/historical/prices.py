@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+import httpx
 import pandas as pd
 
 from .._legacy.columns import DAILY_OHLCV_SCHEMA
@@ -115,7 +116,7 @@ def bdh(
 
 
 @http_retry
-def _bdh_fetch(s, params: dict):
+def _bdh_fetch(s: httpx.Client, params: dict) -> httpx.Response:
     """Isolated HTTP call for retry."""
     return s.get(
         f"{BASE_URL}/BaseHistoricaNumerica/HistoricoFechamentos",
@@ -194,7 +195,7 @@ def bdh_ohlcv(
 
 
 @http_retry
-def _bdh_ohlcv_fetch(s, params: dict):
+def _bdh_ohlcv_fetch(s: httpx.Client, params: dict) -> httpx.Response:
     """Isolated HTTP call for retry."""
     return s.get(
         f"{BASE_URL}/BaseHistoricaNumerica/HistoricoData",

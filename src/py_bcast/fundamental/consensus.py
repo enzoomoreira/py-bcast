@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 
+import httpx
 import pandas as pd
 
 from .._legacy.aetp import rows_to_dicts
@@ -80,7 +81,9 @@ def bconsensus(
 
 
 @http_retry
-def _consensus_fetch(s, ticker: str, token: str, today: str):
+def _consensus_fetch(
+    s: httpx.Client, ticker: str, token: str, today: str
+) -> httpx.Response:
     """Isolated HTTP call for retry."""
     return s.get(
         f"{BASE_URL}/aefundamental/{ticker}/consenso",

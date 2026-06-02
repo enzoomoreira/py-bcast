@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import xml.etree.ElementTree as ET
 
+import httpx
 import pandas as pd
 
 from .._legacy.columns import (
@@ -30,7 +31,7 @@ logger = get_logger(__name__)
 
 
 @http_retry
-async def _abdh_fetch(s, params: dict):
+async def _abdh_fetch(s: httpx.AsyncClient, params: dict) -> httpx.Response:
     """Isolated async HTTP call for retry."""
     return await s.get(
         f"{BASE_URL}/BaseHistoricaNumerica/HistoricoFechamentos",
@@ -40,7 +41,7 @@ async def _abdh_fetch(s, params: dict):
 
 
 @http_retry
-async def _abdh_ohlcv_fetch(s, params: dict):
+async def _abdh_ohlcv_fetch(s: httpx.AsyncClient, params: dict) -> httpx.Response:
     """Isolated async HTTP call for retry."""
     return await s.get(
         f"{BASE_URL}/BaseHistoricaNumerica/HistoricoData",
