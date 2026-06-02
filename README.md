@@ -167,19 +167,28 @@ petr.indicators("EBITDA", "20260101", "20260520")  # -> bindicators
 ```
 src/py_bcast/
 ├── __init__.py         # Public API (58 exported symbols + async_api namespace)
-├── _core/              # Shared infrastructure (both backends)
+├── _core/              # Backend-agnostic infrastructure (both backends)
 │   ├── config.py       # Settings dataclass + configure() (incl. terminal=, plus_login=, plus_password=)
 │   ├── routing.py      # get_active_terminal() — picks legacy vs plus per call
 │   ├── memory.py       # Win32 helpers: find_process_pid + scan_process_memory
 │   ├── exceptions.py   # PyBcastError, SessionError, BroadcastPlusError, BroadcastPlusAuthError, …
-│   ├── session.py      # Legacy session token discovery (memory scan of bcsys32.exe)
 │   ├── constants.py    # Service names, URLs (legacy + plus), exchange normalization
-│   ├── http.py         # Legacy ContentProxy httpx client pool
 │   ├── cache.py        # Response cache (memory + diskcache)
 │   ├── ratelimit.py    # Token-bucket rate limiter
 │   ├── retry.py        # Tenacity retry decorator
 │   ├── validation.py   # Pydantic types + @validate_params
-│   └── (logging, dates, normalize, output, columns, resolve, xml_helpers, ...)
+│   └── (logging, dates, normalize)
+├── _legacy/            # Legacy protocol stack (DDE + ContentProxy; never imported by _plus)
+│   ├── dde.py          # DDE conversations with bcsys32.exe
+│   ├── http.py         # Legacy ContentProxy httpx client pool
+│   ├── session.py      # Legacy session token discovery (memory scan of bcsys32.exe)
+│   ├── aetp.py         # aetp/output binary request helpers
+│   ├── binary.py       # Binary response parser
+│   ├── xml_helpers.py  # ContentProxy XML (content_proxy_get, raise_for_content_proxy_status)
+│   ├── resolve.py      # CVM code + indicator name resolution
+│   ├── columns.py      # Column schemas + rename maps
+│   ├── output.py       # DataFrame builders (to_dataframe, empty_bdh_frame, …)
+│   └── multi.py        # vectorize / vectorize_async multi-ticker fan-out
 ├── _plus/              # Broadcast+ backend
 │   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login
 │   ├── crypto.py       # ECDH P-384 + AES-GCM-256 (matching app.asar buildEncryptedResult)
