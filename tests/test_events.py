@@ -86,3 +86,15 @@ class TestBportfolio:
         assert df["ticker"].notna().any()  # ticker column is populated, not all-NaN
         assert "portfolio_name" in df.columns
         assert df["portfolio_name"].notna().any()
+
+    def test_recommendation_column(self):
+        # Themed portfolios (e.g. "Carteira Top 10", "Dividendos") carry a
+        # per-stock analyst recommendation in tag 13022; the PADRAO holdings
+        # leave it empty. Earlier this tag was dropped as unidentified.
+        df = bportfolio(27)
+        assert "recommendation" in df.columns
+        recs = {str(v).strip().upper() for v in df["recommendation"] if str(v).strip()}
+        assert recs, "recommendation column has no populated values"
+        assert recs & {"COMPRA", "NEUTRA", "VENDA"}, (
+            f"unexpected recommendation tokens: {recs}"
+        )

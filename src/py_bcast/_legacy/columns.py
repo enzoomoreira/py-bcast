@@ -245,11 +245,12 @@ PORTFOLIO_LIST_FIELDS: dict[str, str] = {
 # tag), NOT 13902. The B3 classification columns (sector/subsector/segment and
 # their ids) describe the held stock; 12063 (NFANT) is its trade name.
 # Fundamentals 13918/13965/13991/13982/13956 are documented in fields.md.
-# Five sparse tags (13902, 13022, 13025, 13895) are absent from fields.md and
-# only populated in ~25/65 rows; 13732 ("N"/"S") is fully populated but also
-# undocumented. None of them can be confirmed, so they are dropped (mapped to
-# None) rather than mislabeled — inventing names is exactly what scrambled the
-# original map.
+# 13022 ("COMPRA"/"NEUTRA"/...) is the analyst recommendation; it is populated
+# only on the themed-portfolio rows (see bportfolio docstring), empty on the
+# PADRAO holdings. The remaining sparse tags (13902, 13025, 13895, 13732) are
+# absent from fields.md and their meaning could not be confirmed (13025/13895
+# did not match target price or DY on cross-check), so they are dropped (mapped
+# to None) rather than mislabeled — inventing names scrambled the original map.
 PORTFOLIO_FIELDS: dict[str, str | None] = {
     "10087": "broker_id",
     "13784": "date",
@@ -269,11 +270,11 @@ PORTFOLIO_FIELDS: dict[str, str | None] = {
     "13991": "eps_12m",  # LPAAC: EPS 12m accumulated
     "13982": "ev_ebitda_12m",  # EVEBDAC: EV/EBITDA 12m accumulated
     "13956": "ev_ebitda_quarter",  # EVEBDTC: EV/EBITDA quarter (consolidated)
+    "13022": "recommendation",  # COMPRA/NEUTRA/...; only on themed-portfolio rows
     # Undocumented tags with unconfirmable meaning — dropped, not guessed
     "13902": None,  # drop: sparse, not in fields.md
-    "13022": None,  # drop: sparse, not in fields.md
-    "13025": None,  # drop: sparse, not in fields.md
-    "13895": None,  # drop: sparse, not in fields.md
+    "13025": None,  # drop: sparse, unconfirmed (not target price on cross-check)
+    "13895": None,  # drop: sparse, unconfirmed (not DY on cross-check)
     "13732": None,  # drop: undocumented "N"/"S" flag
 }
 

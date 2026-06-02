@@ -211,20 +211,27 @@ def bportfolio(
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch the latest recommended portfolio from a broker.
+    Fetch a broker's recommended portfolios.
 
-    Uses aetp/output/fundamental/CarteiraRecomendadaUltima.
+    Uses aetp/output/fundamental/CarteiraRecomendadaUltima. One broker returns
+    several portfolios in a single response: the default PADRAO holdings plus
+    themed lists (e.g. "Carteira Top 10", "Arrojada", "Dividendos", "Small
+    Caps"), distinguished by the ``portfolio_name`` column.
 
     Args:
-        broker_id: Broker ID (from bportfolios())
-        session_token: BCAA session token
+        broker_id: Broker ID (from bportfolios()).
+        session_token: BCAA session token.
 
     Returns:
-        DataFrame with portfolio composition (ticker, weight, etc.).
+        Flat DataFrame, one row per held stock, with columns: broker_id, date,
+        ticker, portfolio_name, recommendation, company, sector/subsector/
+        segment (+ ids), and per-stock fundamentals. ``recommendation``
+        (COMPRA/NEUTRA/...) is populated only on the themed-portfolio rows; it
+        is empty for the PADRAO holdings.
 
     Example:
-        >>> df = bportfolio(42)
-        >>> df.head()
+        >>> df = bportfolio(27)
+        >>> df[df["portfolio_name"] == "Carteira Dividendos"][["ticker", "recommendation"]]
     """
     parsed = aetp_request(
         "fundamental/empresa/carteira-recomendada/ultima",
