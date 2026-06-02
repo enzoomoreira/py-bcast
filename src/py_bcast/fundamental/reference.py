@@ -49,9 +49,11 @@ def bcompany(
         session_token: BCAA session token
 
     Returns:
-        DataFrame with company data.
-        Full list fields: 13004 (CVM), 13003 (name), 13786 (ticker), etc.
-        Detail fields: CNPJ, sector, foundation date, etc.
+        Flat DataFrame of company data. List mode carries cvm_code,
+        corporate_name, trade_name, cnpj (string, leading zeros preserved),
+        tickers (";"-joined share classes), logo_url and B3 classification ids.
+        Detail mode adds the sector/subsector/segment names, ipo_date,
+        last_update, website and description.
 
     Example:
         >>> companies = bcompany()  # all companies
@@ -303,28 +305,35 @@ def bindicators(
     """
     Fetch daily indicator history for one or more companies.
 
-    Uses aetp/output/fundamental/IndicadorHistoricoDiario.
+    Uses aetp/output/fundamental/IndicadorHistoricoDiario. This serves the
+    *daily* indicator series — price-derived metrics such as market value and
+    daily risk. Quarterly balance-sheet items (e.g. EBITDA) have no daily
+    series and return an empty frame.
 
     Accepts ticker strings (auto-resolves CVM) or CVM codes directly, or a
-    list mixing both. Accepts indicator names (e.g. "EBITDA", "ROE") or
-    numeric IDs.
+    list mixing both. Accepts indicator names (e.g. "Valor de Mercado") or
+    numeric IDs (see bindicator_meta()).
 
     Args:
         ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
             or a list mixing both.
-        indicator: Indicator name (str, e.g. "EBITDA") or ID (int, e.g. 11).
+        indicator: Indicator name (str, e.g. "Valor de Mercado") or ID
+            (int, e.g. 32).
         start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
         end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
         session_token: BCAA session token
 
     Returns:
-        Flat DataFrame with DatetimeIndex, daily indicator values, and a
-        ``ticker`` column holding each input identifier.
+        Flat DataFrame (RangeIndex) with one row per (date, share class): a
+        string ``date`` column, the indicator ``value``, its day-over-day
+        ``value_change_pct``, and a ``ticker`` column holding the per-row share
+        class. A "PETR4" query returns both PETR3 and PETR4 (like btickers), so
+        ``ticker`` is NOT the input identifier.
 
     Example:
-        >>> df = bindicators("PETR4", "EBITDA", "20260101", "20260519")
-        >>> df = bindicators(9512, 32, "20260101", "20260519")
-        >>> df = bindicators(["PETR4", "VALE3"], 32, "20260101", "20260519")
+        >>> df = bindicators("PETR4", "Valor de Mercado", "20250101", "20251231")
+        >>> df = bindicators(9512, 32, "20250101", "20251231")
+        >>> df = bindicators(["PETR4", "VALE3"], 32, "20250101", "20251231")
     """
     items = ensure_id_list(ticker_or_cvm)
     return vectorize(

@@ -74,12 +74,16 @@ CONSENSUS_FIELDS: dict[str, str] = {
 }
 
 # bcompany() — all companies list
+# 10113 holds the company's tradable tickers (a ";"-joined list of share
+# classes, e.g. "RPAD3;RPAD5;RPAD6"), confirmed from live values — it was
+# mislabeled listing_segment. 12066 (cnpj) is a 14-digit zero-padded id kept as
+# string by the coerce_numeric_columns leading-zero guard.
 COMPANY_LIST_FIELDS: dict[str, str] = {
     "13004": "cvm_code",
     "13112": "corporate_name",
     "12088": "trade_name",
     "12066": "cnpj",
-    "10113": "listing_segment",
+    "10113": "tickers",
     "13824": "logo_url",
     "13798": "sector_id",
     "13799": "subsector_id",
@@ -159,6 +163,14 @@ SHARES_FIELDS: dict[str, str] = {
 }
 
 # bindicators(cvm, indicator_id, start, end)
+# Tail re-derived from live PETR4 indicator-50 rows (90 rows, 2 share classes):
+#   10068 holds the share class (PETR3/PETR4) — the lib-wide ticker tag, it was
+#     mislabeled change_pct. A query echoes both classes of the company, so this
+#     column is the per-row symbol (like btickers), not the input identifier.
+#   13788 is the day-over-day % change of `value` (13016), verified 88/88 against
+#     groupby(ticker).value.pct_change() — it is NOT a price return.
+#   13789 tracks neither the value change (29/88) nor the price return (0/46), so
+#     its meaning is unconfirmed and it stays dropped (not guessed).
 INDICATOR_HISTORY_FIELDS: dict[str, str | None] = {
     "13760": "indicator_id",
     "13762": "indicator_name",
@@ -166,13 +178,22 @@ INDICATOR_HISTORY_FIELDS: dict[str, str | None] = {
     "13784": "date",
     "13016": "value",
     "13764": "frequency",
-    "10068": "change_pct",
-    "13788": "period_change_pct",
-    "13789": None,  # drop: trailing positional filler with no data value
+    "10068": "ticker",
+    "13788": "value_change_pct",
+    "13789": None,  # drop: tracks neither value nor price change; unconfirmed
 }
 
 # bindicator_meta()
-INDICATOR_META_FIELDS: dict[str, str] = {
+# Text-field tags re-derived from live values (80 rows):
+#   13870 = unit ("R$ Milhar", 80/80) — was mislabeled unit_type.
+#   13771 = note (availability/calc caveats, 38/80) — was mislabeled unit.
+#   13772 = formula (calc expression, e.g. "<ticker>.MCAPT*1000", 11/80) — was
+#           mislabeled long_description.
+#   13773 = description (prose explaining the indicator, 80/80) — was mislabeled
+#           calculation_notes.
+#   13774 is a date (2/80) of unconfirmed meaning — dropped, was mislabeled
+#           description.
+INDICATOR_META_FIELDS: dict[str, str | None] = {
     "13760": "indicator_id",
     "13761": "active",
     "13762": "name",
@@ -182,8 +203,7 @@ INDICATOR_META_FIELDS: dict[str, str] = {
     "13766": "has_annual",
     "13767": "has_ttm",
     "13770": "available_since",
-    "13771": "unit",
-    "13774": "description",
+    "13771": "note",
     # Additional metadata flags
     "13791": "is_percentage",
     "13792": "is_per_share",
@@ -191,9 +211,10 @@ INDICATOR_META_FIELDS: dict[str, str] = {
     "13769": "has_chart",
     "13822": "has_ranking",
     "13823": "has_comparison",
-    "13772": "long_description",
-    "13773": "calculation_notes",
-    "13870": "unit_type",
+    "13772": "formula",
+    "13773": "description",
+    "13870": "unit",
+    "13774": None,  # drop: a date (2/80), meaning unconfirmed
 }
 
 # bcalendar(start, end)
@@ -229,7 +250,10 @@ DY_FIELDS: dict[str, str | None] = {
     "13895": "dy_pct",
     "13896": "dps_12m",
     "13897": "dy_12m_pct",
-    "13898": None,  # drop: trailing positional filler with no data value
+    # 13898 is populated (numeric, ~4/5 rows) but its meaning is unconfirmed
+    # (looks like a period change %); dropped pending an authoritative source
+    # rather than guessed.
+    "13898": None,
 }
 
 # bportfolios()

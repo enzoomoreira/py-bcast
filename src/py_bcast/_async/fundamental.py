@@ -294,8 +294,10 @@ async def abindicators(
 ) -> pd.DataFrame:
     """Async version of ``bindicators``.
 
-    Flat DataFrame with a DatetimeIndex, daily indicator values, and a
-    ``ticker`` column holding each input identifier.
+    Flat DataFrame (RangeIndex), one row per (date, share class): a string
+    ``date`` column, the indicator ``value``, its day-over-day
+    ``value_change_pct``, and a ``ticker`` column holding the per-row share
+    class (a "PETR4" query returns both PETR3 and PETR4), not the input.
     """
     items = ensure_id_list(ticker_or_cvm)
     return await vectorize_async(
