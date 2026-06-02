@@ -5,6 +5,7 @@ Catalogo completo de todos os endpoints HTTP descobertos no ContentProxy (`cp.ae
 **Legenda:**
 - Implementado — funcao publica na lib, testada
 - Confirmado — endpoint retorna dados reais, sem adapter na lib ainda
+- Vazio/Casca — endpoint responde HTTP 200 mas sem dado utilizavel: ou `STATUS=success` com celulas/linhas vazias (casca), ou erro de "sem registros" (`in_88000`/`mo_88000`). Vivo, porem sem dado
 - Bloqueado — erro definitivo, ver motivo
 - Fora de escopo — contribuicao, admin, UI-only
 
@@ -16,6 +17,24 @@ Catalogo completo de todos os endpoints HTTP descobertos no ContentProxy (`cp.ae
 - `BUG` — Bug no servidor (SQL, etc.)
 
 **Fontes:** CHM do Add-In Excel, `services_parsed.json` (227 endpoints), varredura automatica (`scripts/probe_all_endpoints.py`) executada em 2025-05-20.
+
+> **Re-verificacao empirica de 2026-06-02.** Uma re-verificacao endpoint-a-endpoint contra o
+> terminal ao vivo (`cp.ae.com.br:44780`, token valido confirmado por controle positivo)
+> corrigiu erros materiais da varredura de 2025-05-20. Os status, params e exemplos abaixo
+> ja refletem esses vereditos. A varredura original cometeu **4 erros sistematicos** — uteis
+> de ter em mente em futuras revisoes:
+>
+> 1. **Params errados** (fuso BRT vs UTC; `BR` vs data; `IPCA` vs `AEIPCA`; param obrigatorio
+>    ausente) -> falso-NEGATIVO (endpoint vivo lido como bloqueado/api_error).
+> 2. **Contar bytes/linhas sem validar CELULAS** — um header de erro de 1 linha OU uma casca
+>    de schema-vazio foram lidos como "Confirmado" -> falso-POSITIVO.
+> 3. **Simbolo "pelado" resolve para instrumento errado** (`LTN` -> `LTN.NYSE`) -> `STATUS=success`
+>    com `<TICKS>` vazio, enganoso. Afeta tambem usuarios da lib hoje.
+> 4. **Param documentado quebra** (ex.: `114` com `961` -> HTTP 500). Afeta usuarios da lib.
+>
+> Bug metodologico relacionado: detectar bloqueio por *substring* `88000` casa dentro de CNPJ
+> no payload, gerando falso "bloqueado". A re-verificacao usou match de campo-exato e priorizou
+> contagem de linhas reais (`rows>0`).
 
 ---
 
@@ -86,48 +105,121 @@ Todos retornam XML com `<RESPONSE><STATUS>success</STATUS>...<TICKS>`.
 | 126 | **Inflacao** | Implementado | 17 indices de inflacao, 12 meses | Sem params extras |
 | 137 | **DiCetipAcumulado** | Implementado | CDI/DI acumulado diario (desde 1986) | `DataInicio`/`DataFim`=YYYYMMDD |
 | 140 | **RetornoDiario** | Implementado | Retorno diario ajustado | `305`=ticker, `DataInicio`/`DataFim`=YYYYMMDD |
-| 150 | **FIIAnbimaBovespa** | Confirmado | FII: DY, last div, vol medio, etc. | `10113`=ticker (ex: HGLG11) |
-| 154 | **EmpresasHistorico** | Confirmado | Balanco completo trimestral (1.2MB!) | `305`=ticker, `961`=start_date |
-| 208 | **Volatilidades** | Confirmado | Volatilidade historica | `10113`=ticker, `12078`=dias |
+| 150 | **FIIAnbimaBovespa** | Confirmado | FII: DY, last div, vol medio, etc. (HGLG11: DVYLD=9.24, ULDV=1.1, QTCT=33.7M) | `10113`=ticker (ex: HGLG11) |
+| 154 | **EmpresasHistorico** | Vazio/Casca | **CASCA VAZIA** — schema de 222 campos (DRE/BP/FC) mas 0 celula financeira | `305`=ticker, `961`=start_date |
+| 208 | **Volatilidades** | Vazio/Casca | `STATUS=success` porem `<TICKS>` sempre vazio (dataset vazio no servidor) | `10113`=ticker, `12078`=dias |
+
+> **154 EmpresasHistorico — casca vazia (era falso-positivo).** A varredura de 2025 viu ~1.2MB
+> e classificou como "balanco completo trimestral". Na re-verificacao (2026-06-02), o endpoint
+> responde `HTTP 200`/`STATUS=success` com ate 7776 linhas `<TICK>` (1 por pregao, schema de 222
+> colunas DRE/BP/FC), mas a varredura COMPLETA das 1597 linhas da janela `961=20200101` (~6 anos)
+> achou **0 celula financeira preenchida**: so `DAT` populado, `QUARTER`/`FISCAL_QUARTER`='nanT',
+> `YEAR`='', todos os `ASSET_RETURN`/`BOOK_BALANCE`/`CAPITAL`/`EBITDA`/... vazios. Os "1.2MB" eram
+> schema largo x linhas vazias, nao dados. Param correto: `305`=ticker + `961`=start (`10113` erra
+> "Instrumento nao encontrado"); o `success` NAO e param-gap, e dataset esvaziado no servidor. **Nao
+> e a fonte de financials que substituiria o GraphQL morto** (ver secao 5.4 e `limitations.md`).
+
+> **207/208 — dataset vazio (eram falso-positivos).** `VolumesMediosSemMesAno` (207) e
+> `Volatilidades` (208) usam `10113`=ticker + `12078`=janela em dias. Ambos respondem
+> `STATUS=success` com o simbolo resolvido (`PETR4.BVMF` em `<SYMBOLS>`), mas `<TICKS>` vem
+> SEMPRE vazio — testados todos os eixos (`12078` in {1,10,20,21,40,252}, so `10113`, `+961`,
+> `+DataInicio/Fim`, VALE3). Datas recentes SAO o eixo correto aqui (vol/volume derivam do preco
+> corrente, cujo endpoint 125 esta vivo), logo a ausencia **nao** e efeito de retencao; e dataset
+> vazio no servidor. `305` em vez de `10113` retorna erro deterministico de tag (nao instabilidade).
 
 ### 2.2 Renda Fixa / Calculos
 
 | ID | Endpoint | Status | Dados | Params Chave |
 |---|----------|--------|-------|--------------|
 | 76 | **Fundos** | Confirmado | Historico de cotas (OHLC, 24KB) | `305`=ticker, `961`=start |
-| 77 | **TitulosPublicos** | Confirmado | Titulos do Tesouro | `305`=LTN/NTN, `961`=start |
+| 77 | **TitulosPublicos** | Confirmado | OHLC de titulo do Tesouro (popula via `.TRDM`) | `305`=`LTNF28.TRDM` (NAO bare `LTN`), `961`=start |
 | 82 | **FundosRentabilidade** | Confirmado | Rentabilidade do fundo | `305`=ticker |
-| 114 | **CalculoPoupanca** | Confirmado | Rendimento poupanca diario (5.7KB) | `961`=start |
-| 135 | **CalculoPreco** | Confirmado | Preco unitario renda fixa | `305`=titulo, `961`=start |
+| 114 | **CalculoPoupanca** | Confirmado | Rendimento poupanca diario (5.7KB) | `DataInicio`/`DataFim` (NAO `961` — `961` -> HTTP 500) |
+| 135 | **CalculoPreco** | Confirmado | Preco unitario renda fixa (popula via `.ANBIMA`) | `305`=`LTN260701.ANBIMA` (NAO bare `LTN`), `961`=start |
 | 136 | **CalculoTaxaPre** | Confirmado | Curva de taxa pre acumulada (6.5KB) | `13539`=notional, `961`=start |
-| 141 | **TitulosPublicosUltimos** | Confirmado | Ultimos precos de titulos | `10113`=ticker |
-| 207 | **VolumesMediosSemMesAno** | Confirmado | Volumes medios historicos | `10113`=ticker, `12078`=dias |
+| 141 | **TitulosPublicosUltimos** | Confirmado | Ultimos precos de titulos (popula via `.ANBIMA`) | `10113` ou `305`=`LTN260701.ANBIMA` (NAO bare `LTN`) |
+| 207 | **VolumesMediosSemMesAno** | Vazio/Casca | `STATUS=success` porem `<TICKS>` sempre vazio (dataset vazio no servidor) | `10113`=ticker, `12078`=dias |
+
+> **Armadilha de simbolo (77/135/141).** Tesouro BR vive em DUAS bolsas no `InstrumentDB`; o
+> simbolo "pelado" NAO basta — `305=LTN` resolve para `LTN.NYSE` (acao US), retornando
+> `STATUS=success` com `<TICKS>` vazio (mesma classe de erro do `HistoricoTick`). Os sufixos
+> populam diferente por endpoint:
+> - **`.ANBIMA`** = precos de referencia diarios (ex.: `LTN260701.ANBIMA`, `NTNB270515.ANBIMA`).
+>   Popula **135** (PU, 22 ticks) e **141** (1 tick). Para **77**, da `success` + 0 ticks.
+> - **`.TRDM`** = Trademate/balcao (ex.: `LTNF28.TRDM`, `NTNBK27.TRDM`). Popula **77** (OHLC +
+>   `WORKING_DAYS` + `EXPIRATION_DATE`). Tambem popula 135.
+>
+> **114 CalculoPoupanca — param documentado quebrava.** O catalogo de 2025 listava `961=start`,
+> mas com `961` o endpoint retorna **HTTP 500** (JBoss error report). Funciona apenas com
+> `DataInicio`/`DataFim` (22 ticks `DAT`/`ACUM`; `sym=AENPOP.AETAXAS`).
 
 ### 2.3 Bloqueados / Com Erro
 
 | ID | Endpoint | Erro | Categoria |
 |---|----------|------|-----------|
-| 26 | HistoricoUltimosPregoes | `Query=NONE` | `AETP_ONLY` |
+| 26 | HistoricoUltimosPregoes | `Query=NONE` | `AETP_ONLY` — confirmado: validacao satisfeita (`QuantidadePregoes`+`Precisao`) e ainda assim `Query=NONE` |
 | 40 | Players | SQL bug | `BUG` — "field BVMF not found in tick descriptor" |
-| 41 | TimesTrades | Empty ticks | `PARAMS` — formato OK mas sem dados para B3 |
-| 81 | FundosIndicadores | `api_error` | `PARAMS` |
-| 83 | FechamentoFormula | `api_error` | `PARAMS` |
-| 131 | ConversorDeMoedas | `api_error` | `PARAMS` |
-| 138 | TabelaRetorno | `api_error` | `PARAMS` |
-| 139 | TabelaRentabilidade | `api_error` | `PARAMS` |
+| 81 | FundosIndicadores | `api_error` | `PARAMS` (nao re-testado nesta rodada) |
+| 83 | FechamentoFormula | api_error | `PARAMS` — parede server-side: `Instrumentos`/`12004` aceitos, mas `DataInicio` e rejeitado como "nao encontrado" MESMO presente |
+| 138 | TabelaRetorno | api_error | `PARAMS` — exige "Tipo de calculo"; nome do param nao descoberto (`13487` e variantes nao satisfazem) |
+| 139 | TabelaRentabilidade | api_error | `PARAMS` — mesma parede do 138 (`13487` != tipo de calculo) |
 | 142 | DiarioEx | `Query=NONE` | `AETP_ONLY` |
-| 144 | CalculoCarteira | `api_error` | `PARAMS` |
-| 145 | CalculoInflacao | `api_error` | `PARAMS` |
-| 204 | FechamentoPrimeiro | `api_error` | `PARAMS` |
+| 144 | CalculoCarteira | api_error | `PARAMS` — `13571`+`961` aceitos; falta "Tipo de calculo" (enum nao descoberto apos ~284 tentativas; provavelmente so no Add-In Excel) |
+
+> **AETP_ONLY genuino (10, 26, 142).** A re-verificacao refutou a hipotese de "so falta param":
+> com a validacao de parametros TOTALMENTE satisfeita (10/26 ainda pediam `Precisao` e
+> `QuantidadePregoes`; adicionados), o servidor persiste em `Nao foi possivel recuperar os campos
+> de saida : Query=NONE`. A query de saida nao esta registrada server-side -> confirma o rotulo
+> `AETP_ONLY`, NAO e flip. (10 = HistoricoDiario, na secao 2.1; 142 = DiarioEx.)
+
+> **83/138/139/144 — paredes de parametro (nao crackadas).** Ficam em `PARAMS`. 138/139/144
+> exigem um "Tipo de calculo" cujo nome/enum nao foi descoberto (~284 combinacoes testadas no
+> 144 sem avancar a mensagem); provavelmente um codigo so conhecido pelo Add-In Excel. O 83 e
+> uma inconsistencia do servidor: ele LE `Instrumentos` (validou simbolo) mas rejeita `DataInicio`
+> como ausente mesmo quando enviado no formato correto (`YYYYMMDD`).
+
+### 2.4 Recuperados na re-verificacao (eram falso-negativos `PARAMS`)
+
+Endpoints que o catalogo de 2025 marcava `api_error`/bloqueado mas que **funcionam** com os
+parametros corretos (verificado 2026-06-02, dados reais):
+
+| ID | Endpoint | Status | Dados | Params Chave |
+|---|----------|--------|-------|--------------|
+| 41 | **TimesTrades** | Confirmado | Times & trades B3/intl (janela UTC) | `305`=ticker, `10071`/`10072`=`YYYYMMDDHHMMSS` **em UTC** |
+| 131 | **ConversorMoedas** | Confirmado | Conversao de moeda **spot** (1 tick, campo `LAST`) | `Instrumento`=de, `Instrumento2`=para, `Valor`=quantia |
+| 145 | **CalculoInflacao** | Confirmado | Serie de inflacao (22 ticks `DAT`/`ACUM`) | `305`=`AEIPCA` (NAO bare `IPCA`), `961`=start |
+| 204 | **FechamentoPrimeiro** | Confirmado | Primeiro fechamento historico do ativo | `Instrumento`=ticker B3 bare (ex.: `PETR4`, NAO `.BVMF`) |
+
+> - **41 TimesTrades**: o "empty ticks para B3" da varredura de 2025 era o **erro de fuso** — a
+>   janela `10071`/`10072` e interpretada em **UTC**, nao BRT. Com janela UTC cobrindo o pregao
+>   (`13:00`–`14:00` UTC = `10:00`–`11:00` BRT), PETR4 e USDBRL retornam ticks. Ver
+>   [`limitations.md`](./limitations.md#timestrades--historicotick--14-digit-datetime).
+> - **131 ConversorMoedas**: a cadeia de erros revelou `Instrumento` -> `Instrumento2` -> `Valor`.
+>   Ex.: `USD`/`BRL`/`100` -> `LAST=501.09` (exatamente 100x a taxa spot -> calcula, nao ecoa).
+>   **E spot**: parametros de data sao inertes (sempre a taxa atual, sem conversao historica).
+> - **145 CalculoInflacao**: usa a familia de simbolos internos AE (igual ao `bmacro`). `305=IPCA`
+>   da "simbolo nao existe na base"; `305=AEIPCA` retorna a serie. Ver tabela de simbolos em
+>   `MacroEconomicos` (secao "Observacoes Tecnicas").
+> - **204 FechamentoPrimeiro**: aceita so o ticker **bare** (`PETR4` -> `DAT=19940704`,
+>   `LAST=0.17117`); `PETR4.BVMF` nao resolve e `Instrumento=USD` da `success` com 0 ticks (usar
+>   ticker de acao B3).
 
 ---
 
 ## 3. AEInstrumentos — Dados de Referencia
 
 **TODOS bloqueados** (`PROPRIETARY`): retornam `ErrorCode=88007, Tipo de resposta indisponivel ou invalido`.
-Protocolo binario proprietario Java que nao aceita `TipoResposta=xml`.
+Protocolo binario proprietario Java que nao aceita resposta em XML/JSON.
 Estes endpoints so sao acessiveis pelo terminal desktop (Java/Swing client).
 **Dados equivalentes disponiveis via `aetp/output/`** (secao 5).
+
+> **Re-verificado (2026-06-02) — bloqueio comprovado, antes presumido.** A varredura de 2025
+> sempre injetava `TipoResposta=xml` e nunca testou sem o param. A re-verificacao exercitou as 3
+> variacoes (`xml`, `json`, ausente) em 9 servlets representativos (17, 18, 19, 21, 24, 25, 34,
+> 68, 98): corpo IDENTICO byte-a-byte (73B de texto puro, `ErrorCode=88007`) nos tres casos,
+> sempre `HTTP 200` (rota existe). Com controle positivo (token vivo via `Inflacao`/126), o 88007
+> e bloqueio especifico do endpoint, nao artefato de sessao. Isto e **fechamento de lacuna**, nao
+> divergencia: o rotulo do catalogo se confirma.
 
 | ID | Endpoint | Status | Dados que teria |
 |---|----------|--------|-----------------|
@@ -208,9 +300,19 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
 | 194 | **CarteiraRecomendadaUltima** | Implementado | Ultima carteira de uma corretora | 9.3KB |
-| 195 | **CarteiraRecomendadaTicker** | Confirmado | Em quais carteiras o ticker esta | 7.9KB |
-| 197 | **CarteiraRecomendadaMudancas** | Confirmado | Mudancas na carteira | 144B |
+| 195 | **CarteiraRecomendadaTicker** | Confirmado | Em quais carteiras o ticker esta (54 linhas, ref-date real) | `10113`=ticker |
+| 197 | **CarteiraRecomendadaMudancas** | A investigar | Mudancas na carteira — vivo, mas sem registros nas datas testadas | `13784`=dataReferencia + `10087`=idCorretora (ambos obrigatorios) |
 | 198 | **CarteiraRecomendadaCorretoras** | Implementado | Lista de corretoras com carteiras | 318B |
+
+> **197 CarteiraRecomendadaMudancas — a investigar (nao e falso-positivo simples).** Os "144B
+> Confirmados" pela varredura de 2025 eram um **header de erro de validacao** (campo obrigatorio
+> faltando), nao dados. O endpoint esta **vivo**: exige DOIS params obrigatorios — `13784`
+> (dataReferencia) + `10087` (idCorretora) — e so com `10087` retorna `Campo obrigatorio nao
+> enviado! ...dataReferencia`. Com ambos, responde `Nao foram encontrados registros` (109B, erro
+> bem-formado) para as datas testadas (2026-06-01). Como mudancas de carteira sao eventos esparsos
+> e o par corretora/data nao foi cruzado contra um sibling com registro real (195 expoe ref-date
+> `2025-01-13`), "sem registros" **nao e conclusivo**: NAO confirmavel como funcional, mas tambem
+> **nao bloqueado**. Fica como `A investigar`.
 
 ### 5.4 Fundamental — Indicadores
 
@@ -226,17 +328,30 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 
 > O backend GraphQL da AWS (`ab684f71...elb.us-east-1.amazonaws.com`) esta offline.
 > Todos os endpoints de indicadores financeiros (P/L, ROE, DRE) estao indisponiveis.
+>
+> **Re-verificado (2026-06-02): segue morto.** 166/167/182/214 retornam `in_88008` /
+> `Erro inesperado ao acessar os dados` + tag `13899=Bad Request` (o front AETP repassa o erro do
+> backend GraphQL). 168/170 retornam `in_88000` "Nao foram encontrados registros". Combinado com a
+> casca vazia do 154 (secao 2.1), **nao ha fonte de demonstracoes financeiras / indicadores
+> historicos via terminal antigo** — ver [`limitations.md`](./limitations.md).
 
 ### 5.5 Fundamental — Metadados / Classificacao
 
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
-| 175 | **ArquivosCategorias** | Confirmado | Categorias de filings | 4KB |
-| 176 | **ArquivosEspecies** | Confirmado | Especies de documentos | 2.2KB |
-| 177 | **ArquivosTipos** | Confirmado | Tipos de documentos | 4.4KB |
-| 185 | **IndicadorCategorias** | Confirmado | Categorias de indicadores | 252B |
-| 205 | **ArquivosDemonstrativos** | Confirmado | Lista de demonstrativos | 139B |
-| 212 | **TickersEmpresas** | Confirmado | Campos externos de um ticker | 109B |
+| 175 | **ArquivosCategorias** | Confirmado | Categorias de filings (89 linhas) | 4KB |
+| 176 | **ArquivosEspecies** | Confirmado | Especies de documentos (54 linhas) | 2.2KB |
+| 177 | **ArquivosTipos** | Confirmado | Tipos de documentos (106 linhas) | 4.4KB |
+| 185 | **IndicadorCategorias** | Confirmado | Categorias de indicadores (12 linhas) | 252B |
+| 205 | **ArquivosDemonstrativos** | Confirmado | Lista de demonstrativos (URLs S3 de PDFs) | requer `13004`=codigoCvm + `13916`=datasIni + `13917`=datasFim |
+| 212 | **TickersEmpresas** | Vazio/Casca | Sem registros (`in_88000`) para PETR4/VALE3 | — |
+
+> **205 era falso-positivo de bytes, mas FUNCIONA com os params certos.** Os "139B Confirmados"
+> de 2025 eram um header de erro (`in_88008`, faltava `codigoCvm`). A cadeia de erros revelou 3
+> params obrigatorios — `13004` (codigoCvm) + `13916` (datasIni) + `13917` (datasFim) — e com os
+> tres o endpoint retorna linhas reais (ex.: URL de PDF de ITR em `agenciaestado-fundamental.s3...`).
+> **212 TickersEmpresas, ao contrario, e genuinamente vazio**: os "109B" eram o erro `in_88000`
+> "Nao foram encontrados registros", reproduzido para PETR4 e VALE3.
 
 ### 5.6 Fundamental — Fundos
 
@@ -258,9 +373,9 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
-| 158 | **FundosListaTipoAtivo** | Confirmado | Tipos de ativo para fundos | 2KB |
-| 159 | **FundosListaTipoAplicacao** | Confirmado | Tipos de aplicacao | 1.6KB |
-| 222 | FundosBuscaRapida | Confirmado | Busca de fundos | 115B |
+| 158 | **FundosListaTipoAtivo** | Confirmado | Tipos de ativo para fundos (78 linhas) | 2KB |
+| 159 | **FundosListaTipoAplicacao** | Confirmado | Tipos de aplicacao (52 linhas) | 1.6KB |
+| 222 | FundosBuscaRapida | Bloqueado | **GraphQL-only** — rejeita xml/sem-TipoResposta com `in_88008` `AllowedResponseTypes=[GQL]` |
 
 ### 5.9 Energia
 
@@ -275,17 +390,18 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 ### 6.1 Protocolo Binario (BLOQUEADO)
 
 Endpoints AETP originais para noticias — todos bloqueados por subscricao (error 88007).
+**Re-verificado (2026-06-02): seguem bloqueados** (com controle positivo via `Inflacao`/126).
 
 | ID | Endpoint | Status | Notas |
 |---|----------|--------|-------|
-| 27 | Noticias (NewsServlet) | Bloqueado | Error 88007 |
-| 28 | Conteudo (ContentServlet) | Bloqueado | Error 88007 |
-| 29 | Cadernos (CadernoServlet) | Bloqueado | Error 88007 |
-| 30 | Arquivo (FileServlet) | Bloqueado | Error 88007 |
-| 108 | CountNoticias | Bloqueado | Binary SOH, 81B (contém apenas error code) |
-| 110 | topNewsLista | Bloqueado | Binary SOH, 81B (contém apenas error code) |
-| 152 | MaisLidasLista (aetp) | Bloqueado | Binary SOH, 63B (apenas header) |
-| 153 | Noticias Relacionadas | Bloqueado | Error 88007 |
+| 27 | Noticias (NewsServlet) | Bloqueado | `tp_88007` (tag `10037`) |
+| 28 | Conteudo (ContentServlet) | Bloqueado | `tp_88007` (tag `10037`) |
+| 29 | Cadernos (CadernoServlet) | Bloqueado | `tp_88007` (tag `10037`) |
+| 30 | Arquivo (FileServlet) | Bloqueado | `tp_88007` (tag `10037`) |
+| 108 | CountNoticias | Bloqueado | Binary SOH, 81B (`tp_88007`, sem dados) |
+| 110 | topNewsLista | Bloqueado | Binary SOH, 81B (`tp_88007`, sem dados) |
+| 152 | MaisLidasLista (aetp) | Bloqueado | Binary SOH, 63B — envelope vazio (so field-defs, 0 linhas); difere em TIPO do 88007 |
+| 153 | Noticias Relacionadas | Bloqueado | `tp_88007` (tag `10037`) |
 
 ### 6.2 CentralMultimidia (FUNCIONAL — sem autenticacao!)
 
@@ -321,24 +437,44 @@ IDs sao sequenciais e cobrem AE-News, Dow Jones Newswires, Trading News, Press R
 
 ## 7. contentProxyOutput — Fundos CVM
 
-**TODOS retornam HTTP 500** (Server Error). Backend Java/Tomcat com stack trace.
+**Parcialmente quebrado — NAO uniformemente 500.** A re-verificacao (2026-06-02) refutou a
+generalizacao de 2025 ("TODOS HTTP 500"): a maioria dos endpoints de Fundos CVM de fato retorna
+HTTP 500 (JBoss/Tomcat error report), mas pelo menos dois respondem `HTTP 200` com dados binarios
+SOH validos. Verifique caso a caso antes de presumir bloqueio.
 
 | IDs | Endpoints | Status |
 |---|----------|--------|
-| 61-67, 73-74, 100, 115-116, 120-123, 127-130, 132, 134 | Todos os Fundos CVM | Bloqueado (500) |
-| 133 | CDIRentabilidade | Bloqueado (500) |
+| 62 ListaCategorias, 63 ListaTiposFundos, 74 BuscarFundos, 133 CDIRentabilidade | (amostra re-testada) | Bloqueado (HTTP 500) |
+| 61, 64-67, 73, 100, 115, 121-123, 127-130, 134 | Demais Fundos CVM | Bloqueado (HTTP 500, nao re-testados individualmente) |
+| 132 | FundosTabelaRentabilidade | `HTTP 200` `in_88000` "sem registros" — e BaseHistoricaNumerica (`nao-cp`), nao um 500 |
+| 120 | **ClasseAnbima** | **Confirmado** — `HTTP 200`, 146B, binary SOH, 11 linhas (classes Anbima: Acoes, FIP, Multimercados, OffShore, ...) |
+| 116 | **BuscarFundosAutoComplete** | **Confirmado** — `HTTP 200`, ~1MB+ binary SOH, 11 campos, >31 linhas (autocomplete de fundos) |
+
+> **120 e 116 eram falso-negativos** (catalogados "500"). Hoje retornam `HTTP 200` com SOH valido
+> e zero tokens de erro. A varredura de 2025 generalizou um 500 observado em outros endpoints do
+> grupo para o grupo inteiro — corrigido aqui.
 
 ---
 
 ## 8. MarkitOutput2 — CDS / Credito
 
-| ID | Endpoint | Status | Notas |
-|---|----------|--------|-------|
-| 91 | **MarkitListaTipoCDS** | Confirmado | Retorna tipos de CDS (268B XML) |
-| 90 | MarkitListaDatas | Bloqueado | api_error |
-| 92 | MarkitIndices | Bloqueado | api_error |
-| 93 | MarkitListaCDS | Bloqueado | api_error |
-| 94 | MarkitCDS | Bloqueado | api_error |
+A varredura de 2025 marcou quase tudo como `DEAD_BACKEND`/`api_error`; a re-verificacao
+(2026-06-02) mostra o backend **vivo** — eram falso-negativos por **param errado** (`BR` em vez
+de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` uniforme):
+
+| ID | Endpoint | Status | Params Chave / Notas |
+|---|----------|--------|----------------------|
+| 91 | **MarkitListaTipoCDS** | Confirmado | sem params (2 tipos de CDS, 268B XML) |
+| 90 | **MarkitListaDatas** | Confirmado | `13336`=`C` (260 linhas); `13336=BR` -> erro "TipoListaDatas invalido" |
+| 92 | **MarkitIndices** | Confirmado | `10047`=data `YYYY-MM-DD` (394 linhas, 135KB); `10047=BR` -> "Data invalida" |
+| 93 | **MarkitListaCDS** | Confirmado | `10047`=data `YYYY-MM-DD` (58 linhas) |
+| 94 | **MarkitCDS** | Confirmado | curva de termo CDS de 1 entidade (SPREAD 6M-10Y + VAR/BID_ASK + recovery/rating). Params: `10047`=data, `13339`=S/C, `13349`=IDCDS, `13350`=TIER, `13351`=DOCCLAUSE — a tripla (IDCDS,TIER,DOCCLAUSE) deve ser coerente com o 93 (ex.: BRASIL usa `CR14`, nao `CR`) |
+
+> **Correcao da generalizacao**: o erro de 2025 (`api_error`) era o servidor rejeitando o
+> placeholder `BR`. **90 NAO usa `10047`** — usa `13336` (tipo de lista de datas; `C` valido).
+> **92/93/94** usam `10047`=data. Com inputs validos, 90/92/93 retornam centenas de linhas;
+> 94 retorna 1 RECORD = a curva de CDS da entidade (verificado 2026-06-02: Alemanha SPREAD_5Y=5,83;
+> Brasil 135,30), passando a tripla coerente (IDCDS,TIER,DOCCLAUSE) colhida do 93.
 
 ---
 
@@ -346,10 +482,17 @@ IDs sao sequenciais e cobrem AE-News, Dow Jones Newswires, Trading News, Press R
 
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
-| 105 | **ListaCategorias** | Confirmado | Categorias (Area, Volume, Produtividade) | 876B |
-| 107 | **CategoriaPreco** | Confirmado | Moedas/simbolos de preco | 1KB |
-| 111 | **ListaFormulas** | Confirmado | Formulas disponiveis | 358B |
-| 102-104, 106 | Filtros, Conteudo, Proporcao | Confirmado | Requer IDs especificos | — |
+| 105 | **ListaCategorias** | Confirmado | Categorias (Area, Volume, Produtividade) — 6 linhas | 876B |
+| 107 | **CategoriaPreco** | Confirmado | Moedas/simbolos de preco — 6 linhas | 1KB |
+| 111 | **ListaFormulas** | Confirmado | Formulas disponiveis — 3 linhas | 358B |
+| 106 | **CategoriaProporcao** | Confirmado | Proporcao por categoria — 5 linhas (`13438`=categoriaId) | 571B |
+| 102 | SelecaoFiltro | Vazio/Casca | `13431`=categoriaId; `STATUS=error` "sem registros" para os IDs testados | 181B |
+| 103 | ConteudoFiltro | Vazio/Casca | `13431`+`13433`; `STATUS=error` "sem registros" | 181B |
+| 104 | ConteudoTabela | Vazio/Casca | `13431`+`13435`+`13436`+`13437`; `STATUS=error` "sem registros" | 181B |
+
+> Re-verificado (2026-06-02): 105/107/111/106 retornam `success` + linhas reais. 102/103/104,
+> mesmo com IDs colhidos de 105/111, retornam `STATUS=error` "Nao foram encontrados registros" —
+> exigem combinacoes de filtro especificas nao mapeadas.
 
 ---
 
@@ -373,10 +516,10 @@ IDs sao sequenciais e cobrem AE-News, Dow Jones Newswires, Trading News, Press R
 | HTTP aefundamental | Parcial | Consensus + binary parser |
 | HTTP aetp/output | **~40 funcionais, 14 implementados** | Binary SOH, fonte mais rica |
 | HTTP IntegracaoTabelas | Parcial | 4 endpoints de commodities/formulas |
-| HTTP AEInstrumentos | 100% bloqueado | `PROPRIETARY` — error 88007 |
-| HTTP AEContent | 100% bloqueado | `PROPRIETARY` — error 88007 |
-| HTTP contentProxyOutput | 100% quebrado | `DEAD_BACKEND` — HTTP 500 |
-| HTTP MarkitOutput2 | Majoritariamente quebrado | Apenas ListaTipoCDS funciona |
+| HTTP AEInstrumentos | 100% bloqueado | `PROPRIETARY` — error 88007 (comprovado em 3 variacoes de `TipoResposta`) |
+| HTTP AEContent | 100% bloqueado | `PROPRIETARY` — error 88007 (News); CentralMultimidia (ASP.NET) e separado e funcional |
+| HTTP contentProxyOutput | Majoritariamente quebrado | Maioria HTTP 500, MAS 120 (ClasseAnbima) e 116 (BuscarFundosAutoComplete) retornam 200+dados |
+| HTTP MarkitOutput2 | Funcional | Backend vivo: 90/91/92/93/94 funcionam com params validos (94 = curva CDS da entidade via tripla coerente do 93) |
 | AETP TCP:8100 | Nao cracked | Protocolo binario, framing customizado |
 | SPC .NET (AESpcNET.dll) | Dead end | Servidor nao roteia dados para clientes externos |
 | RTD COM | Indisponivel | Broadcast nao tem servidor RTD (usa DDE) |
@@ -385,22 +528,35 @@ IDs sao sequenciais e cobrem AE-News, Dow Jones Newswires, Trading News, Press R
 
 ## Resumo Quantitativo
 
+> Contagens revisadas apos a re-verificacao de 2026-06-02. Permanecem aproximadas (`~`): a
+> re-verificacao tocou um subconjunto, nao todos os 227 endpoints. So foram ajustadas as
+> categorias que mudaram de forma demonstravel.
+
 | Status | Count | Descricao |
 |--------|-------|-----------|
 | Implementado na lib | **26 funcoes** | bdp, bdh, bdh_ohlcv, bdi, bdt, bmacro, bdi_cdi, breturn, bvolume, binflation, bconsensus, bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolios, bportfolio, bsearch, InstrumentDB |
-| Funcional, nao implementado | **~35** | Endpoints que retornam dados reais (FIIs, Fundos, Financials, TitulosPublicos, etc.) |
-| Bloqueado/Quebrado | ~70 | Ver categorias abaixo |
+| Funcional, nao implementado | **~38** | Endpoints com dados reais (FIIs, Fundos, TitulosPublicos, Markit/CDS, ClasseAnbima, ConversorMoedas, TimesTrades, etc.). **Sem demonstracoes financeiras** — ver abaixo |
+| Vazio/Casca | **~5** | Vivos mas sem dado utilizavel: 154, 207, 208, 212 (e 102-104 parciais). Nao confirmavel: 197 |
+| Bloqueado/Quebrado | ~68 | Ver categorias abaixo |
 | Fora de escopo | ~8 | Contribuicao, admin, banners |
+
+> **Sem demonstracoes financeiras (DRE/BP/FC, P/L, ROE historicos) via terminal antigo.** O 154
+> (EmpresasHistorico) e casca vazia e o backend GraphQL de indicadores (166/167/182/214) esta
+> morto. Fundamentais legacy = so consenso (52), indicadores diarios (market cap/beta via 171),
+> dividendos/eventos e metadados. Para financials, investigar o backend **Plus**.
 
 ### Categorias de Falha
 
 | Categoria | Count | Endpoints | Possibilidade de Resolver |
 |-----------|-------|-----------|---------------------------|
-| `PROPRIETARY` | ~58 | AEInstrumentos, AEContent | Requer reverse-engineering do protocolo Java binario |
-| `DEAD_BACKEND` | ~37 | contentProxyOutput (500s), GraphQL (AWS offline) | Pode voltar se backend for restaurado |
-| `AETP_ONLY` | ~3 | HistoricoDiario, DiarioEx, UltimosPregoes | Requer suporte ao protocolo AETP TCP:8100 |
-| `PARAMS` | ~8 | Varios BaseHistoricaNumerica | Possivelmente funcional com params corretos |
+| `PROPRIETARY` | ~58 | AEInstrumentos, AEContent (News) | Requer reverse-engineering do protocolo Java binario |
+| `DEAD_BACKEND` | ~34 | contentProxyOutput (maioria 500, exceto 120/116), GraphQL indicadores (AWS offline) | Pode voltar se backend for restaurado |
+| `AETP_ONLY` | ~3 | HistoricoDiario (10), DiarioEx (142), UltimosPregoes (26) | Confirmado: `Query=NONE` mesmo com validacao OK. Requer protocolo AETP TCP:8100 |
+| `PARAMS` | ~5 | 81, 83, 138, 139, 144 (BaseHistoricaNumerica) | Parede de parametro nao crackada (enum/param so no Add-In) |
 | `BUG` | ~1 | Players (SQL error) | Bug no servidor |
+
+> Reducoes vs 2025: `DEAD_BACKEND` e `PARAMS` cairam porque varios "bloqueados" eram
+> falso-negativos (120/116, Markit 90/92/93, e os flips `PARAMS`->funcional 41/131/145/204).
 
 ---
 

@@ -52,17 +52,26 @@ def bdt(
     """
     Get tick-by-tick (trade) data for one or more symbols.
 
-    Uses HistoricoTick endpoint. Works for international instruments:
-    FX pairs (USDBRL, EURUSD, GBPUSD, etc.), precious metals (GOLD, SILVER),
-    energy (WTI), indices (DAX, FTSE, VIX, DXY), treasuries (US10Y, US2Y).
+    Uses HistoricoTick endpoint. Works for both B3/BVMF instruments (PETR4,
+    VALE3, IBOV, ...) and international ones: FX pairs (USDBRL, EURUSD, ...),
+    precious metals (GOLD, SILVER), energy (WTI), indices (DAX, FTSE, VIX,
+    DXY), treasuries (US10Y, US2Y).
 
-    Note: B3/BVMF instruments return empty due to server-side query
-    registration requirement.
+    The request window is interpreted in **UTC**, while B3's floor session
+    runs 10:00-17:00 in Brasilia time. So the B3 regular session is
+    13:00-20:00 UTC in ``start``/``end`` and in the returned timestamps. A
+    Brasilia-clock window (e.g. start "...100000") lands in pre-market and
+    returns no rows. International feeds trade ~24h, so any hour works.
+
+    B3 tick history is short and irregular: recent dates return data, older
+    dates can come back empty even when the floor traded (use ``bdi`` for
+    intraday detail on those). International instruments retain tick history
+    much longer.
 
     Args:
-        ticker: Single symbol or list (e.g., "USDBRL" or ["USDBRL", "GOLD"]).
-        start: Start datetime (str YYYYMMDDHHMMSS, datetime, or Timestamp)
-        end: End datetime (default: start + 1 hour)
+        ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "USDBRL"]).
+        start: Start datetime, UTC (str YYYYMMDDHHMMSS, datetime, or Timestamp)
+        end: End datetime, UTC (default: start + 1 hour)
         session_token: BCAA session token
 
     Returns:
@@ -71,7 +80,8 @@ def bdt(
         open_interest, calendar_days, working_days.
 
     Example:
-        >>> df = bdt("USDBRL", "20260519100000", "20260519103000")
+        >>> # B3 floor open: 13:00 UTC = 10:00 Brasilia
+        >>> df = bdt("PETR4", "20260601130000", "20260601140000")
         >>> df["close"].plot()
     """
     return vectorize(ticker, lambda t: _bdt_one(t, start, end, session_token))
