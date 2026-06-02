@@ -74,3 +74,15 @@ class TestBportfolio:
             if broker_id:
                 holdings = bportfolio(broker_id)
                 assert isinstance(holdings, pd.DataFrame)
+
+    def test_columns_not_scrambled(self):
+        # Broker 27 has a populated portfolio. The held ticker lives in 10068
+        # (the lib-wide ticker tag); a regression mapped it to 13902, leaving
+        # `ticker` all-NaN and `portfolio_name` holding the ticker instead.
+        df = bportfolio(27)
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) >= 1
+        assert "ticker" in df.columns
+        assert df["ticker"].notna().any()  # ticker column is populated, not all-NaN
+        assert "portfolio_name" in df.columns
+        assert df["portfolio_name"].notna().any()

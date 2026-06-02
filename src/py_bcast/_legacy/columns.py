@@ -240,30 +240,41 @@ PORTFOLIO_LIST_FIELDS: dict[str, str] = {
 }
 
 # bportfolio(broker_id)
-PORTFOLIO_FIELDS: dict[str, str] = {
+# Tag meanings re-derived from live broker-27 rows (65 rows) cross-checked
+# against docs/legacy/fields.md. The held ticker is 10068 (the lib-wide ticker
+# tag), NOT 13902. The B3 classification columns (sector/subsector/segment and
+# their ids) describe the held stock; 12063 (NFANT) is its trade name.
+# Fundamentals 13918/13965/13991/13982/13956 are documented in fields.md.
+# Five sparse tags (13902, 13022, 13025, 13895) are absent from fields.md and
+# only populated in ~25/65 rows; 13732 ("N"/"S") is fully populated but also
+# undocumented. None of them can be confirmed, so they are dropped (mapped to
+# None) rather than mislabeled — inventing names is exactly what scrambled the
+# original map.
+PORTFOLIO_FIELDS: dict[str, str | None] = {
     "10087": "broker_id",
     "13784": "date",
-    "13902": "ticker",
-    "10068": "portfolio_name",
-    "10044": "active",
-    "13022": "company",
-    "13918": "weight",
-    "13025": "sector",
-    "13991": "subsector",
-    "13982": "segment",
-    # Stock classification (B3 sector of the held ticker)
-    "13965": "stock_sector_id",
-    "13956": "stock_subsector_id",
-    "13895": "stock_segment_id",
-    "13732": "stock_classification",
-    # Recommended stock fields
-    "12063": "rec_company",
-    "13798": "rec_sector_id",
-    "13702": "rec_sector",
-    "13799": "rec_subsector_id",
-    "13703": "rec_subsector",
-    "13800": "rec_segment_id",
-    "13704": "rec_segment",
+    "10068": "ticker",
+    "10044": "portfolio_name",
+    "12063": "company",  # NFANT: trade name of the held ticker
+    # B3 classification of the held ticker
+    "13702": "sector",  # SETB3
+    "13798": "sector_id",
+    "13703": "subsector",  # SSETB3
+    "13799": "subsector_id",
+    "13704": "segment",  # SEGB3
+    "13800": "segment_id",
+    # Fundamentals (sparse; documented in fields.md)
+    "13918": "avg_volume_week",  # VMDUSEM: weekly avg volume
+    "13965": "eps_quarter",  # LPATC: EPS quarter (consolidated)
+    "13991": "eps_12m",  # LPAAC: EPS 12m accumulated
+    "13982": "ev_ebitda_12m",  # EVEBDAC: EV/EBITDA 12m accumulated
+    "13956": "ev_ebitda_quarter",  # EVEBDTC: EV/EBITDA quarter (consolidated)
+    # Undocumented tags with unconfirmable meaning — dropped, not guessed
+    "13902": None,  # drop: sparse, not in fields.md
+    "13022": None,  # drop: sparse, not in fields.md
+    "13025": None,  # drop: sparse, not in fields.md
+    "13895": None,  # drop: sparse, not in fields.md
+    "13732": None,  # drop: undocumented "N"/"S" flag
 }
 
 
