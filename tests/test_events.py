@@ -98,3 +98,14 @@ class TestBportfolio:
         assert recs & {"COMPRA", "NEUTRA", "VENDA"}, (
             f"unexpected recommendation tokens: {recs}"
         )
+
+    def test_target_and_dy_columns(self):
+        # Themed-portfolio rows also carry a broker target price (13025) and a
+        # 12-month dividend yield (13895), confirmed empirically against the
+        # stocks' consensus target and bdy. Populated only on themed rows.
+        df = bportfolio(27)
+        assert "target_price" in df.columns
+        assert "dy_pct" in df.columns
+        themed = df[df["recommendation"].astype(str).str.strip() != ""]
+        assert pd.to_numeric(themed["target_price"], errors="coerce").gt(0).any()
+        assert pd.to_numeric(themed["dy_pct"], errors="coerce").ge(0).any()

@@ -245,12 +245,16 @@ PORTFOLIO_LIST_FIELDS: dict[str, str] = {
 # tag), NOT 13902. The B3 classification columns (sector/subsector/segment and
 # their ids) describe the held stock; 12063 (NFANT) is its trade name.
 # Fundamentals 13918/13965/13991/13982/13956 are documented in fields.md.
-# 13022 ("COMPRA"/"NEUTRA"/...) is the analyst recommendation; it is populated
-# only on the themed-portfolio rows (see bportfolio docstring), empty on the
-# PADRAO holdings. The remaining sparse tags (13902, 13025, 13895, 13732) are
-# absent from fields.md and their meaning could not be confirmed (13025/13895
-# did not match target price or DY on cross-check), so they are dropped (mapped
-# to None) rather than mislabeled — inventing names scrambled the original map.
+# IMPORTANT: AETP tags are ENDPOINT-SPECIFIC, not global. 13022 is
+# total_analysts in CONSENSUS_FIELDS but the buy/neutral recommendation here, so
+# a tag's meaning in another map is NOT authoritative. The themed-portfolio
+# metrics below are confirmed EMPIRICALLY against this endpoint's live values:
+#   13022 -> recommendation ("COMPRA"/"NEUTRA"/...), themed-portfolio rows only.
+#   13025 -> target_price: 7/8 rows within 20% of the stock's consensus target.
+#   13895 -> dy_pct: matches the stock's 12-month dividend yield (several near
+#            exact, e.g. ALOS3 10.0 vs 9.87, ITSA4 9.1 vs 9.37, SBSP3 4.3 vs 4.23).
+# 13902 ("10"/"20" portfolio-type code) and 13732 ("N"/"S" flag, redundant with
+# portfolio_name) stay dropped — no confirmable meaning, not guessed.
 PORTFOLIO_FIELDS: dict[str, str | None] = {
     "10087": "broker_id",
     "13784": "date",
@@ -270,12 +274,13 @@ PORTFOLIO_FIELDS: dict[str, str | None] = {
     "13991": "eps_12m",  # LPAAC: EPS 12m accumulated
     "13982": "ev_ebitda_12m",  # EVEBDAC: EV/EBITDA 12m accumulated
     "13956": "ev_ebitda_quarter",  # EVEBDTC: EV/EBITDA quarter (consolidated)
-    "13022": "recommendation",  # COMPRA/NEUTRA/...; only on themed-portfolio rows
+    # Themed-portfolio metrics (populated only on the non-PADRAO rows)
+    "13022": "recommendation",  # COMPRA/NEUTRA/...
+    "13025": "target_price",  # broker target; ~consensus target (7/8 within 20%)
+    "13895": "dy_pct",  # 12-month dividend yield (empirical match to bdy)
     # Undocumented tags with unconfirmable meaning — dropped, not guessed
-    "13902": None,  # drop: sparse, not in fields.md
-    "13025": None,  # drop: sparse, unconfirmed (not target price on cross-check)
-    "13895": None,  # drop: sparse, unconfirmed (not DY on cross-check)
-    "13732": None,  # drop: undocumented "N"/"S" flag
+    "13902": None,  # drop: "10"/"20" portfolio-type code, unconfirmed
+    "13732": None,  # drop: "N"/"S" flag, redundant with portfolio_name
 }
 
 

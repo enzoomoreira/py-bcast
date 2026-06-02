@@ -224,10 +224,11 @@ def bportfolio(
 
     Returns:
         Flat DataFrame, one row per held stock, with columns: broker_id, date,
-        ticker, portfolio_name, recommendation, company, sector/subsector/
-        segment (+ ids), and per-stock fundamentals. ``recommendation``
-        (COMPRA/NEUTRA/...) is populated only on the themed-portfolio rows; it
-        is empty for the PADRAO holdings.
+        ticker, portfolio_name, recommendation, target_price, dy_pct, company,
+        sector/subsector/segment (+ ids), and per-stock fundamentals.
+        ``recommendation`` (COMPRA/NEUTRA/...), ``target_price`` (broker price
+        target) and ``dy_pct`` (12-month dividend yield) are populated only on
+        the themed-portfolio rows; they are empty for the PADRAO holdings.
 
     Example:
         >>> df = bportfolio(27)
