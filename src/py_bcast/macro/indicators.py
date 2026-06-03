@@ -4,40 +4,15 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.dates import to_date_str
-from .._legacy.multi import vectorize
-from .._legacy.output import to_dataframe, to_reference_dataframe
-from .._legacy.columns import (
-    CDI_SCHEMA,
-    CONTENT_PROXY_RENAME,
-    INFLATION_SCHEMA,
-    MACRO_SCHEMA,
-    RETURN_SCHEMA,
-    VOLUME_RENAME,
-    VOLUME_SCHEMA,
-)
 from .._core.validation import DateParam, TickerList, validate_params
-from .._legacy.xml_helpers import content_proxy_get, parse_ticks
-
-
-def _bmacro_one(
-    ticker: str,
-    start_date: str,
-    end_date: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch the macro series for a single symbol."""
-    root = content_proxy_get(
-        "BaseHistoricaNumerica/MacroEconomicos",
-        {
-            "305": ticker,
-            "DataInicio": to_date_str(start_date),
-            "DataFim": to_date_str(end_date),
-        },
-        session_token=session_token,
-    )
-    rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows, schema=MACRO_SCHEMA)
+from .._legacy.endpoints import (
+    SPEC_BDI_CDI,
+    SPEC_BINFLATION,
+    SPEC_BMACRO,
+    SPEC_BRETURN,
+    SPEC_BVOLUME,
+)
+from .._legacy.executor import run_spec
 
 
 @validate_params
@@ -75,8 +50,12 @@ def bmacro(
         >>> df = bmacro("USDBRL", "20260101", "20260519")
         >>> df["close"].plot()
     """
-    return vectorize(
-        ticker, lambda t: _bmacro_one(t, start_date, end_date, session_token)
+    return run_spec(
+        SPEC_BMACRO,
+        session_token=session_token,
+        ticker=ticker,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 
@@ -103,33 +82,12 @@ def bdi_cdi(
         >>> df = bdi_cdi("20260101", "20260519")
         >>> df["close"].iloc[-1]
     """
-    root = content_proxy_get(
-        "BaseHistoricaNumerica/DiCetipAcumulado",
-        {"DataInicio": to_date_str(start_date), "DataFim": to_date_str(end_date)},
+    return run_spec(
+        SPEC_BDI_CDI,
         session_token=session_token,
+        start_date=start_date,
+        end_date=end_date,
     )
-    rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows, schema=CDI_SCHEMA)
-
-
-def _breturn_one(
-    ticker: str,
-    start_date: str,
-    end_date: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch adjusted daily returns for a single symbol."""
-    root = content_proxy_get(
-        "BaseHistoricaNumerica/RetornoDiario",
-        {
-            "305": ticker,
-            "DataInicio": to_date_str(start_date),
-            "DataFim": to_date_str(end_date),
-        },
-        session_token=session_token,
-    )
-    rows = parse_ticks(root, sort_by="dat")
-    return to_dataframe(rows, schema=RETURN_SCHEMA)
 
 
 @validate_params
@@ -158,8 +116,12 @@ def breturn(
         >>> df = breturn("PETR4", "20260101", "20260519")
         >>> df["close"].cumsum().plot()
     """
-    return vectorize(
-        ticker, lambda t: _breturn_one(t, start_date, end_date, session_token)
+    return run_spec(
+        SPEC_BRETURN,
+        session_token=session_token,
+        ticker=ticker,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 
@@ -185,16 +147,7 @@ def bvolume(
         >>> df = bvolume(["PETR4", "VALE3"])
         >>> df[df["ticker"] == "PETR4.BVMF"]
     """
-    root = content_proxy_get(
-        "BaseHistoricaNumerica/VolumesMedios",
-        {"10113": ";".join(tickers)},
-        session_token=session_token,
-        timeout=15,
-    )
-    rows = parse_ticks(root)
-    # Flat frame: one row per (ticker, averaging window) — ticker stays a column
-    # because it repeats per window (1m/2m/3m/6m), so it cannot be a unique index.
-    return to_reference_dataframe(rows, rename=VOLUME_RENAME, schema=VOLUME_SCHEMA)
+    return run_spec(SPEC_BVOLUME, session_token=session_token, tickers=tickers)
 
 
 def binflation(
@@ -217,13 +170,4 @@ def binflation(
         >>> df = binflation()
         >>> df[["symbol", "close"]]
     """
-    root = content_proxy_get(
-        "BaseHistoricaNumerica/Inflacao",
-        {},
-        session_token=session_token,
-        timeout=15,
-    )
-    rows = parse_ticks(root)
-    return to_reference_dataframe(
-        rows, rename=CONTENT_PROXY_RENAME, schema=INFLATION_SCHEMA
-    )
+    return run_spec(SPEC_BINFLATION, session_token=session_token)

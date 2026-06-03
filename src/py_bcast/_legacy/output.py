@@ -1,10 +1,15 @@
 """DataFrame output construction layer.
 
-Converts raw API responses (list[dict[str, str]]) into typed pandas DataFrames
-with proper DatetimeIndex and numeric coercion.
+Converts raw API responses (a ``list[dict[str, str]]`` or a single record
+``dict``) into typed pandas DataFrames with the right index and numeric
+coercion. A single :func:`finalize_frame` entry point selects the index policy
+via the :class:`Index` enum; the ``to_*`` helpers are thin adapters over it
+kept for the call sites not yet migrated to the spec-driven executor.
 """
 
 from __future__ import annotations
+
+from enum import Enum, auto
 
 import pandas as pd
 
@@ -15,6 +20,21 @@ from .columns import BDH_DATA_SCHEMA, CONTENT_PROXY_RENAME
 # value is "n/d") is still numeric; the sentinel cells become NaN. Matched
 # case-insensitively against the stripped cell value.
 MISSING_VALUE_SENTINELS: frozenset[str] = frozenset({"n/d", "n/a", "nd", "-", "--"})
+
+
+class Index(Enum):
+    """Index policy for :func:`finalize_frame`.
+
+    - ``RANGE``: default RangeIndex (reference/event tables).
+    - ``DATETIME``: parse ``date_col`` (YYYYMMDD) into a DatetimeIndex.
+    - ``DATETIME_TIME``: combine ``date_col`` + ``time_col`` into a DatetimeIndex.
+    - ``RECORD``: a single record dict materialized as a one-row frame.
+    """
+
+    RANGE = auto()
+    DATETIME = auto()
+    DATETIME_TIME = auto()
+    RECORD = auto()
 
 
 def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -89,12 +109,112 @@ def _empty_frame(schema: dict[str, str] | None) -> pd.DataFrame:
     return pd.DataFrame({col: pd.Series(dtype=dt) for col, dt in schema.items()})
 
 
+def _build_datetime_index(
+    df: pd.DataFrame, date_col: str, time_col: str | None
+) -> pd.DataFrame:
+    """Parse a date (and optional time) column into a DatetimeIndex.
+
+    If ``date_col`` is absent the frame is returned untouched (RangeIndex), so
+    a malformed response degrades to a plain frame instead of raising.
+    """
+    if date_col not in df.columns:
+        return df
+
+    if time_col and time_col in df.columns:
+        # Time format may be HH:MM:SS.mmm (colon-separated) or HHMMSS
+        sample_time = df[time_col].iloc[0] if len(df) > 0 else ""
+        if ":" in sample_time:
+            # Colon-separated: "10:06:33.359" — combine with space
+            dt_strings = df[date_col] + " " + df[time_col]
+            # Strip optional milliseconds for consistent parsing
+            dt_strings = dt_strings.str.replace(r"\.\d+$", "", regex=True)
+            df.index = pd.to_datetime(
+                dt_strings, format="%Y%m%d %H:%M:%S", errors="coerce"
+            )
+        else:
+            dt_strings = df[date_col] + df[time_col]
+            fmt = "%Y%m%d%H%M%S" if len(sample_time) >= 6 else "%Y%m%d%H%M"
+            df.index = pd.to_datetime(dt_strings, format=fmt, errors="coerce")
+        df = df.drop(columns=[date_col, time_col])
+    else:
+        df.index = pd.to_datetime(df[date_col], format="%Y%m%d", errors="coerce")
+        df = df.drop(columns=[date_col])
+    df.index.name = None
+    return df
+
+
+def finalize_frame(
+    data: list[dict[str, str]] | dict[str, str],
+    *,
+    index: Index,
+    rename: dict[str, str | None] | None = None,
+    schema: dict[str, str] | None = None,
+    date_col: str = "dat",
+    time_col: str | None = None,
+    ticker: str | None = None,
+) -> pd.DataFrame:
+    """Build a typed DataFrame from raw rows under one index policy.
+
+    Single entry point unifying the historical ``to_dataframe`` (DatetimeIndex),
+    ``to_reference_dataframe`` (RangeIndex) and ``to_record_dataframe``
+    (one-row) helpers. The ``index`` enum selects the behaviour:
+
+    - ``RANGE`` / ``DATETIME`` / ``DATETIME_TIME`` take a ``list[dict]``.
+    - ``RECORD`` takes a single ``dict`` (one entity).
+
+    All non-empty paths run :func:`coerce_numeric_columns` then the ``rename``
+    mapping. An empty input yields a bare ``pd.DataFrame()`` when ``schema`` is
+    None, or a schema-preserving empty frame otherwise (with an empty
+    DatetimeIndex for the datetime policies). ``ticker`` is only consulted for
+    ``RECORD`` (inserted as the first column when the record carries none).
+
+    Args:
+        data: Row dicts (list policies) or a single record dict (RECORD).
+        index: Index policy (see :class:`Index`).
+        rename: Column rename/drop mapping (keys -> None are dropped).
+        schema: Column -> dtype map used only to type an empty result.
+        date_col: Date column name for the datetime policies (default "dat").
+        time_col: Time column name for ``DATETIME_TIME``.
+        ticker: For ``RECORD`` only: inserted as ``ticker`` if absent.
+
+    Returns:
+        A typed DataFrame following the requested index policy.
+    """
+    if index is Index.RECORD:
+        # RECORD takes a single record dict; an empty dict means "no entity".
+        rows: list[dict[str, str]] = [data] if data else []  # type: ignore[list-item]
+    else:
+        rows = data  # type: ignore[assignment]
+
+    if not rows:
+        if schema is None:
+            return pd.DataFrame()
+        empty = _empty_frame(schema)
+        if index in (Index.DATETIME, Index.DATETIME_TIME):
+            empty.index = pd.DatetimeIndex([])
+        return empty
+
+    df = pd.DataFrame(rows)
+
+    if index is Index.DATETIME:
+        df = _build_datetime_index(df, date_col, None)
+    elif index is Index.DATETIME_TIME:
+        df = _build_datetime_index(df, date_col, time_col)
+
+    df = coerce_numeric_columns(df)
+    df = _apply_rename(df, rename)
+
+    if index is Index.RECORD and ticker is not None and "ticker" not in df.columns:
+        df.insert(0, "ticker", ticker)
+    return df
+
+
 def empty_bdh_frame() -> pd.DataFrame:
     """Empty flat bdh frame: ticker column + OHLC schema on a DatetimeIndex.
 
     Shared by the sync and async ``bdh`` so the empty contract is defined once.
     """
-    df = to_dataframe([], date_col="dat", schema=BDH_DATA_SCHEMA)
+    df = finalize_frame([], index=Index.DATETIME, schema=BDH_DATA_SCHEMA)
     df.insert(0, "ticker", pd.Series(dtype="object"))
     return df
 
@@ -106,68 +226,16 @@ def to_dataframe(
     rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
     schema: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Convert a list of row dicts into a DataFrame with DatetimeIndex.
-
-    Parses the date column (and optionally time column) into a DatetimeIndex,
-    coerces all remaining columns to numeric where possible, and renames
-    columns according to the rename mapping.
-
-    Args:
-        rows: List of dicts from API response.
-        date_col: Name of the date column (default "dat", format YYYYMMDD).
-        time_col: If set, name of the time column (e.g. "hor") to combine
-                  with date_col for intraday DatetimeIndex.
-        rename: Column rename mapping. Keys → None are dropped; keys → str
-                are renamed. Default: CONTENT_PROXY_RENAME. Pass None to skip.
-        schema: Column → dtype map used only when ``rows`` is empty, to return
-                an empty DataFrame with the right columns and a DatetimeIndex
-                (instead of a bare, schema-less frame). The populated frame
-                keeps its coercion-inferred dtypes.
-
-    Returns:
-        DataFrame with DatetimeIndex and numeric columns.
-        Empty DataFrame (with schema + DatetimeIndex if ``schema`` is given)
-        if rows is empty.
-    """
-    if not rows:
-        if schema is None:
-            return pd.DataFrame()
-        df = _empty_frame(schema)
-        df.index = pd.DatetimeIndex([])
-        return df
-
-    df = pd.DataFrame(rows)
-
-    # Build DatetimeIndex
-    if date_col in df.columns:
-        if time_col and time_col in df.columns:
-            # Combine date + time for intraday index
-            # Time format may be HH:MM:SS.mmm (colon-separated) or HHMMSS
-            sample_time = df[time_col].iloc[0] if len(df) > 0 else ""
-            if ":" in sample_time:
-                # Colon-separated: "10:06:33.359" — combine with space
-                dt_strings = df[date_col] + " " + df[time_col]
-                # Strip optional milliseconds for consistent parsing
-                dt_strings = dt_strings.str.replace(r"\.\d+$", "", regex=True)
-                df.index = pd.to_datetime(
-                    dt_strings, format="%Y%m%d %H:%M:%S", errors="coerce"
-                )
-            else:
-                dt_strings = df[date_col] + df[time_col]
-                # Determine format based on time_col length
-                if len(sample_time) >= 6:
-                    fmt = "%Y%m%d%H%M%S"
-                else:
-                    fmt = "%Y%m%d%H%M"
-                df.index = pd.to_datetime(dt_strings, format=fmt, errors="coerce")
-            df = df.drop(columns=[date_col, time_col])
-        else:
-            df.index = pd.to_datetime(df[date_col], format="%Y%m%d", errors="coerce")
-            df = df.drop(columns=[date_col])
-        df.index.name = None
-
-    df = coerce_numeric_columns(df)
-    return _apply_rename(df, rename)
+    """Adapter: DatetimeIndex frame (see :func:`finalize_frame`)."""
+    index = Index.DATETIME_TIME if time_col else Index.DATETIME
+    return finalize_frame(
+        rows,
+        index=index,
+        rename=rename,
+        schema=schema,
+        date_col=date_col,
+        time_col=time_col,
+    )
 
 
 def to_reference_dataframe(
@@ -175,29 +243,8 @@ def to_reference_dataframe(
     rename: dict[str, str | None] | None = None,
     schema: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Convert reference/event data to a DataFrame without DatetimeIndex.
-
-    Uses RangeIndex (default). Coerces numeric columns where possible.
-
-    Args:
-        rows: List of dicts from API response.
-        rename: Rename mapping. Default: None (no rename — AETP endpoints
-                pass their own per-endpoint map).
-        schema: Column → dtype map used only when ``rows`` is empty, to return
-                an empty DataFrame with the right columns (instead of a bare,
-                schema-less frame). The populated frame keeps its
-                coercion-inferred dtypes.
-
-    Returns:
-        DataFrame with RangeIndex and numeric columns where applicable.
-    """
-    if not rows:
-        return pd.DataFrame() if schema is None else _empty_frame(schema)
-
-    df = pd.DataFrame(rows)
-
-    df = coerce_numeric_columns(df)
-    return _apply_rename(df, rename)
+    """Adapter: RangeIndex reference frame (see :func:`finalize_frame`)."""
+    return finalize_frame(rows, index=Index.RANGE, rename=rename, schema=schema)
 
 
 def to_record_dataframe(
@@ -206,28 +253,10 @@ def to_record_dataframe(
     schema: dict[str, str] | None = None,
     ticker: str | None = None,
 ) -> pd.DataFrame:
-    """Convert a single server record to a one-row DataFrame (RangeIndex).
+    """Adapter: one-row RangeIndex frame from a single record.
 
-    Single-entity reference endpoints (quote, shares, consensus) return one
-    record; this materializes it as a one-row DataFrame so every tabular
-    endpoint speaks the same type.
-
-    Args:
-        record: Dict of field -> string value (one entity).
-        rename: Column rename mapping (same semantics as to_dataframe).
-        schema: Column → dtype map used only when ``record`` is empty.
-        ticker: If given and the record carries no ``ticker`` column, insert
-                it as the first column (so the entity key is explicit).
-
-    Returns:
-        One-row DataFrame, or an empty DataFrame (with schema if given) when
-        the record is empty.
+    See :func:`finalize_frame`.
     """
-    if not record:
-        return pd.DataFrame() if schema is None else _empty_frame(schema)
-    df = pd.DataFrame([record])
-    df = coerce_numeric_columns(df)
-    df = _apply_rename(df, rename)
-    if ticker is not None and "ticker" not in df.columns:
-        df.insert(0, "ticker", ticker)
-    return df
+    return finalize_frame(
+        record, index=Index.RECORD, rename=rename, schema=schema, ticker=ticker
+    )

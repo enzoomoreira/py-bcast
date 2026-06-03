@@ -1,0 +1,178 @@
+"""Sync executor for :class:`EndpointSpec`-driven endpoints.
+
+``run_spec`` is the single sync entry point: it builds the request tags from
+the spec's :class:`ParamBind`s (resolving CVM codes, indicator IDs, dates,
+etc.), dispatches the right transport, finalizes the frame, and vectorizes when
+the spec declares ``vectorize_over``. The async twin (``_async/executor.py``)
+mirrors this; the only sync/async difference is the awaited primitives, so the
+per-endpoint duplication is gone.
+"""
+
+from __future__ import annotations
+
+import datetime
+from typing import Any
+
+import httpx
+import pandas as pd
+
+from .._core.constants import BASE_URL
+from .._core.dates import to_date_str, to_datetime_str
+from .._core.exceptions import ProtocolError, is_no_records
+from .._core.normalize import ensure_id_list, ensure_list
+from .._core.retry import http_retry
+from .aetp import aetp_request, rows_to_dicts
+from .binary import parse_binary_response
+from .http import get_http_client, get_session_token
+from .multi import vectorize
+from .output import Index, finalize_frame
+from .resolve import resolve_cvm, resolve_indicator
+from .spec import EndpointSpec, Resolve
+from .xml_helpers import content_proxy_get, parse_ticks
+
+
+def _resolve_cvm_or_int(value: Any, session_token: str | None) -> int:
+    """Ticker-or-CVM identifier -> CVM code (digit passthrough else resolve)."""
+    if isinstance(value, int) or str(value).isdigit():
+        return int(value)
+    return resolve_cvm(str(value), session_token)
+
+
+def _coerce_bind(resolve: Resolve, raw: Any, session_token: str | None) -> str:
+    """Transform a bound value per its resolve policy (see :class:`ParamBind`)."""
+    if resolve == "none":
+        return str(raw)
+    if resolve == "cvm":
+        return str(_resolve_cvm_or_int(raw, session_token))
+    if resolve == "indicator":
+        return str(resolve_indicator(raw, session_token))
+    if resolve == "date":
+        return to_date_str(raw)
+    if resolve == "datetime":
+        return to_datetime_str(raw)
+    if resolve == "join":
+        return ";".join(ensure_list(raw))
+    raise ValueError(f"unknown resolve policy: {resolve!r}")
+
+
+def _build_params(
+    spec: EndpointSpec, inputs: dict[str, Any], session_token: str | None
+) -> dict[str, str]:
+    """Merge static tags with the resolved binds into a request param dict.
+
+    An absent optional argument (value None) skips its bind; ``today`` ignores
+    the bound value and stamps the current date.
+    """
+    params = dict(spec.static_params)
+    for bind in spec.params:
+        if bind.resolve == "today":
+            params[bind.tag] = datetime.date.today().strftime("%Y%m%d")
+            continue
+        raw = inputs.get(bind.arg)
+        if raw is None:
+            continue
+        params[bind.tag] = _coerce_bind(bind.resolve, raw, session_token)
+    return params
+
+
+@http_retry
+def _binary_fetch(
+    s: httpx.Client, path: str, params: dict[str, str], timeout: int
+) -> httpx.Response:
+    """Isolated HTTP GET for the binary transport (retry-decorated)."""
+    return s.get(f"{BASE_URL}/{path}", params=params, timeout=timeout)
+
+
+def _binary_rows(
+    spec: EndpointSpec,
+    params: dict[str, str],
+    inputs: dict[str, Any],
+    session_token: str | None,
+) -> list[dict[str, str]]:
+    """Fetch+parse a binary endpoint whose path is templated (e.g. consensus).
+
+    The ``spec.path`` carries ``{arg}`` placeholders filled from ``inputs``
+    (e.g. ``"aefundamental/{ticker}/consenso"``). A no-records reply yields an
+    empty row list (the finalize step turns it into a schema-typed empty frame),
+    mirroring the soft policy of ``aetp_request``.
+    """
+    token = get_session_token(session_token)
+    s = get_http_client()
+    params["10039"] = token
+    path = spec.path.format(**inputs)
+
+    r = _binary_fetch(s, path, params, spec.timeout)
+    try:
+        parsed = parse_binary_response(r.content)
+    except ProtocolError as exc:
+        if is_no_records(exc.error_tag):
+            return []
+        raise
+    return rows_to_dicts(parsed)
+
+
+def _fetch_rows(
+    spec: EndpointSpec,
+    params: dict[str, str],
+    inputs: dict[str, Any],
+    session_token: str | None,
+) -> list[dict[str, str]]:
+    """Dispatch to the spec's transport and return raw row dicts."""
+    if spec.transport == "aetp":
+        parsed = aetp_request(spec.path, params, session_token, empty_ok=spec.empty_ok)
+        return rows_to_dicts(parsed)
+    if spec.transport == "cp_ticks":
+        root = content_proxy_get(
+            spec.path, params, session_token=session_token, timeout=spec.timeout
+        )
+        rows = parse_ticks(root, sort_by=spec.cp_sort_by or "")
+        if spec.cp_reverse:
+            rows.reverse()
+        return rows
+    if spec.transport == "binary":
+        return _binary_rows(spec, params, inputs, session_token)
+    raise ValueError(f"unknown transport: {spec.transport!r}")
+
+
+def _run_single(
+    spec: EndpointSpec, inputs: dict[str, Any], session_token: str | None
+) -> pd.DataFrame:
+    """Serve one (non-vectorized) request and finalize its frame."""
+    params = _build_params(spec, inputs, session_token)
+    rows = _fetch_rows(spec, params, inputs, session_token)
+    if spec.index is Index.RECORD:
+        record = rows[0] if rows else {}
+        return finalize_frame(
+            record, index=Index.RECORD, rename=spec.rename, schema=spec.schema
+        )
+    return finalize_frame(
+        rows,
+        index=spec.index,
+        rename=spec.rename,
+        schema=spec.schema,
+        date_col=spec.date_col,
+        time_col=spec.time_col,
+    )
+
+
+def run_spec(
+    spec: EndpointSpec, *, session_token: str | None = None, **inputs: Any
+) -> pd.DataFrame:
+    """Serve an endpoint from its spec, returning the flat DataFrame.
+
+    When ``spec.vectorize_over`` is set, the named argument is normalized to a
+    list and one request is issued per item, the blocks concatenated with a
+    ``ticker`` column (inserted only when the endpoint does not already emit
+    one). Otherwise a single request is issued.
+    """
+    if spec.vectorize_over is None:
+        return _run_single(spec, inputs, session_token)
+
+    items = ensure_id_list(inputs[spec.vectorize_over])
+
+    def one(item: Any) -> pd.DataFrame:
+        local = dict(inputs)
+        local[spec.vectorize_over] = item
+        return _run_single(spec, local, session_token)
+
+    return vectorize(items, one)
