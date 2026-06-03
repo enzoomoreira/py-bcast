@@ -4,33 +4,23 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._legacy.aetp import aetp_request, rows_to_dicts
-from .._legacy.columns import (
-    COMPANY_DETAIL_FIELDS,
-    COMPANY_LIST_FIELDS,
-    COMPANY_LIST_SCHEMA,
-    INDEX_FIELDS,
-    INDEX_SCHEMA,
-    INDICATOR_META_FIELDS,
-    INDICATOR_META_SCHEMA,
-    QUOTE_FIELDS,
-    QUOTE_SCHEMA,
-    SECTOR_FIELDS,
-    SECTOR_SCHEMA,
-    SHARES_FIELDS,
-    SHARES_SCHEMA,
-    TICKER_FIELDS,
-)
 from .._core.dates import DateLike
-from .._core.logging import get_logger
-from .._legacy.multi import vectorize
-from .._core.normalize import ensure_id_list, ensure_list, ensure_str
-from .._legacy.output import to_record_dataframe, to_reference_dataframe
-from .._legacy.resolve import resolve_cvm
+from .._core.normalize import ensure_list
+from .._legacy.aetp import aetp_request, rows_to_dicts
+from .._legacy.columns import QUOTE_FIELDS, QUOTE_SCHEMA
+from .._legacy.endpoints import (
+    SPEC_BCOMPANY_DETAIL,
+    SPEC_BCOMPANY_LIST,
+    SPEC_BINDICATOR_META,
+    SPEC_BINDICATORS,
+    SPEC_BINDICES,
+    SPEC_BSECTORS,
+    SPEC_BSHARES,
+    SPEC_BTICKERS,
+)
 from .._legacy.executor import run_spec
-from .._legacy.endpoints import SPEC_BINDICATORS
-
-logger = get_logger(__name__)
+from .._legacy.multi import vectorize
+from .._legacy.output import to_record_dataframe
 
 
 def bcompany(
@@ -60,22 +50,10 @@ def bcompany(
         >>> petr = bcompany(9512)   # Petrobras detail
     """
     if cvm_code is None:
-        parsed = aetp_request("fundamental/empresa/metadado", {}, session_token)
-        return to_reference_dataframe(
-            rows_to_dicts(parsed),
-            rename=COMPANY_LIST_FIELDS,
-            schema=COMPANY_LIST_SCHEMA,
-        )
-    else:
-        parsed = aetp_request(
-            "fundamental/empresa",
-            {"13004": ensure_str(cvm_code)},
-            session_token,
-            empty_ok=False,
-        )
-        return to_reference_dataframe(
-            rows_to_dicts(parsed), rename=COMPANY_DETAIL_FIELDS
-        )
+        return run_spec(SPEC_BCOMPANY_LIST, session_token=session_token)
+    return run_spec(
+        SPEC_BCOMPANY_DETAIL, session_token=session_token, cvm_code=cvm_code
+    )
 
 
 def bindices(
@@ -97,10 +75,7 @@ def bindices(
         >>> df = bindices()
         >>> df.head()
     """
-    parsed = aetp_request("ativos/indice", {}, session_token)
-    return to_reference_dataframe(
-        rows_to_dicts(parsed), rename=INDEX_FIELDS, schema=INDEX_SCHEMA
-    )
+    return run_spec(SPEC_BINDICES, session_token=session_token)
 
 
 def bsectors(
@@ -121,10 +96,7 @@ def bsectors(
         >>> df = bsectors()
         >>> df.head()
     """
-    parsed = aetp_request("fundamental/setor", {}, session_token)
-    return to_reference_dataframe(
-        rows_to_dicts(parsed), rename=SECTOR_FIELDS, schema=SECTOR_SCHEMA
-    )
+    return run_spec(SPEC_BSECTORS, session_token=session_token)
 
 
 def _quote_one(
@@ -172,24 +144,6 @@ def bquote(
     return vectorize(tickers, lambda t: _quote_one(t, session_token))
 
 
-def _btickers_one(
-    ticker_or_cvm: str | int,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch all tickers for one company (by CVM code or ticker)."""
-    if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
-        cvm_code = int(ticker_or_cvm)
-    else:
-        cvm_code = resolve_cvm(str(ticker_or_cvm), session_token)
-    parsed = aetp_request(
-        "fundamental/ativo/simbolo",
-        {"13004": str(cvm_code)},
-        session_token,
-        empty_ok=False,
-    )
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=TICKER_FIELDS)
-
-
 def btickers(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -215,25 +169,9 @@ def btickers(
         >>> df = btickers(9512)     # direct CVM code
         >>> df = btickers(["PETR4", 4170])  # mixed list
     """
-    items = ensure_id_list(ticker_or_cvm)
-    return vectorize(items, lambda x: _btickers_one(x, session_token))
-
-
-def _bshares_one(
-    ticker: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch shares outstanding for a single ticker (raises if unknown)."""
-    parsed = aetp_request(
-        "fundamental/ativo/quantidade",
-        {"10068": ticker},
-        session_token,
-        empty_ok=False,
+    return run_spec(
+        SPEC_BTICKERS, session_token=session_token, ticker_or_cvm=ticker_or_cvm
     )
-
-    rows = rows_to_dicts(parsed)
-    record = rows[0] if rows else {}
-    return to_record_dataframe(record, rename=SHARES_FIELDS, schema=SHARES_SCHEMA)
 
 
 def bshares(
@@ -258,8 +196,7 @@ def bshares(
         >>> df = bshares("PETR4")
         >>> print(df["total_shares"].iloc[0])
     """
-    tickers = ensure_list(ticker)
-    return vectorize(tickers, lambda t: _bshares_one(t, session_token))
+    return run_spec(SPEC_BSHARES, session_token=session_token, ticker=ticker)
 
 
 def bindicators(
@@ -331,9 +268,4 @@ def bindicator_meta(
         >>> df = bindicator_meta()
         >>> df.head()
     """
-    parsed = aetp_request("fundamental/indicador/metadado", {}, session_token)
-    return to_reference_dataframe(
-        rows_to_dicts(parsed),
-        rename=INDICATOR_META_FIELDS,
-        schema=INDICATOR_META_SCHEMA,
-    )
+    return run_spec(SPEC_BINDICATOR_META, session_token=session_token)

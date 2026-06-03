@@ -9,14 +9,26 @@ from __future__ import annotations
 
 from .columns import (
     CDI_SCHEMA,
+    COMPANY_DETAIL_FIELDS,
+    COMPANY_LIST_FIELDS,
+    COMPANY_LIST_SCHEMA,
     CONSENSUS_FIELDS,
     CONSENSUS_SCHEMA,
     CONTENT_PROXY_RENAME,
+    INDEX_FIELDS,
+    INDEX_SCHEMA,
     INDICATOR_HISTORY_FIELDS,
     INDICATOR_HISTORY_SCHEMA,
+    INDICATOR_META_FIELDS,
+    INDICATOR_META_SCHEMA,
     INFLATION_SCHEMA,
     MACRO_SCHEMA,
     RETURN_SCHEMA,
+    SECTOR_FIELDS,
+    SECTOR_SCHEMA,
+    SHARES_FIELDS,
+    SHARES_SCHEMA,
+    TICKER_FIELDS,
     VOLUME_RENAME,
     VOLUME_SCHEMA,
 )
@@ -62,6 +74,78 @@ SPEC_BCONSENSUS = EndpointSpec(
     ),
     vectorize_over="ticker",
     timeout=15,
+)
+
+# ── fundamental reference (aetp) ──────────────────────────────────────────
+# bcompany splits into two specs the wrapper picks between by ``cvm_code``:
+# the full list (soft) vs one company's detail (fail-fast). DETAIL stamps the
+# CVM code straight into 13004 (no resolution — it already is the code).
+SPEC_BCOMPANY_LIST = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/metadado",
+    index=Index.RANGE,
+    rename=COMPANY_LIST_FIELDS,
+    schema=COMPANY_LIST_SCHEMA,
+)
+
+SPEC_BCOMPANY_DETAIL = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa",
+    index=Index.RANGE,
+    rename=COMPANY_DETAIL_FIELDS,
+    empty_ok=False,
+    params=(ParamBind("cvm_code", "13004", "none"),),
+)
+
+# bindices / bsectors / bindicator_meta — full catalogs, no params, soft.
+SPEC_BINDICES = EndpointSpec(
+    transport="aetp",
+    path="ativos/indice",
+    index=Index.RANGE,
+    rename=INDEX_FIELDS,
+    schema=INDEX_SCHEMA,
+)
+
+SPEC_BSECTORS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/setor",
+    index=Index.RANGE,
+    rename=SECTOR_FIELDS,
+    schema=SECTOR_SCHEMA,
+)
+
+SPEC_BINDICATOR_META = EndpointSpec(
+    transport="aetp",
+    path="fundamental/indicador/metadado",
+    index=Index.RANGE,
+    rename=INDICATOR_META_FIELDS,
+    schema=INDICATOR_META_SCHEMA,
+)
+
+# btickers — all share classes for a company. Vectorizes over the lookup id
+# (13004 resolves a ticker to its CVM, digit passthrough). Fail-fast. The
+# endpoint echoes 10068 -> ticker (the company's symbols), so no insert.
+SPEC_BTICKERS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/ativo/simbolo",
+    index=Index.RANGE,
+    rename=TICKER_FIELDS,
+    empty_ok=False,
+    params=(ParamBind("ticker_or_cvm", "13004", "cvm"),),
+    vectorize_over="ticker_or_cvm",
+)
+
+# bshares — shares outstanding, one record per ticker. Fail-fast; echoes
+# 10068 -> ticker, so the vectorizer does not insert one.
+SPEC_BSHARES = EndpointSpec(
+    transport="aetp",
+    path="fundamental/ativo/quantidade",
+    index=Index.RECORD,
+    rename=SHARES_FIELDS,
+    schema=SHARES_SCHEMA,
+    empty_ok=False,
+    params=(ParamBind("ticker", "10068", "none"),),
+    vectorize_over="ticker",
 )
 
 # ── macro / fixed-income (ContentProxy cp_ticks) ──────────────────────────

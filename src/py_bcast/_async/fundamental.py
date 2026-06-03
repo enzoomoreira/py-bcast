@@ -4,35 +4,26 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._legacy.aetp import rows_to_dicts
-from .._legacy.columns import (
-    COMPANY_DETAIL_FIELDS,
-    COMPANY_LIST_FIELDS,
-    COMPANY_LIST_SCHEMA,
-    INDEX_FIELDS,
-    INDEX_SCHEMA,
-    INDICATOR_META_FIELDS,
-    INDICATOR_META_SCHEMA,
-    QUOTE_FIELDS,
-    QUOTE_SCHEMA,
-    SECTOR_FIELDS,
-    SECTOR_SCHEMA,
-    SHARES_FIELDS,
-    SHARES_SCHEMA,
-    TICKER_FIELDS,
-)
 from .._core.dates import DateLike
-from .._core.logging import get_logger
-from .._core.normalize import ensure_id_list, ensure_list, ensure_str
+from .._core.normalize import ensure_list
 from .._core.validation import TickerList, validate_params
-from .._legacy.endpoints import SPEC_BCONSENSUS, SPEC_BINDICATORS
+from .._legacy.aetp import rows_to_dicts
+from .._legacy.columns import QUOTE_FIELDS, QUOTE_SCHEMA
+from .._legacy.endpoints import (
+    SPEC_BCOMPANY_DETAIL,
+    SPEC_BCOMPANY_LIST,
+    SPEC_BCONSENSUS,
+    SPEC_BINDICATOR_META,
+    SPEC_BINDICATORS,
+    SPEC_BINDICES,
+    SPEC_BSECTORS,
+    SPEC_BSHARES,
+    SPEC_BTICKERS,
+)
 from .._legacy.multi import vectorize_async
-from .._legacy.output import to_record_dataframe, to_reference_dataframe
-from .._legacy.resolve import aresolve_cvm
+from .._legacy.output import to_record_dataframe
 from ._helpers import async_aetp_request
 from .executor import arun_spec
-
-logger = get_logger(__name__)
 
 
 async def abcompany(
@@ -45,21 +36,10 @@ async def abcompany(
     one company (NotFoundError if unknown).
     """
     if cvm_code is None:
-        parsed = await async_aetp_request(
-            "fundamental/empresa/metadado", {}, session_token
-        )
-        return to_reference_dataframe(
-            rows_to_dicts(parsed),
-            rename=COMPANY_LIST_FIELDS,
-            schema=COMPANY_LIST_SCHEMA,
-        )
-    parsed = await async_aetp_request(
-        "fundamental/empresa",
-        {"13004": ensure_str(cvm_code)},
-        session_token,
-        empty_ok=False,
+        return await arun_spec(SPEC_BCOMPANY_LIST, session_token=session_token)
+    return await arun_spec(
+        SPEC_BCOMPANY_DETAIL, session_token=session_token, cvm_code=cvm_code
     )
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=COMPANY_DETAIL_FIELDS)
 
 
 @validate_params
@@ -107,24 +87,6 @@ async def abquote(
     )
 
 
-async def _abtickers_one(
-    ticker_or_cvm: str | int,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch all tickers for one company (by CVM code or ticker)."""
-    if isinstance(ticker_or_cvm, int) or str(ticker_or_cvm).isdigit():
-        cvm_code = int(ticker_or_cvm)
-    else:
-        cvm_code = await aresolve_cvm(str(ticker_or_cvm), session_token)
-    parsed = await async_aetp_request(
-        "fundamental/ativo/simbolo",
-        {"13004": str(cvm_code)},
-        session_token,
-        empty_ok=False,
-    )
-    return to_reference_dataframe(rows_to_dicts(parsed), rename=TICKER_FIELDS)
-
-
 async def abtickers(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -134,25 +96,9 @@ async def abtickers(
     The endpoint emits its own ``ticker`` column (the company's symbols), so
     that column is NOT the lookup identifier.
     """
-    return await vectorize_async(
-        ensure_id_list(ticker_or_cvm), lambda x: _abtickers_one(x, session_token)
+    return await arun_spec(
+        SPEC_BTICKERS, session_token=session_token, ticker_or_cvm=ticker_or_cvm
     )
-
-
-async def _abshares_one(
-    ticker: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch shares outstanding for a single ticker (raises if unknown)."""
-    parsed = await async_aetp_request(
-        "fundamental/ativo/quantidade",
-        {"10068": ticker},
-        session_token,
-        empty_ok=False,
-    )
-    rows = rows_to_dicts(parsed)
-    record = rows[0] if rows else {}
-    return to_record_dataframe(record, rename=SHARES_FIELDS, schema=SHARES_SCHEMA)
 
 
 async def abshares(
@@ -164,37 +110,22 @@ async def abshares(
     Flat DataFrame with shares data (one row per ticker). Raises NotFoundError
     if any ticker is unknown (fail-fast).
     """
-    return await vectorize_async(
-        ensure_list(ticker), lambda t: _abshares_one(t, session_token)
-    )
+    return await arun_spec(SPEC_BSHARES, session_token=session_token, ticker=ticker)
 
 
 async def abindices(session_token: str | None = None) -> pd.DataFrame:
     """Async version of ``bindices``. List of B3 market indices."""
-    parsed = await async_aetp_request("ativos/indice", {}, session_token)
-    return to_reference_dataframe(
-        rows_to_dicts(parsed), rename=INDEX_FIELDS, schema=INDEX_SCHEMA
-    )
+    return await arun_spec(SPEC_BINDICES, session_token=session_token)
 
 
 async def absectors(session_token: str | None = None) -> pd.DataFrame:
     """Async version of ``bsectors``. B3 sector/subsector/segment classification."""
-    parsed = await async_aetp_request("fundamental/setor", {}, session_token)
-    return to_reference_dataframe(
-        rows_to_dicts(parsed), rename=SECTOR_FIELDS, schema=SECTOR_SCHEMA
-    )
+    return await arun_spec(SPEC_BSECTORS, session_token=session_token)
 
 
 async def abindicator_meta(session_token: str | None = None) -> pd.DataFrame:
     """Async version of ``bindicator_meta``. Metadata for all indicators."""
-    parsed = await async_aetp_request(
-        "fundamental/indicador/metadado", {}, session_token
-    )
-    return to_reference_dataframe(
-        rows_to_dicts(parsed),
-        rename=INDICATOR_META_FIELDS,
-        schema=INDICATOR_META_SCHEMA,
-    )
+    return await arun_spec(SPEC_BINDICATOR_META, session_token=session_token)
 
 
 async def abindicators(
