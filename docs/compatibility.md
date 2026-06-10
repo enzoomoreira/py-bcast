@@ -2,7 +2,7 @@
 
 Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada terminal suporta, qual endpoint corresponde a qual funcao da lib, e o status atual de implementacao no Plus.
 
-> Endpoints confirmados via probe HTTP sistematico com JWT valido (2026-05-25/27).
+> Endpoints confirmados via probe HTTP sistematico com JWT valido (2026-05-25/27). Adapters verificados ao vivo em 2026-06-10.
 > Catalogo detalhado por backend: [`legacy/endpoints.md`](./legacy/endpoints.md) | [`plus/endpoints.md`](./plus/endpoints.md)
 
 ---
@@ -12,19 +12,19 @@ Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada 
 | Funcao py-bcast | Endpoint Legacy | Endpoint Plus | Status Plus |
 |---|---|---|---|
 | `bdp()` / `BroadcastClient` | DDE `BC/COT/TICKER.FIELD` | WS `startStreamQuote` | **Implementado via `BroadcastPlusClient`** |
-| `BroadcastClient.snapshot()` | DDE `BC/ATIVO/TICKER` | `POST /stock/v1/quote/symbol` | Confirmado — retorna metadata; preco via WS |
+| `BroadcastClient.snapshot()` | DDE `BC/ATIVO/TICKER` | `POST /stock/v1/quote/symbol` | **Implementado via `binfo()`** — metadata; preco via WS |
 | `bdh()` | `BaseHistoricaNumerica/HistoricoFechamentos` | `POST /stock/v1/historical/symbol` | Bloqueado — erro bh_88063 (restricao de assinatura) |
 | `bdi()` | `BaseHistoricaNumerica/HistoricoIntraday` | `POST /stock/v1/timesAndTrades` | **Implementado via `btrades()`** — 500 trades/chamada |
-| `bdt()` | `BaseHistoricaNumerica/HistoricoTick` | `POST /stock/v1/historical/tickbytick/symbol` | A confirmar — endpoint existe, params a testar |
+| `bdt()` | `BaseHistoricaNumerica/HistoricoTick` | `POST /stock/v1/historical/tickbytick/symbol` | Bloqueado — mesmo bh_88063 |
 | `bmacro()` | `BaseHistoricaNumerica/MacroEconomicos` | Sem equivalente | Sem suporte no Plus |
 | `bconsensus()` | `aefundamental/consenso` | Sem equivalente | Sem suporte no Plus |
 | `bcompany()` | `aetp/output/fundamental/empresa` | Sem equivalente | Sem suporte no Plus |
-| `bindices()` | `aetp/output/ativos/indice` | `GET /stock/v1/indexes` | Confirmado — lista de codigos de indices |
+| `bindices()` | `aetp/output/ativos/indice` | `GET /stock/v1/indexes` | **Implementado via `bindexes()`** — lista de codigos de indices |
 | `bsectors()` | `aetp/output/fundamental/setor` | `GET /stock/v1/instrumentTypes` | Confirmado — tipos de instrumento |
-| `bcalendar()` | `aetp/output/fundamental/calendario` | `GET /stock/v1/calendar` | Confirmado — feriados por pais |
-| `bdividends()` | `aetp/output/fundamental/eventos/jcp-dividendos` | `POST /stock/v1/corporateevents/{symbol}` | Confirmado — JCP + dividendos + fatores de ajuste |
+| `bcalendar()` | `aetp/output/fundamental/calendario` | `GET /stock/v1/calendar/tables` | **Implementado via `bholidays()`** — catalogo de tabelas; datas bloqueadas (param nao descoberto) |
+| `bdividends()` | `aetp/output/fundamental/eventos/jcp-dividendos` | `POST /stock/v1/corporateevents/{symbol}` | **Implementado via `bcorpevents()`** — inclui fatores de ajuste que o legado nao tem |
 | `bdy()` | `aetp/output/fundamental/eventos/dividend-yield` | incluido em `corporateevents` | A implementar |
-| `bnews()` / `bnews_recent()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | Confirmado — 121 secoes, tagging rico |
+| `bnews()` / `bnews_recent()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | **Implementado via `bsections()`/`bheadlines()`/`bnews_content()`** — 121 secoes, tagging rico |
 | `bsearch()` | `aetp_17.dat` (arquivo local) | `POST /stock/v1/quote/symbol/search` | **Implementado com routing automatico** — schema unificado em `pd.DataFrame` |
 | `bportfolios()` / `bportfolio()` | `aetp/output/fundamental/empresa/carteira-recomendada` | Sem equivalente | Sem suporte no Plus |
 | `bmacro()` / `bdi_cdi()` | `BaseHistoricaNumerica/DiCetipAcumulado` | Sem equivalente | Sem suporte no Plus |
@@ -35,18 +35,24 @@ Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada 
 
 Endpoints que nao tem equivalente no Terminal Antigo:
 
-| Endpoint Plus | Descricao |
-|---|---|
-| `GET /stock/v1/indexes/{index}` | Composicao de indice com pesos de relevancia (IBOV: 79 membros, IFIX: 107) |
-| `GET /stock/v1/logo/{symbol}` | Logo PNG do instrumento (2-4KB) |
-| `GET /stock/v1/fields` | Todos os campos com nome, tipo, descricao (83KB) |
-| `POST /funds/v1/search` + `GET /funds/v1/{id}` | Fundos de investimento: rentabilidade, taxas, CNPJ, ANBIMA, gestor |
-| `POST /fit/v1/table` + `GET /fit/v1/filter/{id}` | Screener/triagem de acoes com filtros salvos na conta |
-| `GET /marketplace/v1/products` | Produtos complementares do marketplace |
-| `POST /news/v2/headlines` | Headlines v2 (100/pagina, mesmo schema) |
-| `POST /authentication/v1/permissions` | 429 permissoes da conta por produto/servico/exchange |
-| WS `startStreamBook` | Book de ofertas em tempo real |
-| WS `startStreamMarket` | Estatisticas de mercado em tempo real |
+| Endpoint Plus | Funcao | Descricao |
+|---|---|---|
+| `GET /stock/v1/indexes/{index}` | `bindex_members(index)` | Composicao de indice com pesos de relevancia (IBOV: 79 membros, IFIX: 107) |
+| `GET /stock/v1/logo/{symbol}` | `blogo(symbol)` | Logo PNG do instrumento (2-4KB) |
+| `POST /funds/v1/search` | `bfunds(query)` | Busca de fundos por nome (min. 3 chars) — rentabilidade, taxas, CNPJ, ANBIMA |
+| `GET /funds/v1/{id}` | `bfund(fund_id)` | Detalhe de fundo por id numerico |
+| `GET /news/v1/sections` | `bsections()` | Catalogo de 121 secoes de noticias |
+| `POST /news/v1/headlines` | `bheadlines(sections, count)` | Manchetes paginadas com tagging rico |
+| `GET /news/v1/content/{id}` | `bnews_content(content_id)` | Corpo HTML + tagging (autores, entidades, topicos, localizacoes) |
+| WS `startStreamMarket` | `BroadcastPlusClient.subscribe_market(market_ids, callback)` | Tabelas ao vivo da Bovespa: maiores altas/baixas, volume, Ibovespa |
+| WS `startStreamBook` | — | Book de ofertas — bloqueado por permissao de conta; nao implementado |
+| `GET /stock/v1/fields` | — | Todos os campos com nome, tipo, descricao (83KB) |
+| `POST /fit/v1/table` + `GET /fit/v1/filter/{id}` | — | Screener/triagem de acoes com filtros salvos na conta |
+| `GET /marketplace/v1/products` | — | Produtos complementares do marketplace |
+| `POST /news/v2/headlines` | — | Headlines v2 (100/pagina, mesmo schema) |
+| `POST /authentication/v1/permissions` | — | 429 permissoes da conta por produto/servico/exchange |
+
+Todas as funcoes Plus tem twin async com prefixo `a` (ex.: `abinfo`, `abindex_members`, `abfunds`, `abcorpevents`) disponivel em `py_bcast.async_api`.
 
 ---
 
@@ -84,3 +90,5 @@ Funcionalidades que existem apenas no Terminal Antigo e nao tem plano de suporte
 | Configuracao headless | — | `configure(plus_login=..., plus_password=...)` |
 | Dados historicos | `bdh()`, `bdi()`, `bdt()` | Historico bloqueado (bh_88063), T&T via `timesAndTrades` |
 | Banco de instrumentos | `aetp_17.dat` (623K, local) | Lookup via `quote/symbol` (online) |
+| Market stats streaming | Nao | `subscribe_market` em `BroadcastPlusClient` |
+| Book streaming | Nao | Bloqueado (permissao de conta ausente) |

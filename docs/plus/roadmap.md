@@ -1,6 +1,6 @@
 # Roadmap — Terminal Novo (Broadcast+.exe)
 
-Backlog de adapters e funcionalidades a implementar para o backend Plus. Endpoints todos confirmados via probe HTTP com JWT valido (2026-05-25/27).
+Backlog de adapters e funcionalidades para o backend Plus. Endpoints confirmados via probe HTTP com JWT valido (2026-05-25/27); adapters verificados ao vivo em 2026-06-10.
 
 Ver [`endpoints.md`](./endpoints.md) para o catalogo completo de endpoints com status.
 Ver [`limitations.md`](./limitations.md) para blockers conhecidos.
@@ -11,104 +11,40 @@ Ver [`limitations.md`](./limitations.md) para blockers conhecidos.
 
 | Funcao | Modulo | Endpoint |
 |--------|--------|----------|
-| `BroadcastPlusClient` | `_plus/realtime.py` | WS `/stock/ws` — quote streaming com auth refresh, ping/pong, reconnect |
-| `BroadcastPlusAsyncClient` | `_plus/realtime_async.py` | Twin asyncio do `BroadcastPlusClient` (lib `websockets`, sem threads) |
+| `BroadcastPlusClient` | `_plus/realtime.py` | WS `/stock/ws` — quote streaming, market stats, auth refresh, ping/pong, reconexao |
+| `BroadcastPlusAsyncClient` | `_plus/realtime_async.py` | Twin asyncio do `BroadcastPlusClient` |
 | `btrades(ticker, date)` | `_plus/intraday.py` | `POST /stock/v1/timesAndTrades` — ultimos 500 trades |
-| `abtrades(ticker, date)` | `_async/plus.py` (via `py_bcast.async_api`) | Twin async do `btrades` — mesma assinatura e retorno |
+| `abtrades(ticker, date)` | `_async/plus.py` (via `py_bcast.async_api`) | Twin async do `btrades` |
+| `binfo(symbols)` | `_plus/reference.py` | `POST /stock/v1/quote/symbol` — metadata de instrumento (nunca preco) |
+| `bindexes()` | `_plus/reference.py` | `GET /stock/v1/indexes` — lista de codigos de indices |
+| `bindex_members(index)` | `_plus/reference.py` | `GET /stock/v1/indexes/{index}` — composicao com pesos |
+| `blogo(symbol)` | `_plus/reference.py` | `GET /stock/v1/logo/{symbol}` — bytes PNG do logo |
+| `bholidays()` | `_plus/reference.py` | `GET /stock/v1/calendar/tables` — catalogo de tabelas de feriados |
+| `bfunds(query)` | `_plus/funds.py` | `POST /funds/v1/search` — busca de fundos (min. 3 chars) |
+| `bfund(id)` | `_plus/funds.py` | `GET /funds/v1/{id}` — detalhe de fundo por id numerico |
+| `bsections()` | `_plus/news.py` | `GET /news/v1/sections` — 121 secoes de noticias |
+| `bheadlines(sections, count)` | `_plus/news.py` | `POST /news/v1/headlines` — manchetes paginadas |
+| `bnews_content(id)` | `_plus/news.py` | `GET /news/v1/content/{id}` — corpo HTML + tagging |
+| `bcorpevents(symbol)` | `_plus/corporate.py` | `POST /stock/v1/corporateevents/{symbol}` — eventos corporativos com fatores de ajuste |
 | `bsearch()` (routing Plus) | `instruments/db.py` | `POST /stock/v1/quote/symbol/search` |
 | `get_plus_token()` / `discover_plus_token()` | `_plus/session.py` | Auth chain ECDH + memory scan + refresh |
 | `plus_request()` | `_plus/_async/transport.py` (fonte) -> `_plus/_sync/transport.py` (gerado) | Helper REST com 401-refresh automatico |
 
-Ainda nao implementadas as acoes WS de **book** (`startStreamBook`) e **market stats** (`startStreamMarket`); apenas `startStreamQuote` esta exposto.
+**Market streaming:** `subscribe_market(market_ids, callback)` e `unsubscribe_market(...)` sao metodos de `BroadcastPlusClient` e `BroadcastPlusAsyncClient`. Tabelas fixas da Bovespa: 0 maiores altas (a vista), 1 maiores baixas (a vista), 2 maiores altas (indice), 3 maiores baixas (indice), 4 mais negociadas por volume financeiro, 5 volume negociado, 6 evolucao do Ibovespa.
+
+**Book streaming:** `startStreamBook` responde `success: false` para esta conta — sem a permissao "BOOK" nas 429 permissoes da assinatura. Nao implementado; limitacao de plano.
 
 ---
 
-## Prioridade Alta — Funcionalidades Essenciais
+## Bloqueado ou Parametros Nao Descobertos
 
-### 1. `bquote_plus(symbols)` — Metadata de Instrumento
-
-**Modulo:** `src/py_bcast/_plus/quotes.py`
-**Endpoint:** `POST /stock/v1/quote/symbol`
-
-Retorna metadata do instrumento (nome, tipo, exchange, flags, cvmCode). Nao retorna preco — preco e exclusivamente via WebSocket.
-
-Schema de request/response: [`internals.md §8.1`](./internals.md)
-
-### 2. Streaming de Book e Market Stats
-
-**Modulo:** `src/py_bcast/_plus/realtime.py` (extensao do `BroadcastPlusClient`)
-
-Acoes WS adicionais ainda nao expostas:
-- `startStreamBook` / `stopStreamBook` — book de ofertas
-- `startStreamMarket` / `stopStreamMarket` — estatisticas agregadas de mercado
-
----
-
-## Prioridade Media — Dados de Referencia e Conteudo
-
-### 4. `bnews_plus(sections, count)` + `bnews_content_plus(id)` — Noticias
-
-**Modulo:** `src/py_bcast/_plus/news.py`
-**Endpoints:**
-- `POST /news/v1/headlines` — headlines paginadas
-- `GET /news/v1/content/{id}` — conteudo completo com tagging
-
-Diferenca vs Legacy: o Plus inclui `tagging` rico (autores, entidades, topicos, localizacoes, sentimento). A CentralMultimidia legada nao tem tagging estruturado.
-
-### 5. `bindices_plus()` + `bindex_composition_plus(index)` — Indices
-
-**Modulo:** `src/py_bcast/_plus/reference.py`
-**Endpoints:**
-- `GET /stock/v1/indexes` — lista de codigos de indices
-- `GET /stock/v1/indexes/{index}` — composicao com pesos de relevancia
-
-A composicao de indices e uma capacidade **nova** sem equivalente no Terminal Antigo.
-
-### 6. `bcalendar_plus()` — Feriados
-
-**Modulo:** `src/py_bcast/_plus/reference.py`
-**Endpoints:**
-- `GET /stock/v1/calendar` — calendario de feriados por pais
-- `GET /stock/v1/calendar/tables` — 49 tabelas
-
-### 7. `bdividends_plus(symbol)` — Eventos Corporativos
-
-**Modulo:** `src/py_bcast/_plus/corporate.py`
-**Endpoint:** `POST /stock/v1/corporateevents/{symbol}`
-
-Retorna JCP, dividendos, splits com fatores de ajuste (`addFactor`, `calculatedFactor`, `multiplicativeFactor`). O schema Plus e diferente do legado — inclui fatores de ajuste que o legado nao tem.
-
----
-
-## Prioridade Baixa — Capacidades Plus-Exclusive
-
-### 8. `bfunds_plus(query)` + `bfund_plus(id)` — Fundos de Investimento
-
-**Modulo:** `src/py_bcast/_plus/funds.py`
-**Endpoints:**
-- `POST /funds/v1/search` — busca por nome (minimo 3 chars)
-- `GET /funds/v1/{id}` — detalhes pelo ID numerico
-
-Sem equivalente no Terminal Antigo. Schema completo: [`internals.md §8.4`](./internals.md)
-
-Retorna: rentabilidade (diaria, mensal, anual, 2a, 3a, 5a), taxas, patrimonio, cota, categorias ANBIMA, CNPJ, gestor, administrador.
-
-### 9. `blogo_plus(symbol)` — Logo do Instrumento
-
-**Modulo:** a definir
-**Endpoint:** `GET /stock/v1/logo/{symbol}`
-
-Retorna PNG binario. Content-Type: `image/png`. Sem equivalente no Terminal Antigo.
-
----
-
-## A Confirmar (Endpoint Existe, Params Nao Testados)
-
-| Endpoint | Descricao | Proximo Passo |
-|----------|-----------|---------------|
-| `POST /stock/v1/historical/tickbytick/symbol` | Tick-by-tick historico | Testar com `Symbol` + `Resolution` no body — pode ter mesma restricao de plano que o historico OHLCV |
-| `POST /stock/v1/calendar/holidays` | Feriados de uma tabela/ano | Mapear parametros obrigatorios |
-| `POST /fit/v1/table` | Screener configurado via UI | Verificar schema de filtros customizados |
+| Funcionalidade | Endpoint | Motivo |
+|----------------|----------|--------|
+| Historico OHLCV | `POST /stock/v1/historical/symbol` | Restricao de assinatura — erro bh_88063 |
+| Tick-by-tick historico | `POST /stock/v1/historical/tickbytick/symbol` | Mesma restricao bh_88063 |
+| Book de ofertas | WS `startStreamBook` | Sem permissao "BOOK" na conta (429 permissoes, nenhuma e BOOK) |
+| Feriados por tabela | `POST /stock/v1/calendar/holidays` | Parametro de filtro nao descoberto — 27 variantes de payload testadas, servidor ignora todos os filtros e responde "Nenhum filtro de tabela de feriados aplicado." |
+| Screener FIT | `POST /fit/v1/table` | Retorna estrutura vazia sem filtro configurado na UI do terminal; sem adapter |
 
 ---
 

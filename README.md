@@ -17,13 +17,21 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 
 **Terminal Novo (`Broadcast+.exe`)**
 - **Real-time streaming** via WebSocket (`BroadcastPlusClient` / asyncio `BroadcastPlusAsyncClient`) com auth refresh transparente
+- **Market stats streaming** — `subscribe_market` transmite tabelas ao vivo da Bovespa: maiores altas/baixas, volume financeiro, evolucao do Ibovespa
+- **Instrument metadata** (`binfo`) — nome, tipo, exchange, flags, CVM code; nunca retorna preco (preco exclusivo via WebSocket)
 - **Times & trades** (`btrades`) — ultimos 500 trades em fuso `America/Sao_Paulo`
+- **Index composition** (`bindexes` + `bindex_members`) — lista de indices e composicao com pesos de relevancia; sem equivalente no terminal antigo
+- **Instrument logo** (`blogo`) — bytes PNG do logo; sem equivalente no terminal antigo
+- **Corporate events with adjustment factors** (`bcorpevents`) — dividendos, JCP, splits + `add_factor`, `calculated_factor`, `multiplicative_factor` que o `bdividends` legado nao expoe
+- **Investment funds** (`bfunds` / `bfund`) — busca e detalhe: rentabilidade, taxas, CNPJ, ANBIMA; sem equivalente no terminal antigo
+- **News (Plus feed)** (`bsections` + `bheadlines` + `bnews_content`) — 121 secoes, manchetes paginadas, corpo HTML + tagging estruturado (autores, entidades, topicos, localizacoes)
+- **Holiday catalog** (`bholidays`) — catalogo de tabelas de feriados por pais/bolsa
 - **Headless login** via ECDH P-384 + AES-GCM (`configure(plus_login=..., plus_password=...)`)
 - **Token discovery** — memory scan do `Broadcast+.exe` ou `BROADCAST_PLUS_TOKEN` env var
 
 **Compartilhado entre os backends**
 - **Routing automatico** — `configure(terminal="auto"|"legacy"|"plus")`; `bsearch()` ja roteia
-- **Async API** — `async_api` namespace com versoes async de todas as funcoes HTTP
+- **Async API** — `async_api` namespace com versoes async de todas as funcoes HTTP (prefixo `a`: `abinfo`, `abindex_members`, `abfunds`, `abcorpevents`, `abheadlines`, etc.)
 - **Caching** — memoria (default) e disco (`diskcache`) com TTL configuravel
 - **Rate limiting** — token-bucket e connection pooling
 - Proper Python package com `src/` layout, type annotations, Pydantic validation, structured logging
@@ -90,7 +98,15 @@ with BroadcastClient() as bc:
 ### Terminal Novo (`Broadcast+.exe`)
 
 ```python
-from py_bcast import BroadcastPlusClient, btrades, bsearch, configure
+from py_bcast import (
+    BroadcastPlusClient,
+    binfo, bindexes, bindex_members, blogo,
+    bfunds, bfund,
+    bsections, bheadlines, bnews_content,
+    bcorpevents, bholidays,
+    btrades, bsearch,
+    configure,
+)
 
 # Headless: define BROADCAST_PLUS_TOKEN no ambiente, ou:
 configure(plus_login="user@example.com", plus_password="...")
@@ -98,20 +114,55 @@ configure(plus_login="user@example.com", plus_password="...")
 # Forca o backend Plus (ou deixa "auto" para detectar Broadcast+.exe rodando)
 configure(terminal="plus")
 
+# Metadata de instrumento (nunca preco — preco exclusivo via WebSocket)
+df = binfo(["PETR4", "USDBRL"])
+print(df[["name", "type", "currency"]])
+
+# Indices disponiveis e composicao com pesos
+print(bindexes()["index"].tolist())
+df = bindex_members("IBOV")
+print(df.sort_values("relevance", ascending=False).head())
+
+# Logo PNG
+open("petr4.png", "wb").write(blogo("PETR4"))
+
+# Fundos de investimento
+hits = bfunds("Verde")
+print(hits[["id", "company", "profit_1y"]].head())
+detail = bfund(hits["id"].iloc[0])
+
+# Noticias Plus (secoes, manchetes, conteudo)
+sections = bsections()
+headlines = bheadlines(sections["id"].iloc[0], count=10)
+article = bnews_content(headlines["id"].iloc[0])
+print(article["title"], article["tagging"]["entities"])
+
+# Eventos corporativos com fatores de ajuste
+df = bcorpevents("PETR4")
+print(df[["type", "effective_date", "calculated_factor"]])
+
+# Catalogo de feriados (datas por tabela indisponiveis — param nao descoberto)
+print(bholidays()[["id", "name"]])
+
+# Times & trades intraday
+trades = btrades("PETR4", "20260525")
+print(trades[["last", "size", "tendency"]].head())
+
 # Instrument search via API
 df = bsearch("PETR", max_results=5)
 print(df[["ticker", "name", "exchange", "has_intraday"]])
 
-# Times & trades intraday (DataFrame com DatetimeIndex em America/Sao_Paulo)
-trades = btrades("PETR4", "20260525")
-print(trades[["last", "size", "tendency"]].head())
-
-# Streaming WebSocket
+# Quote streaming
 def on_quote(data: dict) -> None:
     print(data["COD"], data["ULT"], data["VAR"])
 
+# Market stats streaming (tabelas ao vivo da Bovespa)
+def on_market(data: dict) -> None:
+    print(data["header"], data["rows"][:2])
+
 with BroadcastPlusClient() as client:
     client.subscribe(["PETR4", "VALE3"], callback=on_quote)
+    client.subscribe_market([0, 1], callback=on_market)  # maiores altas/baixas
     client.run(duration=60)
 ```
 
@@ -198,8 +249,12 @@ src/py_bcast/
 │   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login
 │   ├── crypto.py       # ECDH P-384 + AES-GCM-256 (matching app.asar buildEncryptedResult)
 │   ├── http.py         # Plus httpx client singletons (sync + async) + auth headers
-│   ├── realtime.py     # BroadcastPlusClient (WebSocket /stock/ws)
+│   ├── realtime.py     # BroadcastPlusClient (WebSocket /stock/ws) — quotes + market stats
 │   ├── intraday.py     # btrades() facade — POST /stock/v1/timesAndTrades
+│   ├── reference.py    # binfo, bindexes, bindex_members, blogo, bholidays
+│   ├── funds.py        # bfunds, bfund — POST /funds/v1/search, GET /funds/v1/{id}
+│   ├── news.py         # bsections, bheadlines, bnews_content
+│   ├── corporate.py    # bcorpevents — POST /stock/v1/corporateevents/{symbol}
 │   ├── _async/         # Plus I/O SOURCE (async-first): plus_request, trades core
 │   └── _sync/          # Plus I/O GENERATED from _async/ by scripts/gen_sync.py — do not edit
 ├── _async/             # Async versions of all legacy HTTP data functions

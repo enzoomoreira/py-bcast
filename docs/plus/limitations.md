@@ -21,11 +21,43 @@ O endpoint existe e aceita os parametros corretamente, mas retorna sempre:
 }
 ```
 
-**Diagnostico:** testadas 14+ variacoes de parametros (`Resolution`, `StartDate`, `EndDate`, `Adjusted`, `Type`, `Fields`, `Count`, etc.). Todos retornam o mesmo erro. O codigo `bh_88063` sugere que o plano da conta nao inclui acesso a historico OHLCV — a "data de inicio do historico" nunca e configurada para esta assinatura.
+**Diagnostico:** testadas 14+ variacoes de parametros (`Resolution`, `StartDate`, `EndDate`, `Adjusted`, `Type`, `Fields`, `Count`, etc.). Todos retornam o mesmo erro. O codigo `bh_88063` indica que o plano da conta nao inclui acesso a historico OHLCV.
 
-**Nao e um problema de parametros — provavelmente restricao de assinatura.**
+**Nao e um problema de parametros — restricao de assinatura.**
 
-**Alternativa:** continuar usando `bdh()` / `bdi()` via ContentProxy legado, que funciona corretamente e nao tem essa restricao.
+**Alternativa:** continuar usando `bdh()` / `bdi()` via ContentProxy legado.
+
+---
+
+## Tick-by-tick Historico Bloqueado (bh_88063)
+
+**Endpoint:** `POST /stock/v1/historical/tickbytick/symbol`
+
+Mesma restricao do historico OHLCV — o endpoint retorna o erro `bh_88063` independente dos parametros. Restricao de assinatura, nao de parametros.
+
+---
+
+## Book de Ofertas Bloqueado (sem permissao de conta)
+
+**Acao WS:** `startStreamBook` / `stopStreamBook`
+
+O `startStreamBook` responde `success: false` para esta conta. A causa e verificavel via `POST /authentication/v1/permissions`: das 429 permissoes retornadas, nenhuma contem a string `"BOOK"`. O book de ofertas e um modulo de assinatura separado nao incluso no plano atual.
+
+**Nao e um problema de implementacao — e limitacao de plano, identica ao bloqueio do historico OHLCV.**
+
+Se o plano for ampliado para incluir book, o adapter pode ser adicionado a `BroadcastPlusClient` (e ao twin async) sem alteracoes de protocolo.
+
+---
+
+## Feriados por Tabela — Parametro de Filtro Nao Descoberto
+
+**Endpoint:** `POST /stock/v1/calendar/holidays`
+
+O endpoint aceita qualquer body sem erro HTTP, mas ignora todos os filtros testados — responde sempre "Nenhum filtro de tabela de feriados aplicado." Foram testadas 27 variantes de payload incluindo todas as combinacoes de `tableId`, `TableId`, `id`, `Id`, `year`, `Year`, `table`, `Table`, `calendarId`, `code`, e variantes com e sem outros campos.
+
+**Consequencia:** `bholidays()` expoe apenas o catalogo de tabelas (`GET /stock/v1/calendar/tables`). As datas de feriados em si nao estao acessiveis ate que o parametro de filtro correto seja descoberto.
+
+**Status:** parametro a revisitar em versoes futuras ou quando documentacao oficial estiver disponivel.
 
 ---
 
@@ -65,7 +97,7 @@ O JWT e o refreshToken do Broadcast+ **nao sao persistidos em disco** pelo termi
 
 O WebSocket `/stock/ws` e `/news/ws` encerram a conexao se o cliente nao enviar ping a cada 10 segundos (`webSocketKeepAliveInterval = 10000`).
 
-**Consequencia:** o `BroadcastPlusClient` (a implementar) precisa gerenciar um loop de keepalive (`{"action": "ping"}` / `{"action": "pong"}`) ativo enquanto a conexao estiver aberta.
+O `BroadcastPlusClient` e o `BroadcastPlusAsyncClient` gerenciam automaticamente o loop de keepalive (`{"action": "ping"}` / `{"action": "pong"}`) enquanto a conexao estiver aberta — nenhuma acao adicional e necessaria por parte do chamador.
 
 ---
 
@@ -73,7 +105,7 @@ O WebSocket `/stock/ws` e `/news/ws` encerram a conexao se o cliente nao enviar 
 
 O servidor WebSocket pode enviar `{"action": "requireUpdateToken"}` quando o JWT esta proximo de expirar. O cliente precisa responder com `{"action": "updateToken", "token": "<novo_JWT>"}`.
 
-**Consequencia:** o `BroadcastPlusClient` precisa lidar com o ciclo de refresh de token dentro da conexao WebSocket, nao apenas no inicio.
+O `BroadcastPlusClient` e o `BroadcastPlusAsyncClient` tratam esse ciclo automaticamente: ao receber `requireUpdateToken`, chamam `refresh_plus_token()` e enviam o novo JWT sem interromper o stream.
 
 ---
 
