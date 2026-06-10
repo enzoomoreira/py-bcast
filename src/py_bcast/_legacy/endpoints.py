@@ -8,6 +8,8 @@ Endpoints are migrated family by family; this module grows as each lands.
 from __future__ import annotations
 
 from .columns import (
+    CALENDAR_FIELDS,
+    CALENDAR_SCHEMA,
     CDI_SCHEMA,
     COMPANY_DETAIL_FIELDS,
     COMPANY_LIST_FIELDS,
@@ -15,6 +17,10 @@ from .columns import (
     CONSENSUS_FIELDS,
     CONSENSUS_SCHEMA,
     CONTENT_PROXY_RENAME,
+    DIVIDEND_FIELDS,
+    DIVIDEND_SCHEMA,
+    DY_FIELDS,
+    DY_SCHEMA,
     INDEX_FIELDS,
     INDEX_SCHEMA,
     INDICATOR_HISTORY_FIELDS,
@@ -23,6 +29,9 @@ from .columns import (
     INDICATOR_META_SCHEMA,
     INFLATION_SCHEMA,
     MACRO_SCHEMA,
+    PORTFOLIO_FIELDS,
+    PORTFOLIO_LIST_FIELDS,
+    PORTFOLIO_LIST_SCHEMA,
     RETURN_SCHEMA,
     SECTOR_FIELDS,
     SECTOR_SCHEMA,
@@ -146,6 +155,107 @@ SPEC_BSHARES = EndpointSpec(
     empty_ok=False,
     params=(ParamBind("ticker", "10068", "none"),),
     vectorize_over="ticker",
+)
+
+# ── fundamental events (aetp) ─────────────────────────────────────────────
+# bcalendar — corporate-events calendar over a date window. Single request.
+SPEC_BCALENDAR = EndpointSpec(
+    transport="aetp",
+    path="fundamental/calendario-eventos-corporativos",
+    index=Index.RANGE,
+    rename=CALENDAR_FIELDS,
+    schema=CALENDAR_SCHEMA,
+    params=(
+        ParamBind("start_date", "10057", "date"),
+        ParamBind("end_date", "10058", "date"),
+    ),
+)
+
+# bdividends — dividend/JCP history. The ticker lands in two tags: 13004 (its
+# CVM, resolved) and 10068 (the literal symbol). The endpoint does not echo a
+# ticker, so the vectorizer inserts the queried one. BYCVM is the wrapper's
+# override path: a caller-supplied CVM is stamped straight into 13004 (no
+# resolution), honored only for a single ticker.
+SPEC_BDIVIDENDS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/eventos/jcp-dividendos",
+    index=Index.RANGE,
+    rename=DIVIDEND_FIELDS,
+    schema=DIVIDEND_SCHEMA,
+    params=(
+        ParamBind("ticker", "13004", "cvm"),
+        ParamBind("ticker", "10068", "none"),
+    ),
+    vectorize_over="ticker",
+)
+
+SPEC_BDIVIDENDS_BYCVM = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/eventos/jcp-dividendos",
+    index=Index.RANGE,
+    rename=DIVIDEND_FIELDS,
+    schema=DIVIDEND_SCHEMA,
+    params=(
+        ParamBind("cvm_code", "13004", "none"),
+        ParamBind("ticker", "10068", "none"),
+    ),
+    vectorize_over="ticker",
+)
+
+# bdy — dividend-yield series over a date window (10029=1 selects the series).
+# Same dual ticker tags + BYCVM override as bdividends. RangeIndex is preserved
+# (the docstring says DatetimeIndex but the code uses RangeIndex; fixing that
+# is a separate behavior-change pass, not this migration).
+SPEC_BDY = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/eventos/dividend-yield",
+    index=Index.RANGE,
+    rename=DY_FIELDS,
+    schema=DY_SCHEMA,
+    static_params={"10029": "1"},
+    params=(
+        ParamBind("ticker", "13004", "cvm"),
+        ParamBind("ticker", "10068", "none"),
+        ParamBind("start_date", "10057", "date"),
+        ParamBind("end_date", "10058", "date"),
+    ),
+    vectorize_over="ticker",
+)
+
+SPEC_BDY_BYCVM = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/eventos/dividend-yield",
+    index=Index.RANGE,
+    rename=DY_FIELDS,
+    schema=DY_SCHEMA,
+    static_params={"10029": "1"},
+    params=(
+        ParamBind("cvm_code", "13004", "none"),
+        ParamBind("ticker", "10068", "none"),
+        ParamBind("start_date", "10057", "date"),
+        ParamBind("end_date", "10058", "date"),
+    ),
+    vectorize_over="ticker",
+)
+
+# bportfolios — brokers that publish model portfolios. Single request.
+SPEC_BPORTFOLIOS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/carteira-recomendada/corretoras",
+    index=Index.RANGE,
+    rename=PORTFOLIO_LIST_FIELDS,
+    schema=PORTFOLIO_LIST_SCHEMA,
+)
+
+# bportfolio — one broker's latest recommended portfolios. Fail-fast; echoes
+# 10068 -> ticker (the held stock), so it is single-shot (no vectorize).
+SPEC_BPORTFOLIO = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/carteira-recomendada/ultima",
+    index=Index.RANGE,
+    rename=PORTFOLIO_FIELDS,
+    empty_ok=False,
+    params=(ParamBind("broker_id", "10087", "none"),),
 )
 
 # ── macro / fixed-income (ContentProxy cp_ticks) ──────────────────────────
