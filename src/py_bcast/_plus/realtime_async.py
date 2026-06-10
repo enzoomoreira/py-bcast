@@ -30,6 +30,7 @@ from .realtime import (
     _PING_INTERVAL,
     _RECONNECT_DELAY,
     _WS_URL,
+    _ensure_int_list,
 )
 from .session import get_plus_token, refresh_plus_token
 
@@ -84,6 +85,10 @@ class BroadcastPlusAsyncClient:
         self._subscriptions: dict[str, Callable[[dict[str, Any]], Any]] = {}
         self._global_callback: Callable[[dict[str, Any]], Any] | None = None
         self._extra_fields: list[str] = []
+
+        # market-table subscription state (set of ids + one shared callback)
+        self._market_ids: set[int] = set()
+        self._market_callback: Callable[[dict[str, Any]], Any] | None = None
 
         self._reconnect_count = 0
 
@@ -144,6 +149,53 @@ class BroadcastPlusAsyncClient:
         self._subscriptions.clear()
         if tickers and self._auth_ok and self._ws:
             await self._send({"action": "stopStreamQuote", "symbols": tickers})
+
+    async def subscribe_market(
+        self,
+        market_ids: int | list[int],
+        callback: Callable[[dict[str, Any]], Any],
+    ) -> None:
+        """Subscribe to live market-statistics tables (top gainers/losers, etc.).
+
+        Async twin of :meth:`BroadcastPlusClient.subscribe_market`. The
+        available ids are fixed by the server (Bovespa): 0 top gainers (cash),
+        1 top losers (cash), 2 top gainers (index), 3 top losers (index), 4 most
+        traded by financial volume, 5 traded volume, 6 Ibovespa evolution.
+
+        A single ``callback`` (sync function or coroutine function) receives
+        every subscribed table's updates; route by the payload's ``header`` /
+        ``type`` rather than by id (the server does not echo the numeric id on
+        every push).
+
+        Args:
+            market_ids: One id or a list (e.g. 0 or [0, 1]).
+            callback:   Called on each table update with a dict carrying
+                        ``header``, ``columns``, ``rows`` (numeric cells parsed
+                        to float), and ``type``/``id``.
+        """
+        ids = _ensure_int_list(market_ids)
+        self._market_ids.update(ids)
+        self._market_callback = callback
+        if self._auth_ok and self._ws:
+            for mid in ids:
+                await self._send(
+                    {"action": "startStreamMarket", "id": mid, "requestId": str(mid)}
+                )
+
+    async def unsubscribe_market(
+        self, market_ids: int | list[int] | None = None
+    ) -> None:
+        """Unsubscribe from market tables. None unsubscribes from all of them."""
+        ids = (
+            list(self._market_ids)
+            if market_ids is None
+            else _ensure_int_list(market_ids)
+        )
+        for mid in ids:
+            self._market_ids.discard(mid)
+        if ids and self._auth_ok and self._ws:
+            for mid in ids:
+                await self._send({"action": "stopStreamMarket", "id": mid})
 
     async def run(self, duration: float | None = None) -> None:
         """Connect and stream until ``duration`` seconds elapse or stop() is called.
@@ -287,6 +339,32 @@ class BroadcastPlusAsyncClient:
                 except Exception as exc:
                     logger.warning("BroadcastPlusAsyncClient: callback raised: %s", exc)
 
+        elif action == "streamMarket":
+            data = msg.get("data") or {}
+            if not data:
+                return
+            rows = data.get("rows")
+            if isinstance(rows, list):
+                # Cells arrive BR-formatted ("0,11", "17.499"); parse numerics
+                # to float, leave codes/times as strings.
+                data = {
+                    **data,
+                    "rows": [
+                        [parse_br_number(c) if isinstance(c, str) else c for c in row]
+                        for row in rows
+                    ],
+                }
+            cb = self._market_callback
+            if cb:
+                try:
+                    result = cb(data)
+                    if inspect.isawaitable(result):
+                        await result
+                except Exception as exc:
+                    logger.warning(
+                        "BroadcastPlusAsyncClient: market callback raised: %s", exc
+                    )
+
         elif action == "requireUpdateToken":
             logger.info("BroadcastPlusAsyncClient: token refresh requested by server.")
             try:
@@ -330,6 +408,10 @@ class BroadcastPlusAsyncClient:
         if self._extra_fields:
             await self._send(
                 {"action": "addFields", "fields": self._extra_fields, "symbols": None}
+            )
+        for mid in list(self._market_ids):
+            await self._send(
+                {"action": "startStreamMarket", "id": mid, "requestId": str(mid)}
             )
 
     async def _send(self, payload: dict[str, Any]) -> None:

@@ -60,6 +60,13 @@ _MAX_RECONNECTS = 3
 _RECONNECT_DELAY = 2  # seconds (doubled each attempt)
 
 
+def _ensure_int_list(market_ids: int | list[int]) -> list[int]:
+    """Coerce a single market id or a list of ids to a list of ints."""
+    if isinstance(market_ids, int):
+        return [market_ids]
+    return [int(m) for m in market_ids]
+
+
 class BroadcastPlusClient:
     """Real-time market data streaming via Broadcast+ WebSocket.
 
@@ -101,6 +108,11 @@ class BroadcastPlusClient:
         self._subscriptions: dict[str, Callable[[dict[str, Any]], None]] = {}
         self._global_callback: Callable[[dict[str, Any]], None] | None = None
         self._extra_fields: list[str] = []
+
+        # market-table subscription state (set of ids + one shared callback)
+        self._market_ids: set[int] = set()
+        self._market_callback: Callable[[dict[str, Any]], None] | None = None
+
         self._lock = threading.Lock()
 
         self._reconnect_count = 0
@@ -165,6 +177,54 @@ class BroadcastPlusClient:
             self._subscriptions.clear()
         if tickers and self._auth_ok and self._ws:
             self._send({"action": "stopStreamQuote", "symbols": tickers})
+
+    def subscribe_market(
+        self,
+        market_ids: int | list[int],
+        callback: Callable[[dict[str, Any]], None],
+    ) -> None:
+        """Subscribe to live market-statistics tables (top gainers/losers, etc.).
+
+        Unlike quotes (one tick per symbol), each market id streams a whole
+        table that refreshes in place. The available ids are fixed by the
+        server (Bovespa): 0 top gainers (cash), 1 top losers (cash), 2 top
+        gainers (index), 3 top losers (index), 4 most traded by financial
+        volume, 5 traded volume, 6 Ibovespa evolution.
+
+        A single ``callback`` receives every subscribed table's updates — the
+        server does not echo the numeric id on every push, so route by the
+        ``header`` / ``type`` fields in the payload rather than by id.
+
+        Args:
+            market_ids: One id or a list (e.g. 0 or [0, 1]).
+            callback:   Called on each table update with a dict carrying
+                        ``header`` (title), ``columns`` (column names), ``rows``
+                        (list of rows, numeric cells parsed to float), and
+                        ``type``/``id`` identifying the table.
+        """
+        ids = _ensure_int_list(market_ids)
+        with self._lock:
+            self._market_ids.update(ids)
+            self._market_callback = callback
+        if self._auth_ok and self._ws:
+            for mid in ids:
+                self._send(
+                    {"action": "startStreamMarket", "id": mid, "requestId": str(mid)}
+                )
+
+    def unsubscribe_market(self, market_ids: int | list[int] | None = None) -> None:
+        """Unsubscribe from market tables. None unsubscribes from all of them."""
+        with self._lock:
+            ids = (
+                list(self._market_ids)
+                if market_ids is None
+                else _ensure_int_list(market_ids)
+            )
+            for mid in ids:
+                self._market_ids.discard(mid)
+        if ids and self._auth_ok and self._ws:
+            for mid in ids:
+                self._send({"action": "stopStreamMarket", "id": mid})
 
     def run(self, duration: float | None = None) -> None:
         """Start streaming and block until duration seconds or stop() is called.
@@ -294,6 +354,31 @@ class BroadcastPlusClient:
                 except Exception as exc:
                     logger.warning("BroadcastPlusClient: callback raised: %s", exc)
 
+        elif action == "streamMarket":
+            data = msg.get("data") or {}
+            if not data:
+                return
+            rows = data.get("rows")
+            if isinstance(rows, list):
+                # Cells arrive BR-formatted ("0,11", "17.499"); parse numerics
+                # to float, leave codes/times as strings.
+                data = {
+                    **data,
+                    "rows": [
+                        [parse_br_number(c) if isinstance(c, str) else c for c in row]
+                        for row in rows
+                    ],
+                }
+            with self._lock:
+                cb = self._market_callback
+            if cb:
+                try:
+                    cb(data)
+                except Exception as exc:
+                    logger.warning(
+                        "BroadcastPlusClient: market callback raised: %s", exc
+                    )
+
         elif action == "requireUpdateToken":
             logger.info("BroadcastPlusClient: token refresh requested by server.")
             try:
@@ -376,11 +461,16 @@ class BroadcastPlusClient:
         """Re-send startStreamQuote for all active subscriptions after reconnect."""
         with self._lock:
             tickers = list(self._subscriptions.keys())
+            market_ids = list(self._market_ids)
         if tickers:
             self._send({"action": "startStreamQuote", "symbols": tickers})
         if self._extra_fields:
             self._send(
                 {"action": "addFields", "fields": self._extra_fields, "symbols": None}
+            )
+        for mid in market_ids:
+            self._send(
+                {"action": "startStreamMarket", "id": mid, "requestId": str(mid)}
             )
 
     def _send(
