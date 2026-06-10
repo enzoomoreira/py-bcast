@@ -457,6 +457,36 @@ holdings = bportfolio(27)
 
 ---
 
+## Credit (HTTP — MarkitOutput2)
+
+### `bcds(entity=None, date=None, cds_type="S", tier=None, docclause=None)`
+
+CDS (credit default swap) term-structure curves from the Markit feed —
+sovereign and corporate credit spreads in basis points.
+
+```python
+from py_bcast import bcds
+
+bcds()                              # entities available on the latest date
+df = bcds("BRASIL")                 # sovereign curve, one row per tenor
+df[["tenor", "spread"]]             # 6M, 1Y, 2Y, 3Y, 4Y, 5Y, 7Y, 10Y
+bcds("Banco do Brasil", cds_type="C")   # corporate curve
+bcds("ALEMANHA", docclause="CR")    # override the automatic ISDA-2014 pick
+```
+
+Returns a flat DataFrame (RangeIndex), one row per tenor, with the spread
+(``spread``), daily/monthly changes, bid/ask, and entity metadata (region,
+sector, currency, recovery, composite and implied ratings). ``date=None``
+resolves to the most recent date the feed carries; the resolved date is in the
+``date`` column. ``entity`` matches the Markit code or the display name,
+case- and accent-insensitively. When an entity lists more than one
+(tier, docclause) pair, the ISDA 2014 (``*14``) clause is picked
+automatically; pass ``tier=``/``docclause=`` to override. Raises
+``NotFoundError`` for an unknown entity; a valid date with no Markit coverage
+returns an empty DataFrame with schema.
+
+---
+
 ## News & Multimedia (HTTP — CentralMultimidia)
 
 No authentication required. Access all Broadcast news (AE-News, Dow Jones, Press Releases, Trading News, podcasts, etc.) via sequential numeric IDs.

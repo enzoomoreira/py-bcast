@@ -10,6 +10,7 @@ A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - Reference data (bindices, bsectors, bquote, btickers, bshares)
 - Broker portfolios (bportfolios, bportfolio)
 - News and multimedia (bnews, bnews_recent, bnews_multimedia)
+- Credit: CDS term-structure curves via Markit (bcds)
 - Instrument database search (bsearch, InstrumentDB)
 
 Quick Start:
@@ -68,6 +69,7 @@ from .instruments import InstrumentDB, bsearch
 from .ticker import Ticker
 from . import accessor as _accessor  # noqa: F401 — registers the .bcast DataFrame accessor
 from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation
+from .credit import bcds
 from .news import bnews, bnews_recent, bnews_multimedia, MULTIMEDIA_CATEGORIES
 from ._legacy.session import discover_session_token, clear_token_cache
 from ._plus.session import discover_plus_token, clear_plus_token_cache
@@ -127,6 +129,7 @@ __all__ = [
     "bportfolios",
     "bportfolio",
     # News / Multimedia
+    "bcds",
     "bnews",
     "bnews_recent",
     "bnews_multimedia",

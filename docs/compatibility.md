@@ -65,6 +65,7 @@ Funcionalidades que existem apenas no Terminal Antigo e nao tem plano de suporte
 | `bvolume()` | `VolumesMedios` | Sem endpoint de volumes medios no Plus |
 | `binflation()` | `Inflacao` | Sem endpoint de indices de inflacao no Plus |
 | `bindicators()` | `IndicadorHistoricoDiario` | Sem endpoint de indicadores fundamentalistas no Plus |
+| `bcds()` | `MarkitOutput2/CDS` | Sem endpoint de CDS/credito no Plus |
 | `InstrumentDB` / `bsearch()` (busca local) | `aetp_17.dat` | Arquivo local do bcsys32; Plus usa `quote/symbol` para lookup pontual |
 
 ---

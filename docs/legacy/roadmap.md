@@ -42,40 +42,20 @@ nao tem consumidores externos, entao o churn e so interno + docs + tests).
 
 ---
 
-## Pendencias conhecidas (bugs de contrato, nao reformulacao)
-
-- **`bindicators` viola o eixo valid-but-empty**: levanta `ProtocolError` ("Server returned
-  empty response") para janelas indicador/range que simplesmente nao tem dados (ex.: indicador
-  32 em certos ranges), em vez do empty-frame-with-schema que o contrato promete.
-
----
-
 ## Prioridade Alta (transporte/parser ja existem, so mapear campos)
 
 | # | Endpoint | ID | Tipo | O que retorna | Esforco |
 |---|----------|-----|------|---------------|---------|
-| 1 | **`bcds` — MarkitOutput2 (CDS/credito)** | 90-94 | XML | Curva de termo de CDS soberano/corporativo (58 entidades + 394 indices). Params 100% decodificados — ver `endpoints.md` sec. 8 e o design abaixo | Baixo — engenharia de params ja feita |
-| 2 | **FIIAnbimaBovespa** | 150 | XML | FII: dividend yield, ultimo dividendo, vol medio (HGLG11: DY 9,2%) | Baixo |
-| 3 | **CarteiraTopFundos** | 187 | Binary SOH | Quais fundos investem no ativo (top holders, com %) | Baixo |
-| 4 | **HistoricoDiarioSimbolos** | 75 | XML | Multi-ticker daily alternativo ao bdh (`10113`=tickers `;`, `961`=start) | Baixo |
-| 5 | **EmpresaAcoesUnits** | 183 | Binary SOH | Acoes ON/PN, free float | Baixo |
+| 1 | **FIIAnbimaBovespa** | 150 | XML | FII: dividend yield, ultimo dividendo, vol medio (HGLG11: DY 9,2%) | Baixo |
+| 2 | **CarteiraTopFundos** | 187 | Binary SOH | Quais fundos investem no ativo (top holders, com %) | Baixo |
+| 3 | **HistoricoDiarioSimbolos** | 75 | XML | Multi-ticker daily alternativo ao bdh (`10113`=tickers `;`, `961`=start) | Baixo |
+| 4 | **EmpresaAcoesUnits** | 183 | Binary SOH | Acoes ON/PN, free float | Baixo |
 
-### Design proposto — `bcds(entity, date=None, tipo="S")`
-
-Derivado da coleta empirica de 2026-06-02 (terminal vivo); params e schema completos em
-`endpoints.md` sec. 8 (fluxo 91 tipos -> 90 datas -> 93 entidades -> 94 curva).
-
-- Retorna DataFrame **LONG**: uma linha por tenor (6M, 1Y, 2Y, 3Y, 4Y, 5Y, 7Y, 10Y).
-  Colunas: `entity, tenor, spread, var_dia, var_mes, bid_ask` + metadados repetidos
-  (recovery, rating implicito, regiao, moeda). RangeIndex + coluna `tenor` (e curva de
-  uma data, nao serie temporal).
-- **Resolucao automatica da tripla** (IDCDS, TIER, DOCCLAUSE), como `resolve_cvm` faz para
-  ticker: dado `entity` (+`tipo`), consultar 93 ListaCDS(date) e pegar a tripla valida —
-  ela varia por entidade (ex.: BRASIL usa `CR14`, nao `CR`). Mais de uma tripla -> exigir
-  desambiguacao.
-- `bcds()` sem entity -> listar entidades disponiveis (93) ou datas (90).
-- Valores BR com virgula -> `_core/normalize.parse_br_number` (ja existe).
-- Cabe no transporte ContentProxy XML existente; modulo de dominio proprio (ex.: `credit/`).
+> `bcds` (MarkitOutput2 90-94, CDS/credito) foi IMPLEMENTADO em 2026-06-10 — modulo
+> `credit/` + core nas arvores geradas (`_legacy/_async/markit.py`). Ver `api.md`.
+> Pendencia anterior do `bindicators` (ProtocolError em janela vazia) NAO reproduz mais:
+> a politica `empty_ok` centralizada do transporte EndpointSpec trata a resposta vazia
+> (verificado live 2026-06-10 com 7 variacoes de janela/indicador).
 
 ---
 

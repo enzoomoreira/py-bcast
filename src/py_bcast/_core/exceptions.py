@@ -36,6 +36,9 @@ _NOT_FOUND_MARKERS = (
 # Server messages that mean "a valid query simply matched no rows".
 _NO_RECORDS_MARKERS = (
     "não foram encontrados registros",
+    # MarkitOutput2 emits its messages unaccented ("ERRO: Nao foram
+    # encontrados registros para os parametros solicitados").
+    "nao foram encontrados registros",
     "registro não encontrado",
     # Range entirely before the instrument's history start: a valid query
     # over a window with no data, not a bad symbol or a transport failure.

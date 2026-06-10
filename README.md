@@ -10,6 +10,7 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 - **Macroeconomic series** — FX, indices, commodities, CDI, inflation, returns
 - **Fundamental data** — analyst consensus, indicators (Market Cap, Beta), company metadata
 - **Corporate events** — dividends, JCP, calendar, dividend yield, broker portfolios
+- **Credit** — sovereign/corporate CDS term-structure curves via Markit (`bcds`)
 - **Reference data** — 1020 companies, 37 indices, 38 sectors, real-time quotes
 - **News & multimedia** — full-text articles, Dow Jones wires, podcasts (no auth needed)
 - **Instrument database** — 623K+ instruments across 30+ exchanges (local `aetp_17.dat`)
