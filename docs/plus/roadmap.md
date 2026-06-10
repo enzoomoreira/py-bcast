@@ -13,9 +13,10 @@ Ver [`limitations.md`](./limitations.md) para blockers conhecidos.
 |--------|--------|----------|
 | `BroadcastPlusClient` | `_plus/realtime.py` | WS `/stock/ws` — quote streaming com auth refresh, ping/pong, reconnect |
 | `btrades(ticker, date)` | `_plus/intraday.py` | `POST /stock/v1/timesAndTrades` — ultimos 500 trades |
+| `abtrades(ticker, date)` | `_async/plus.py` (via `py_bcast.async_api`) | Twin async do `btrades` — mesma assinatura e retorno |
 | `bsearch()` (routing Plus) | `instruments/db.py` | `POST /stock/v1/quote/symbol/search` |
 | `get_plus_token()` / `discover_plus_token()` | `_plus/session.py` | Auth chain ECDH + memory scan + refresh |
-| `plus_request()` | `_plus/http.py` | Helper REST com 401-refresh automatico |
+| `plus_request()` | `_plus/_async/transport.py` (fonte) -> `_plus/_sync/transport.py` (gerado) | Helper REST com 401-refresh automatico |
 
 Ainda nao implementadas as acoes WS de **book** (`startStreamBook`) e **market stats** (`startStreamMarket`); apenas `startStreamQuote` esta exposto.
 

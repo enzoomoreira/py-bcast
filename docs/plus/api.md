@@ -4,7 +4,7 @@ Referencia da API publica da lib para o backend do Terminal Novo (`Broadcast+.ex
 
 Para a API do Terminal Antigo, ver [`../legacy/api.md`](../legacy/api.md).
 
-> **Status (2026-05-27):** autenticacao + streaming WebSocket (`BroadcastPlusClient`) + times & trades (`btrades`) + `bsearch` (via routing) implementados. Demais adapters no [`roadmap.md`](./roadmap.md).
+> **Status (2026-06-10):** autenticacao + streaming WebSocket (`BroadcastPlusClient`) + times & trades (`btrades` / async `abtrades`) + `bsearch` (via routing) implementados. Demais adapters no [`roadmap.md`](./roadmap.md).
 
 ---
 
@@ -87,6 +87,15 @@ print(df[["last", "size", "tendency"]].head())
 | `bid_exchange_id` | Codigo da venue da compra (string identificador) |
 
 Sem trades retorna `pd.DataFrame()` vazio. API limita a 500 trades por chamada (mais recentes); ordenado em ordem cronologica (oldest first) no DataFrame.
+
+O twin async `abtrades(ticker, date)` tem a mesma assinatura e o mesmo retorno:
+
+```python
+import asyncio
+from py_bcast import async_api
+
+df = asyncio.run(async_api.abtrades("PETR4", "20260525"))
+```
 
 ---
 
@@ -194,7 +203,7 @@ Para probing e implementacao de novos adapters enquanto as funcoes de alto nivel
 Faz uma requisicao autenticada ao backend Plus com 401-refresh automatico.
 
 ```python
-from py_bcast._plus.http import plus_request
+from py_bcast._plus._sync.transport import plus_request
 
 # GET
 resp = plus_request("GET", "/stock/v1/indexes")
@@ -206,6 +215,8 @@ resp = plus_request("POST", "/stock/v1/quote/symbol",
 data = resp.json()["data"][0]
 print(data["description"])   # "PETROLEO BRASILEIRO S.A. PETROBRAS, PN, A Vista"
 ```
+
+A variante async (`await plus_request(...)`) vive em `py_bcast._plus._async.transport` — a fonte da qual a arvore `_sync/` e gerada (`scripts/gen_sync.py`).
 
 ### `get_plus_http_client()`
 

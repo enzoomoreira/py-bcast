@@ -68,7 +68,7 @@ graph LR
 
 ## Shared Core (`_core/`)
 
-Infraestrutura backend-agnostica — usada pelos dois backends (o Plus so importa `retry`).
+Infraestrutura backend-agnostica — usada pelos dois backends.
 Nenhum modulo aqui conhece protocolo Legacy ou Plus:
 
 | Modulo | Proposito |

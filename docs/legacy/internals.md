@@ -138,9 +138,9 @@ O token BCAA e descoberto via scan de memoria do `bcsys32.exe` (tag 10039 na URL
 | CentralMultimidia | `/CentralMultimidia/` | JSON/XML | **2 funcionais** | 2 total |
 | AEInstrumentos | `/AEInstrumentos/` | Binary (proprietary) | TODOS bloqueados | ~50 total |
 | AEContent | `/AEContent/` | Binary (proprietary) | TODOS bloqueados | ~8 total |
-| contentProxyOutput | `/contentProxyOutput/` | JSON/XML | TODOS com erro 500 | ~30 total |
+| contentProxyOutput | `/contentProxyOutput/` | JSON/XML | Maioria erro 500; 116/120 vivos | ~30 total |
 | IntegracaoTabelas | `/IntegracaoTabelas/` | XML | 4 funcionais | ~6 total |
-| MarkitOutput2 | `/MarkitOutput2/` | XML | 1 funcional | 5 total |
+| MarkitOutput2 | `/MarkitOutput2/` | XML | 5 funcionais | 5 total |
 
 ---
 
@@ -211,7 +211,7 @@ Last:       [\x03]                      -- terminador ETX
 - ETX (0x03) = fim do stream
 - Erros detectados pela presenca do tag `10037` nos dados brutos
 
-O decoder em `src/py_bcast/fundamental.py` (`_parse_binary_response()`) ja suporta todos esses casos. **Nao ha trabalho adicional de protocolo para implementar novos endpoints desses grupos** — apenas mapear os campos de resposta.
+O decoder em `src/py_bcast/_legacy/binary.py` (`parse_binary_response()`) ja suporta todos esses casos. **Nao ha trabalho adicional de protocolo para implementar novos endpoints desses grupos** — apenas mapear os campos de resposta.
 
 ---
 

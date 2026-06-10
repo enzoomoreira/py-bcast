@@ -316,19 +316,19 @@ webSocketKeepAliveInterval = 10000   // ms — WS ping interval
 Analise de quais componentes sao reutilizaveis pelo backend Plus. A reorg que extraiu o protocolo
 Legacy para `_legacy/` materializou esta analise: o genuinamente compartilhado ficou em `_core/`; o
 acoplado ao ContentProxy/bcsys32 foi para `_legacy/` (o Plus nunca importa de la — usa seus proprios
-`_plus/http.py` e `_plus/session.py`).
+`_plus/http.py`, `_plus/session.py` e a camada de transporte gerada `_plus/_async/` -> `_plus/_sync/`).
 
 | Componente | Reutilizavel? | Observacoes |
 |---|---|---|
 | `_core/cache.py` | Sim | Cache TTL agnostico de protocolo |
 | `_core/ratelimit.py` | Sim | Rate limiter agnostico |
-| `_core/retry.py` | Sim | `@http_retry` funciona para qualquer httpx call (unico `_core` que o Plus importa) |
+| `_core/retry.py` | Sim | `@http_retry` funciona para qualquer httpx call |
 | `_core/logging.py` | Sim | `get_logger()` e generico |
 | `_core/validation.py` | Sim | `Ticker`, `DateParam`, etc. |
 | `_core/dates.py` | Sim | Conversoes de data |
 | `_core/normalize.py` | Sim | `ensure_list()` etc. |
 | `_core/config.py` | Expandido | `Settings` recebeu `plus_login`, `plus_password` (repr=False) |
-| `_legacy/output.py` | Nao | Construtores de DataFrame acoplados aos schemas Legacy (`columns.py`); o Plus monta o seu proprio em `btrades` |
+| `_legacy/output.py` | Nao | Construtores de DataFrame acoplados aos schemas Legacy (`columns.py`); o Plus monta o seu proprio em `_plus/_async/trades.py` (`trades_core`) |
 | `_legacy/http.py` | Nao | Cliente ContentProxy Legacy (`get_http_client`, `base_params`); o Plus usa `_plus/http.py` |
 | `_legacy/session.py` | Nao | BCAA token discovery especifico do bcsys32.exe |
 | `_legacy/binary.py` | Nao | Parser de binary SOH especifico do ContentProxy |
@@ -336,7 +336,8 @@ acoplado ao ContentProxy/bcsys32 foi para `_legacy/` (o Plus nunca importa de la
 | `realtime/client.py` | Nao | DDE e exclusivo do bcsys32.exe |
 | `instruments/db.py` | Nao | `aetp_17.dat` e instalado pelo bcsys32 |
 | `_plus/session.py` | N/A | **Novo** — JWT auth chain (env var / mem scan / ECDH) |
-| `_plus/http.py` | N/A | **Novo** — singleton client + `plus_request()` com 401-refresh |
+| `_plus/http.py` | N/A | **Novo** — singletons httpx (sync + async) + `plus_auth_headers()` |
+| `_plus/_async/` -> `_plus/_sync/` | N/A | **Novo** — `plus_request()` com 401-refresh e `trades_core` em arvores gemeas: fonte async escrita a mao, arvore sync gerada por `scripts/gen_sync.py` |
 
 ---
 
