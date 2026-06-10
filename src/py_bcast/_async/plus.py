@@ -5,7 +5,8 @@ from __future__ import annotations
 import pandas as pd
 
 from .._core.dates import to_date_str
-from .._core.validation import DateParam, Ticker, validate_params
+from .._core.validation import DateParam, Ticker, TickerList, validate_params
+from .._plus._async.reference import index_members_core, info_core, logo_core
 from .._plus._async.trades import trades_core
 
 
@@ -21,3 +22,32 @@ async def abtrades(
     same schema if no trades are found.
     """
     return await trades_core(ticker, to_date_str(date))
+
+
+@validate_params
+async def abinfo(symbols: TickerList) -> pd.DataFrame:
+    """Async version of ``binfo``. Instrument metadata via Broadcast+.
+
+    Flat DataFrame, one row per resolved symbol. Unknown symbols are omitted;
+    an all-unknown request returns an empty DataFrame with the same schema.
+    """
+    return await info_core(symbols)
+
+
+@validate_params
+async def abindex_members(index: Ticker) -> pd.DataFrame:
+    """Async version of ``bindex_members``. Index composition via Broadcast+.
+
+    DataFrame with columns index, symbol, relevance (one row per member).
+    Raises NotFoundError if the index code does not exist.
+    """
+    return await index_members_core(index)
+
+
+@validate_params
+async def ablogo(symbol: Ticker) -> bytes:
+    """Async version of ``blogo``. Instrument PNG logo bytes via Broadcast+.
+
+    Raises NotFoundError if the symbol has no logo.
+    """
+    return await logo_core(symbol)
