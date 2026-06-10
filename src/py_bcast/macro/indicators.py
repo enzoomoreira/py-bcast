@@ -12,7 +12,7 @@ from .._legacy.endpoints import (
     SPEC_BRETURN,
     SPEC_BVOLUME,
 )
-from .._legacy.executor import run_spec
+from .._legacy._sync.executor import run_spec
 
 
 @validate_params

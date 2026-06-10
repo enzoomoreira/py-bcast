@@ -1,0 +1,15 @@
+"""I/O layer for the legacy backend (sync/async twin trees).
+
+The async tree (``_legacy/_async/``) is the hand-written source; the sync
+tree (``_legacy/_sync/``) is GENERATED from it by ``scripts/gen_sync.py`` —
+never edit the sync tree by hand, edit the async source and regenerate.
+Cross-boundary names are swapped by the generator's token replacements:
+
+- ``get_async_http_client`` -> ``get_http_client``
+- ``rate_limit_async``      -> ``rate_limit``
+- ``vectorize_async``       -> ``vectorize``
+- ``AsyncClient``           -> ``Client``
+
+Shared state (HTTP client singletons, resolution caches, rate limiter, the
+response cache) lives outside both trees so the twins keep sharing it.
+"""

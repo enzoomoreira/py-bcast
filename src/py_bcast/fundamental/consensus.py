@@ -6,7 +6,7 @@ import pandas as pd
 
 from .._core.validation import TickerList, validate_params
 from .._legacy.endpoints import SPEC_BCONSENSUS
-from .._legacy.executor import run_spec
+from .._legacy._sync.executor import run_spec
 
 
 @validate_params

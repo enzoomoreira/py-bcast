@@ -180,18 +180,19 @@ src/py_bcast/
 │   └── (logging, dates, normalize)
 ├── _legacy/            # Legacy protocol stack (DDE + ContentProxy; never imported by _plus)
 │   ├── dde.py          # DDE conversations with bcsys32.exe
-│   ├── http.py         # Legacy ContentProxy httpx client pool
+│   ├── http.py         # Legacy ContentProxy httpx client pool (sync + async singletons)
 │   ├── session.py      # Legacy session token discovery (memory scan of bcsys32.exe)
-│   ├── aetp.py         # aetp/output binary request helpers
+│   ├── aetp.py         # Pure AETP protocol helpers (rows_to_dicts, entity tags)
 │   ├── binary.py       # Binary response parser
-│   ├── xml_helpers.py  # ContentProxy XML (content_proxy_get, raise_for_content_proxy_status)
-│   ├── resolve.py      # CVM code + indicator name resolution
+│   ├── xml_helpers.py  # Pure ContentProxy XML parsing (parse_ticks, status policy)
+│   ├── resolve_state.py # Shared sync/async resolution caches + pure matchers
 │   ├── columns.py      # Column schemas + rename maps
 │   ├── spec.py         # EndpointSpec / ParamBind declarative endpoint descriptors
 │   ├── endpoints.py    # EndpointSpec catalog (one spec per migrated endpoint)
-│   ├── executor.py     # run_spec() — sync spec-driven executor
 │   ├── output.py       # DataFrame finalization (finalize_frame, empty_bdh_frame)
-│   └── multi.py        # vectorize / vectorize_async multi-ticker fan-out
+│   ├── multi.py        # vectorize / vectorize_async multi-ticker fan-out
+│   ├── _async/         # I/O layer SOURCE (async-first): transport, executor, resolve, quote, bdh
+│   └── _sync/          # I/O layer GENERATED from _async/ by scripts/gen_sync.py — do not edit
 ├── _plus/              # Broadcast+ backend
 │   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login
 │   ├── crypto.py       # ECDH P-384 + AES-GCM-256 (matching app.asar buildEncryptedResult)

@@ -94,21 +94,28 @@ Stack de protocolo do Terminal Antigo (`bcsys32.exe`). Importado pelos pacotes d
 (`historical/`, `macro/`, `fundamental/`, `news/`, `realtime/`) e pelos gemeos `_async/`; nunca pelo
 Plus. Depende de `_core/` para infraestrutura, nunca o contrario.
 
+A camada de I/O e gerada: `_legacy/_async/` e a fonte escrita a mao (async-first) e
+`_legacy/_sync/` e GERADA dela por `scripts/gen_sync.py` (unasync) — nunca editar a arvore
+sync a mao. `tests/test_unasync.py` falha se a arvore gerada estiver desatualizada. Estado
+compartilhado (singletons HTTP, caches de resolucao, rate limiter) vive fora das duas
+arvores para que sync e async continuem compartilhando.
+
 | Modulo | Proposito |
 |--------|-----------|
 | `dde.py` | Cliente DDEML (Windows DDEML) para tempo real (`bdp` / `BroadcastClient`). |
-| `aetp.py` | Protocolo AETP binario: `aetp_request()`, `rows_to_dicts()`. |
+| `aetp.py` | Conhecimento puro do protocolo AETP: `rows_to_dicts()`, identificacao de entidade para NotFoundError. |
 | `binary.py` | Parser de resposta binaria SOH: `parse_binary_response()`. |
-| `xml_helpers.py` | ContentProxy HTTP + parsing XML: `content_proxy_get()`, `parse_ticks()`, `raise_for_content_proxy_status()` (politica de erro de dois eixos). |
-| `http.py` | Singleton `httpx.Client` / `httpx.AsyncClient` com connection pooling para a ContentProxy Legacy. |
+| `xml_helpers.py` | Parsing XML ContentProxy puro: `parse_ticks()`, `raise_for_content_proxy_status()` (politica de erro de dois eixos). |
+| `http.py` | Singletons `httpx.Client` / `httpx.AsyncClient` com connection pooling (estado compartilhado, fora do codegen). |
 | `session.py` | Descoberta e cache do BCAA session token (tag `10039`) via memoria do `bcsys32.exe`. |
-| `resolve.py` | Resolucao ticker -> codigo CVM / indicador: `resolve_cvm()`, `aresolve_cvm()`, `resolve_indicator()`. |
+| `resolve_state.py` | Caches de resolucao compartilhados sync/async + matchers puros (`match_indicator`, `cvm_from_quote`). |
 | `columns.py` | Schemas de coluna e renomeacao dos outputs Legacy (`CONTENT_PROXY_RENAME`, `VOLUME_RENAME`, ...). |
 | `spec.py` | Descritores declarativos de endpoint: `EndpointSpec` / `ParamBind` (transporte, tags, politica de indice/erro, vetorizacao). |
 | `endpoints.py` | Catalogo de `EndpointSpec` — um spec por endpoint migrado, compartilhado pelos executores sync e async. |
-| `executor.py` | `run_spec()` — executor sync dirigido por spec (binding de params, dispatch de transporte, finalizacao). Twin async em `_async/executor.py`. |
 | `output.py` | Finalizacao de DataFrame: `finalize_frame()` (politica de indice via enum `Index`), `empty_bdh_frame()`. |
-| `multi.py` | Fan-out multi-ticker: `vectorize()` / `vectorize_async()` (concatena por `ticker`, propaga o primeiro erro). |
+| `multi.py` | Fan-out multi-ticker: `vectorize()` / `vectorize_async()` (residuo de concorrencia deliberado, fora do codegen). |
+| `_async/` | FONTE da camada de I/O (async): `transport.py` (`aetp_request`, `content_proxy_get`), `executor.py` (`run_spec`), `resolve.py`, `quote.py`, `bdh.py`. |
+| `_sync/` | Camada de I/O sync GERADA — mesmos modulos/nomes da fonte, tokens async removidos. NAO EDITAR. |
 
 ---
 

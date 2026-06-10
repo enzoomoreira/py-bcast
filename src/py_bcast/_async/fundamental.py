@@ -7,8 +7,8 @@ import pandas as pd
 from .._core.dates import DateLike
 from .._core.normalize import ensure_list
 from .._core.validation import TickerList, validate_params
-from .._legacy.aetp import rows_to_dicts
-from .._legacy.columns import QUOTE_FIELDS, QUOTE_SCHEMA
+from .._legacy._async.executor import run_spec as arun_spec
+from .._legacy._async.quote import quote_one
 from .._legacy.endpoints import (
     SPEC_BCOMPANY_DETAIL,
     SPEC_BCOMPANY_LIST,
@@ -21,9 +21,6 @@ from .._legacy.endpoints import (
     SPEC_BTICKERS,
 )
 from .._legacy.multi import vectorize_async
-from .._legacy.output import Index, finalize_frame
-from ._helpers import async_aetp_request
-from .executor import arun_spec
 
 
 async def abcompany(
@@ -55,25 +52,6 @@ async def abconsensus(
     return await arun_spec(SPEC_BCONSENSUS, session_token=session_token, ticker=ticker)
 
 
-async def _abquote_one(
-    ticker: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch the quote for a single symbol (one row, or empty with schema).
-
-    Soft (empty_ok default): an unknown ticker yields an empty block rather
-    than raising — symmetry with sync ``_quote_one``.
-    """
-    parsed = await async_aetp_request(
-        "fundamental/ativo/cotacao", {"10068": ticker}, session_token
-    )
-    rows = rows_to_dicts(parsed)
-    record = rows[0] if rows else {}
-    return finalize_frame(
-        record, index=Index.RECORD, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA
-    )
-
-
 async def abquote(
     ticker: str | list[str],
     session_token: str | None = None,
@@ -85,7 +63,7 @@ async def abquote(
     quote.
     """
     return await vectorize_async(
-        ensure_list(ticker), lambda t: _abquote_one(t, session_token)
+        ensure_list(ticker), lambda t: quote_one(t, session_token)
     )
 
 

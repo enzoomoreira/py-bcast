@@ -4,10 +4,11 @@ Guards the two-package mirror (``py_bcast`` vs ``py_bcast._async``): every publi
 sync data function must have an async twin with an identical call signature, and
 every async export must map back to a public sync function.
 
-This is the deliberate replacement for the abandoned unasync codegen inversion: a
-single generated source was rejected (it would resolve helper imports wrongly and
-erase the rich public docstrings), so the sync and async modules stay hand-written
-and this test is what prevents drift between the pairs.
+The I/O layer underneath is drift-proof by construction (``_legacy/_sync/`` is
+generated from ``_legacy/_async/`` — see ``scripts/gen_sync.py`` and
+``tests/test_unasync.py``); the thin public facades remain hand-written on both
+sides for idiomatic docstrings, and this test is what prevents drift between
+those facade pairs.
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ SYNC_WITHOUT_ASYNC_TWIN = {
 
 # Non-data public symbols: classes, config, exceptions, resolvers, namespaces.
 # Excluded from the data-function parity sweep. resolve_cvm/resolve_indicator are
-# public but their async forms (aresolve_*) are internal and not in _async.__all__.
+# public but their async forms (_legacy/_async/resolve.py) are internal and not
+# in _async.__all__.
 NON_DATA_SYMBOLS = {
     "BroadcastClient",
     "BroadcastPlusClient",

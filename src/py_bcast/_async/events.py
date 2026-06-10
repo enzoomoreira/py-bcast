@@ -16,7 +16,7 @@ from .._legacy.endpoints import (
     SPEC_BPORTFOLIO,
     SPEC_BPORTFOLIOS,
 )
-from .executor import arun_spec
+from .._legacy._async.executor import run_spec as arun_spec
 
 
 @validate_params

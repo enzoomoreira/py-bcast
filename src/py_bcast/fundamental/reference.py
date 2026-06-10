@@ -6,8 +6,8 @@ import pandas as pd
 
 from .._core.dates import DateLike
 from .._core.normalize import ensure_list
-from .._legacy.aetp import aetp_request, rows_to_dicts
-from .._legacy.columns import QUOTE_FIELDS, QUOTE_SCHEMA
+from .._legacy._sync.executor import run_spec
+from .._legacy._sync.quote import quote_one
 from .._legacy.endpoints import (
     SPEC_BCOMPANY_DETAIL,
     SPEC_BCOMPANY_LIST,
@@ -18,9 +18,7 @@ from .._legacy.endpoints import (
     SPEC_BSHARES,
     SPEC_BTICKERS,
 )
-from .._legacy.executor import run_spec
 from .._legacy.multi import vectorize
-from .._legacy.output import Index, finalize_frame
 
 
 def bcompany(
@@ -99,24 +97,6 @@ def bsectors(
     return run_spec(SPEC_BSECTORS, session_token=session_token)
 
 
-def _quote_one(
-    ticker: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Fetch the quote for a single symbol (one row, or empty with schema).
-
-    Scalar core shared by the vectorized ``bquote`` and ``resolve_cvm``;
-    ``resolve_cvm`` requires exactly one row, so it must never depend on the
-    list-returning public ``bquote``.
-    """
-    parsed = aetp_request("fundamental/ativo/cotacao", {"10068": ticker}, session_token)
-    rows = rows_to_dicts(parsed)
-    record = rows[0] if rows else {}
-    return finalize_frame(
-        record, index=Index.RECORD, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA
-    )
-
-
 def bquote(
     ticker: str | list[str],
     session_token: str | None = None,
@@ -125,7 +105,7 @@ def bquote(
     Fetch current quote (price, volume) for one or more symbols via aetp.
 
     Uses aetp/output/fundamental/AtivoCotacao. This is also the ticker → CVM
-    resolution primitive (via the scalar ``_quote_one`` core), so it stays
+    resolution primitive (via the scalar ``quote_one`` core), so it stays
     "soft": an unknown ticker yields an empty block (resolve_cvm turns that
     into NotFoundError) rather than raising here.
 
@@ -143,7 +123,7 @@ def bquote(
         >>> print(q["close"].iloc[0])
     """
     tickers = ensure_list(ticker)
-    return vectorize(tickers, lambda t: _quote_one(t, session_token))
+    return vectorize(tickers, lambda t: quote_one(t, session_token))
 
 
 def btickers(

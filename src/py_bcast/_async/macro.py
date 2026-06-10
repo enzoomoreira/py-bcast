@@ -12,7 +12,7 @@ from .._legacy.endpoints import (
     SPEC_BRETURN,
     SPEC_BVOLUME,
 )
-from .executor import arun_spec
+from .._legacy._async.executor import run_spec as arun_spec
 
 
 @validate_params

@@ -7,7 +7,7 @@ import pandas as pd
 from .._core.dates import default_tick_end, to_date_str, to_datetime_str
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
 from .._legacy.endpoints import SPEC_BDI, SPEC_BDT
-from .._legacy.executor import run_spec
+from .._legacy._sync.executor import run_spec
 
 
 @validate_params
