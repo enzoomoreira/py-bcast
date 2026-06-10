@@ -6,6 +6,7 @@ import pandas as pd
 
 from .._core.dates import to_date_str
 from .._core.validation import DateParam, Ticker, TickerList, validate_params
+from .._plus._async.funds import fund_core, funds_core
 from .._plus._async.reference import index_members_core, info_core, logo_core
 from .._plus._async.trades import trades_core
 
@@ -51,3 +52,22 @@ async def ablogo(symbol: Ticker) -> bytes:
     Raises NotFoundError if the symbol has no logo.
     """
     return await logo_core(symbol)
+
+
+@validate_params
+async def abfunds(query: str) -> pd.DataFrame:
+    """Async version of ``bfunds``. Fund search via Broadcast+.
+
+    Flat DataFrame, one row per matching fund, keyed by ``id``. Empty DataFrame
+    with the same schema if nothing matches.
+    """
+    return await funds_core(query)
+
+
+@validate_params
+async def abfund(fund_id: int) -> pd.DataFrame:
+    """Async version of ``bfund``. Fund detail by numeric id via Broadcast+.
+
+    Single-row DataFrame. Raises NotFoundError if the id does not exist.
+    """
+    return await fund_core(fund_id)

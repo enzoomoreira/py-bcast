@@ -32,7 +32,7 @@ from .fundamental import (
 from .events import abcalendar, abdividends, abdy, abportfolios, abportfolio
 from .news import abnews, abnews_recent, abnews_multimedia
 from .credit import abcds
-from .plus import abtrades, abinfo, abindex_members, ablogo
+from .plus import abtrades, abinfo, abindex_members, ablogo, abfunds, abfund
 
 __all__ = [
     "abdh",
@@ -66,4 +66,6 @@ __all__ = [
     "abinfo",
     "abindex_members",
     "ablogo",
+    "abfunds",
+    "abfund",
 ]

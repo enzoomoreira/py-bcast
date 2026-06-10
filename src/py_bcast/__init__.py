@@ -12,6 +12,7 @@ A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - News and multimedia (bnews, bnews_recent, bnews_multimedia)
 - Credit: CDS term-structure curves via Markit (bcds)
 - Broadcast+ reference: instrument metadata, index composition, logos (binfo, bindex_members, blogo)
+- Broadcast+ funds: investment-fund search and detail (bfunds, bfund)
 - Instrument database search (bsearch, InstrumentDB)
 
 Quick Start:
@@ -50,6 +51,7 @@ from ._plus.realtime import BroadcastPlusClient
 from ._plus.realtime_async import BroadcastPlusAsyncClient
 from ._plus.intraday import btrades
 from ._plus.reference import binfo, bindex_members, blogo
+from ._plus.funds import bfunds, bfund
 from .historical import bdh, bdh_ohlcv, bdi, bdt
 from .fundamental import (
     bconsensus,
@@ -108,6 +110,8 @@ __all__ = [
     "binfo",
     "bindex_members",
     "blogo",
+    "bfunds",
+    "bfund",
     "bconsensus",
     "InstrumentDB",
     "bsearch",
