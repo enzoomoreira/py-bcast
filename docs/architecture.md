@@ -104,7 +104,10 @@ Plus. Depende de `_core/` para infraestrutura, nunca o contrario.
 | `session.py` | Descoberta e cache do BCAA session token (tag `10039`) via memoria do `bcsys32.exe`. |
 | `resolve.py` | Resolucao ticker -> codigo CVM / indicador: `resolve_cvm()`, `aresolve_cvm()`, `resolve_indicator()`. |
 | `columns.py` | Schemas de coluna e renomeacao dos outputs Legacy (`CONTENT_PROXY_RENAME`, `VOLUME_RENAME`, ...). |
-| `output.py` | Construtores de DataFrame achatado: `to_dataframe()`, `to_reference_dataframe()`, `to_record_dataframe()`, `empty_bdh_frame()`. |
+| `spec.py` | Descritores declarativos de endpoint: `EndpointSpec` / `ParamBind` (transporte, tags, politica de indice/erro, vetorizacao). |
+| `endpoints.py` | Catalogo de `EndpointSpec` — um spec por endpoint migrado, compartilhado pelos executores sync e async. |
+| `executor.py` | `run_spec()` — executor sync dirigido por spec (binding de params, dispatch de transporte, finalizacao). Twin async em `_async/executor.py`. |
+| `output.py` | Finalizacao de DataFrame: `finalize_frame()` (politica de indice via enum `Index`), `empty_bdh_frame()`. |
 | `multi.py` | Fan-out multi-ticker: `vectorize()` / `vectorize_async()` (concatena por `ticker`, propaga o primeiro erro). |
 
 ---

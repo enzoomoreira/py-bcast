@@ -187,7 +187,10 @@ src/py_bcast/
 │   ├── xml_helpers.py  # ContentProxy XML (content_proxy_get, raise_for_content_proxy_status)
 │   ├── resolve.py      # CVM code + indicator name resolution
 │   ├── columns.py      # Column schemas + rename maps
-│   ├── output.py       # DataFrame builders (to_dataframe, empty_bdh_frame, …)
+│   ├── spec.py         # EndpointSpec / ParamBind declarative endpoint descriptors
+│   ├── endpoints.py    # EndpointSpec catalog (one spec per migrated endpoint)
+│   ├── executor.py     # run_spec() — sync spec-driven executor
+│   ├── output.py       # DataFrame finalization (finalize_frame, empty_bdh_frame)
 │   └── multi.py        # vectorize / vectorize_async multi-ticker fan-out
 ├── _plus/              # Broadcast+ backend
 │   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login
