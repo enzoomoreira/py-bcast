@@ -15,7 +15,7 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 - **Instrument database** — 623K+ instruments across 30+ exchanges (local `aetp_17.dat`)
 
 **Terminal Novo (`Broadcast+.exe`)**
-- **Real-time streaming** via WebSocket (`BroadcastPlusClient`) com auth refresh transparente
+- **Real-time streaming** via WebSocket (`BroadcastPlusClient` / asyncio `BroadcastPlusAsyncClient`) com auth refresh transparente
 - **Times & trades** (`btrades`) — ultimos 500 trades em fuso `America/Sao_Paulo`
 - **Headless login** via ECDH P-384 + AES-GCM (`configure(plus_login=..., plus_password=...)`)
 - **Token discovery** — memory scan do `Broadcast+.exe` ou `BROADCAST_PLUS_TOKEN` env var

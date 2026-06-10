@@ -34,6 +34,7 @@ SYNC_WITHOUT_ASYNC_TWIN = {
 NON_DATA_SYMBOLS = {
     "BroadcastClient",
     "BroadcastPlusClient",
+    "BroadcastPlusAsyncClient",
     "InstrumentDB",
     "Ticker",
     "MULTIMEDIA_CATEGORIES",

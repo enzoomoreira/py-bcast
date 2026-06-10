@@ -45,6 +45,7 @@ Quick Start:
 
 from .realtime import BroadcastClient, bdp
 from ._plus.realtime import BroadcastPlusClient
+from ._plus.realtime_async import BroadcastPlusAsyncClient
 from ._plus.intraday import btrades
 from .historical import bdh, bdh_ohlcv, bdi, bdt
 from .fundamental import (
@@ -92,6 +93,7 @@ from . import _async as async_api
 __all__ = [
     "BroadcastClient",
     "BroadcastPlusClient",
+    "BroadcastPlusAsyncClient",
     "bdp",
     "bdh",
     "bdh_ohlcv",

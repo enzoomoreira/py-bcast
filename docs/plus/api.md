@@ -56,6 +56,27 @@ Campos default do handshake `initialData`: `COD, ULT, VAR, ABE, MAX, MIN, HOR, N
 
 A callback recebe um dict com os campos do tick — incluindo o codigo do ticker em `data["COD"]`, util quando subscribed em multiplos tickers com a mesma callback. Valores numericos (precos, percentuais) vem parseados como `float`; codigos, nomes e horarios ficam string.
 
+### `BroadcastPlusAsyncClient`
+
+Twin asyncio do `BroadcastPlusClient` — mesmo protocolo e ciclo de vida (auth chain, ping/pong de aplicacao, refresh de token, reconexao com backoff), mas tudo roda no event loop do chamador, sem threads. As partes bloqueantes da cadeia de auth (memory scan / login ECDH) rodam em `asyncio.to_thread`.
+
+```python
+import asyncio
+from py_bcast import BroadcastPlusAsyncClient
+
+async def on_quote(data: dict) -> None:
+    print(data["COD"], data["ULT"], data["VAR"])
+
+async def main() -> None:
+    async with BroadcastPlusAsyncClient() as client:
+        await client.subscribe(["PETR4", "VALE3"], callback=on_quote)
+        await client.run(duration=60)
+
+asyncio.run(main())
+```
+
+Diferencas vs o sync: `subscribe`/`unsubscribe`/`unsubscribe_all`/`stop` sao corotinas (`await`); `run(duration=None)` e uma corotina que ocupa a task ate `duration` ou `stop()` — para streamar em paralelo com outro trabalho, use `asyncio.create_task(client.run())`. A callback pode ser uma funcao comum ou uma coroutine function (awaited no task do stream). Nao ha `run_async()` — em asyncio, `create_task` cumpre esse papel.
+
 ---
 
 ## Dados Intraday

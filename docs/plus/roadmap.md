@@ -12,6 +12,7 @@ Ver [`limitations.md`](./limitations.md) para blockers conhecidos.
 | Funcao | Modulo | Endpoint |
 |--------|--------|----------|
 | `BroadcastPlusClient` | `_plus/realtime.py` | WS `/stock/ws` — quote streaming com auth refresh, ping/pong, reconnect |
+| `BroadcastPlusAsyncClient` | `_plus/realtime_async.py` | Twin asyncio do `BroadcastPlusClient` (lib `websockets`, sem threads) |
 | `btrades(ticker, date)` | `_plus/intraday.py` | `POST /stock/v1/timesAndTrades` — ultimos 500 trades |
 | `abtrades(ticker, date)` | `_async/plus.py` (via `py_bcast.async_api`) | Twin async do `btrades` — mesma assinatura e retorno |
 | `bsearch()` (routing Plus) | `instruments/db.py` | `POST /stock/v1/quote/symbol/search` |
