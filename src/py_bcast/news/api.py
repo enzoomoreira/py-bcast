@@ -11,6 +11,7 @@ import httpx
 from .._core.constants import BASE_URL
 from .._legacy.http import get_http_client
 from .._core.logging import get_logger
+from .._core.ratelimit import rate_limit
 from .._core.retry import http_retry
 
 logger = get_logger(__name__)
@@ -77,6 +78,7 @@ def bnews(news_id: int | str) -> dict:
     """
     s = get_http_client()
     logger.debug("bnews: fetching content ID %s", news_id)
+    rate_limit()
     r = _news_fetch_content(s, news_id)
     r.raise_for_status()
     data = _decode_json(r).get("d")
@@ -168,6 +170,7 @@ def bnews_multimedia(category: int, days_ago: int = 60, limit: int = 20) -> list
     """
     s = get_http_client()
     logger.debug("bnews_multimedia: category=%d days_ago=%d", category, days_ago)
+    rate_limit()
     r = _news_multimedia_fetch(s, category, days_ago, limit)
     r.raise_for_status()
 
@@ -225,6 +228,7 @@ def _find_latest_id() -> Optional[int]:
     lo, hi = 56_100_000, 56_500_000
 
     # Verify lo is valid
+    rate_limit()
     r = _news_fetch_content(s, lo)
     if r.status_code != 200:
         return None
@@ -234,6 +238,7 @@ def _find_latest_id() -> Optional[int]:
 
     while hi - lo > 1:
         mid = (lo + hi) // 2
+        rate_limit()
         # Transport errors propagate (after @http_retry exhausts) rather than
         # being misread as "id above the ceiling"; only a 200-with-no-title or a
         # non-200 status narrows the upper bound.
