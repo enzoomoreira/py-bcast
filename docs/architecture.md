@@ -33,9 +33,9 @@ graph LR
 
         subgraph "Plus (Broadcast+.exe)"
             P_SESS["_plus/session.py<br/>get_plus_token"]
-            P_HTTP["_plus/http.py<br/>plus_request"]
+            P_HTTP["_plus/_async + _sync<br/>plus_request (gerado)"]
             P_RT["_plus/realtime.py<br/>BroadcastPlusClient"]
-            P_INTRA["_plus/intraday.py<br/>btrades"]
+            P_INTRA["_plus/intraday.py<br/>btrades / abtrades"]
         end
 
         CORE --> L_PROTO

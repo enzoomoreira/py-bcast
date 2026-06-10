@@ -277,7 +277,7 @@ def bsearch(
 
 def _bsearch_plus(query: str, max_results: int) -> pd.DataFrame:
     """Search instruments via the Broadcast+ REST API."""
-    from .._plus.http import plus_request
+    from .._plus._sync.transport import plus_request
 
     r = plus_request(
         "post",

@@ -24,7 +24,6 @@ from py_bcast import async_api
 # commented so a future sync data function added without a twin fails loudly.
 SYNC_WITHOUT_ASYNC_TWIN = {
     "bdp",  # DDE point-lookup, polymorphic (scalar/dict/None) -- not an HTTP path
-    "btrades",  # Broadcast+ times & trades -- Plus backend, no async path
     "bsearch",  # local instrument DB lookup -- no network, no async path
 }
 

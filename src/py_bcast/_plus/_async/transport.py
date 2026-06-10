@@ -1,0 +1,67 @@
+"""Authenticated request helper for the Broadcast+ REST API."""
+
+from __future__ import annotations
+
+import httpx
+
+from ..._core.exceptions import BroadcastPlusAuthError
+from ..._core.logging import get_logger
+from ..._core.retry import http_retry
+from ..http import get_plus_async_http_client, plus_auth_headers
+from ..session import refresh_plus_token
+
+logger = get_logger(__name__)
+
+
+@http_retry
+async def _raw_request(
+    s: httpx.AsyncClient,
+    method: str,
+    path: str,
+    headers: dict[str, str],
+    **kwargs,
+) -> httpx.Response:
+    """Isolated HTTP call so ``@http_retry`` can replay on transient failures."""
+    return await s.request(method.upper(), path, headers=headers, **kwargs)
+
+
+async def plus_request(method: str, path: str, **kwargs) -> httpx.Response:
+    """Make an authenticated request to the Broadcast+ API.
+
+    Handles JWT injection, automatic token refresh on 401, and HTTP retry
+    on transient 5xx / network errors (via ``@http_retry``). The refresh
+    itself runs through the sync auth chain (see the package docstring).
+
+    Args:
+        method: ``"get"`` or ``"post"``.
+        path: API path relative to PLUS_BASE_URL (e.g. ``"/stock/v1/quote/symbol"``).
+        **kwargs: Forwarded to the client ``request`` (``json``, ``params``, etc.).
+                  Do NOT pass ``headers`` — auth headers are injected automatically.
+
+    Returns:
+        :class:`httpx.Response` with a non-401 status code.
+
+    Raises:
+        BroadcastPlusAuthError: If 401 persists after a token refresh attempt.
+        httpx.HTTPStatusError: On 4xx (other than 401) or 5xx after retries.
+        httpx.NetworkError / httpx.TimeoutException: On network failures.
+    """
+    s = get_plus_async_http_client()
+    r = await _raw_request(s, method, path, plus_auth_headers(), **kwargs)
+
+    if r.status_code == 401:
+        logger.info("Broadcast+ 401 received — refreshing JWT and retrying.")
+        try:
+            refresh_plus_token()
+        except BroadcastPlusAuthError:
+            raise
+        r = await _raw_request(s, method, path, plus_auth_headers(), **kwargs)
+
+    if r.status_code == 401:
+        raise BroadcastPlusAuthError(
+            "Broadcast+ returned 401 after token refresh.",
+            endpoint=path,
+            status_code=401,
+        )
+
+    return r

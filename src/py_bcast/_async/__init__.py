@@ -31,6 +31,7 @@ from .fundamental import (
 )
 from .events import abcalendar, abdividends, abdy, abportfolios, abportfolio
 from .news import abnews, abnews_recent, abnews_multimedia
+from .plus import abtrades
 
 __all__ = [
     "abdh",
@@ -59,4 +60,5 @@ __all__ = [
     "abnews",
     "abnews_recent",
     "abnews_multimedia",
+    "abtrades",
 ]

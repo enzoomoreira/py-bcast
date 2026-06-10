@@ -196,9 +196,11 @@ src/py_bcast/
 ├── _plus/              # Broadcast+ backend
 │   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login
 │   ├── crypto.py       # ECDH P-384 + AES-GCM-256 (matching app.asar buildEncryptedResult)
-│   ├── http.py         # plus_request() with 401-refresh; singleton httpx.Client
+│   ├── http.py         # Plus httpx client singletons (sync + async) + auth headers
 │   ├── realtime.py     # BroadcastPlusClient (WebSocket /stock/ws)
-│   └── intraday.py     # btrades() — POST /stock/v1/timesAndTrades
+│   ├── intraday.py     # btrades() facade — POST /stock/v1/timesAndTrades
+│   ├── _async/         # Plus I/O SOURCE (async-first): plus_request, trades core
+│   └── _sync/          # Plus I/O GENERATED from _async/ by scripts/gen_sync.py — do not edit
 ├── _async/             # Async versions of all legacy HTTP data functions
 ├── realtime/client.py  # Legacy DDE: BroadcastClient, bdp (one or many tickers)
 ├── historical/         # bdh, bdh_ohlcv, bdi, bdt (legacy ContentProxy)
