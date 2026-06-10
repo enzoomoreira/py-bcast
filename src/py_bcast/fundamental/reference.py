@@ -11,6 +11,8 @@ from .._legacy._sync.quote import quote_one
 from .._legacy.endpoints import (
     SPEC_BCOMPANY_DETAIL,
     SPEC_BCOMPANY_LIST,
+    SPEC_BFREE_FLOAT,
+    SPEC_BFUND_HOLDERS,
     SPEC_BINDICATOR_META,
     SPEC_BINDICATORS,
     SPEC_BINDICES,
@@ -179,6 +181,71 @@ def bshares(
         >>> print(df["total_shares"].iloc[0])
     """
     return run_spec(SPEC_BSHARES, session_token=session_token, ticker=ticker)
+
+
+def bfree_float(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch share classes with free float and units composition for companies.
+
+    Uses aetp/output/fundamental/EmpresaAcoesUnits. One row per share class
+    (ON/PN/UNIT): total, free-float and treasury share counts (thousands),
+    the free-float percentage, and — on UNIT rows — how many ON/PN shares
+    compose one unit (the share counts are blank there).
+
+    Args:
+        ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
+            or a list mixing both.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex) with ticker, share_type, total_shares,
+        float_shares, treasury_shares, float_pct, unit_on, unit_pn. The
+        endpoint emits its own ``ticker`` column (the company's share
+        classes), so it is NOT the lookup identifier. Raises NotFoundError if
+        any identifier is unknown (fail-fast).
+
+    Example:
+        >>> df = bfree_float("PETR4")   # PETR3 + PETR4 rows
+        >>> df = bfree_float("SANB11")  # SANB3 + SANB4 + SANB11 (UNIT) rows
+    """
+    return run_spec(
+        SPEC_BFREE_FLOAT, session_token=session_token, ticker_or_cvm=ticker_or_cvm
+    )
+
+
+def bfund_holders(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the top investment funds holding one or more companies.
+
+    Uses aetp/output/fundamental/CarteiraTopFundos. One row per fund position:
+    the fund's id, names, CNPJ, administrator, manager and category, the
+    position's value and quantity, the asset's share of the fund's equity
+    (``pct_of_fund``), and the position's reference year/month.
+
+    Args:
+        ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
+            or a list mixing both.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), each block tagged with a ``ticker``
+        column holding the queried identifier. A company no fund holds
+        contributes an empty block; empty DataFrame with the schema if none
+        has holders.
+
+    Example:
+        >>> df = bfund_holders("PETR4")
+        >>> df[["fund_trade_name", "position_value", "pct_of_fund"]].head()
+    """
+    return run_spec(
+        SPEC_BFUND_HOLDERS, session_token=session_token, ticker_or_cvm=ticker_or_cvm
+    )
 
 
 def bindicators(

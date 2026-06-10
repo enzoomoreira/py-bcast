@@ -13,6 +13,8 @@ from .._legacy.endpoints import (
     SPEC_BCOMPANY_DETAIL,
     SPEC_BCOMPANY_LIST,
     SPEC_BCONSENSUS,
+    SPEC_BFREE_FLOAT,
+    SPEC_BFUND_HOLDERS,
     SPEC_BINDICATOR_META,
     SPEC_BINDICATORS,
     SPEC_BINDICES,
@@ -106,6 +108,36 @@ async def absectors(session_token: str | None = None) -> pd.DataFrame:
 async def abindicator_meta(session_token: str | None = None) -> pd.DataFrame:
     """Async version of ``bindicator_meta``. Metadata for all indicators."""
     return await arun_spec(SPEC_BINDICATOR_META, session_token=session_token)
+
+
+async def abfree_float(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bfree_float``.
+
+    One row per share class (ON/PN/UNIT) with free float and units
+    composition. The endpoint emits its own ``ticker`` column (the company's
+    share classes). Raises NotFoundError if any identifier is unknown.
+    """
+    return await arun_spec(
+        SPEC_BFREE_FLOAT, session_token=session_token, ticker_or_cvm=ticker_or_cvm
+    )
+
+
+async def abfund_holders(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bfund_holders``.
+
+    One row per fund position, each block tagged with a ``ticker`` column
+    holding the queried identifier. A company no fund holds contributes an
+    empty block.
+    """
+    return await arun_spec(
+        SPEC_BFUND_HOLDERS, session_token=session_token, ticker_or_cvm=ticker_or_cvm
+    )
 
 
 async def abindicators(

@@ -17,13 +17,15 @@ Usage::
 """
 
 from .historical import abdh, abdh_ohlcv, abdi, abdt
-from .macro import abmacro, abdi_cdi, abreturn, abvolume, abinflation
+from .macro import abmacro, abdi_cdi, abreturn, abvolume, abinflation, abstats
 from .fundamental import (
     abconsensus,
     abcompany,
     abquote,
     abtickers,
     abshares,
+    abfree_float,
+    abfund_holders,
     abindices,
     absectors,
     abindicators,
@@ -57,11 +59,14 @@ __all__ = [
     "abreturn",
     "abvolume",
     "abinflation",
+    "abstats",
     "abconsensus",
     "abcompany",
     "abquote",
     "abtickers",
     "abshares",
+    "abfree_float",
+    "abfund_holders",
     "abindices",
     "absectors",
     "abindicators",

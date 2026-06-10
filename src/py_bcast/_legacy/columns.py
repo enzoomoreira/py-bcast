@@ -56,6 +56,37 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
 VOLUME_RENAME: dict[str, str | None] = {**CONTENT_PROXY_RENAME, "symbol": "ticker"}
 
 
+# bstats: FIIAnbimaBovespa per-asset market-stats snapshot. Field meanings
+# derived from live values cross-checked against sibling endpoints: ulcp/ulvd
+# straddle the session close (HGLG11 151.8 <= bdh close 151.83 <= 152.0) and
+# mirror the DDE OCP/OVD bid/ask pair; qtct matches EmpresaAcoesUnits
+# total_shares for PETR4; pliq/qtct reproduces the FII's net asset value per
+# quota (HGLG11 ~224). davl is a sparse FII-only date of unconfirmed meaning.
+STATS_RENAME: dict[str, str | None] = {
+    "cod_broad": "ticker",
+    "ulcp": "bid",
+    "dulcp": "bid_date",
+    "ulvd": "ask",
+    "dulvd": "ask_date",
+    "uldv": "last_dividend",
+    "duldv": "last_dividend_date",
+    "dvyld": "dividend_yield_pct",
+    "qtct": "shares_outstanding",
+    "min1ano": "low_52w",
+    "dmin1ano": "low_52w_date",
+    "max1ano": "high_52w",
+    "dmax1ano": "high_52w_date",
+    "vfult": "turnover_last",
+    "vm30d": "avg_turnover_30d",
+    "vm100d": "avg_turnover_100d",
+    "vm180d": "avg_turnover_180d",
+    "qnm180d": "avg_trades_180d",
+    "pliq": "net_assets",
+    "fnt": "source",
+    "davl": None,  # drop: sparse FII-only date, meaning unconfirmed
+}
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Group B: AETP binary endpoints — per-endpoint tag-to-name maps
 # ─────────────────────────────────────────────────────────────────────
@@ -308,6 +339,46 @@ PORTFOLIO_FIELDS: dict[str, str | None] = {
 }
 
 
+# bfund_holders(ticker_or_cvm) — top investment funds holding a company.
+# Tag meanings derived from live cvm=9512 rows: 13154 is the administrator and
+# 13144 the manager (CAIXA PETROBRAS fund: 13154=CAIXA ECONOMICA FEDERAL,
+# 13144=Caixa DTVM, matching the fund's public records); 10055 is the asset's
+# share of the fund's equity (95.4 for that dedicated single-stock fund);
+# 13102 is a 14-digit zero-padded CNPJ kept as string by the leading-zero
+# guard. 13855/13856 are the position's reference year/month.
+FUND_HOLDER_FIELDS: dict[str, str] = {
+    "13169": "fund_id",
+    "13855": "ref_year",
+    "13856": "ref_month",
+    "12088": "fund_name",
+    "12063": "fund_trade_name",
+    "13102": "cnpj",
+    "13154": "administrator",
+    "13144": "manager",
+    "13117": "category",
+    "13167": "position_value",
+    "13166": "position_quantity",
+    "10055": "pct_of_fund",
+}
+
+# bfree_float(ticker_or_cvm) — share classes with free float and units
+# composition. 12073/12075 reproduces 13827 (free-float %) on every live row
+# (PETR, SANB); a unit row (e.g. SANB11) leaves the share counts blank and
+# fills 13831/13832 with the ON/PN quantities composing one unit. 12072 is
+# blank in all live samples — dropped, not guessed.
+FREE_FLOAT_FIELDS: dict[str, str | None] = {
+    "305": "ticker",
+    "12071": "share_type",
+    "12075": "total_shares",
+    "12073": "float_shares",
+    "12074": "treasury_shares",
+    "13827": "float_pct",
+    "13831": "unit_on",
+    "13832": "unit_pn",
+    "12072": None,  # drop: blank in all live samples, meaning unconfirmed
+}
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Group C: empty-result schemas (column -> dtype)
 #
@@ -378,6 +449,28 @@ VOLUME_SCHEMA: dict[str, str] = {
     "months": "float64",
     "dat": "float64",
 }
+STATS_SCHEMA: dict[str, str] = {
+    "ticker": "object",
+    "bid": "float64",
+    "bid_date": "float64",
+    "ask": "float64",
+    "ask_date": "float64",
+    "last_dividend": "float64",
+    "last_dividend_date": "float64",
+    "dividend_yield_pct": "float64",
+    "shares_outstanding": "float64",
+    "low_52w": "float64",
+    "low_52w_date": "float64",
+    "high_52w": "float64",
+    "high_52w_date": "float64",
+    "turnover_last": "float64",
+    "avg_turnover_30d": "float64",
+    "avg_turnover_100d": "float64",
+    "avg_turnover_180d": "float64",
+    "source": "object",
+    "net_assets": "float64",
+    "avg_trades_180d": "float64",
+}
 
 # Reference / mixed (RangeIndex, object) — only endpoints that can return empty
 COMPANY_LIST_SCHEMA = _object_schema(COMPANY_LIST_FIELDS)
@@ -389,6 +482,7 @@ CALENDAR_SCHEMA = _object_schema(CALENDAR_FIELDS)
 DIVIDEND_SCHEMA = _object_schema(DIVIDEND_FIELDS)
 DY_SCHEMA = _object_schema(DY_FIELDS)
 PORTFOLIO_LIST_SCHEMA = _object_schema(PORTFOLIO_LIST_FIELDS)
+FUND_HOLDER_SCHEMA = _object_schema(FUND_HOLDER_FIELDS)
 
 # Single-entity snapshots returned as a one-row DataFrame (RangeIndex)
 QUOTE_SCHEMA = _object_schema(QUOTE_FIELDS)

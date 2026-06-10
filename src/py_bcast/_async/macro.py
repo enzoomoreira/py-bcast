@@ -10,6 +10,7 @@ from .._legacy.endpoints import (
     SPEC_BINFLATION,
     SPEC_BMACRO,
     SPEC_BRETURN,
+    SPEC_BSTATS,
     SPEC_BVOLUME,
 )
 from .._legacy._async.executor import run_spec as arun_spec
@@ -83,6 +84,20 @@ async def abvolume(
     ``ticker`` stays a column because it repeats per window.
     """
     return await arun_spec(SPEC_BVOLUME, session_token=session_token, tickers=tickers)
+
+
+@validate_params
+async def abstats(
+    tickers: TickerList,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bstats``.
+
+    Flat DataFrame (RangeIndex), one row per symbol with the market-stats
+    snapshot (bid/ask at the close, dividend yield, 52-week range, average
+    turnover). Unknown symbols are omitted.
+    """
+    return await arun_spec(SPEC_BSTATS, session_token=session_token, tickers=tickers)
 
 
 async def abinflation(

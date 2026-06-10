@@ -21,6 +21,9 @@ from .columns import (
     DIVIDEND_SCHEMA,
     DY_FIELDS,
     DY_SCHEMA,
+    FREE_FLOAT_FIELDS,
+    FUND_HOLDER_FIELDS,
+    FUND_HOLDER_SCHEMA,
     INDEX_FIELDS,
     INDEX_SCHEMA,
     INDICATOR_HISTORY_FIELDS,
@@ -38,6 +41,8 @@ from .columns import (
     SECTOR_SCHEMA,
     SHARES_FIELDS,
     SHARES_SCHEMA,
+    STATS_RENAME,
+    STATS_SCHEMA,
     TICK_SCHEMA,
     TICKER_FIELDS,
     VOLUME_RENAME,
@@ -142,6 +147,34 @@ SPEC_BTICKERS = EndpointSpec(
     index=Index.RANGE,
     rename=TICKER_FIELDS,
     empty_ok=False,
+    params=(ParamBind("ticker_or_cvm", "13004", "cvm"),),
+    vectorize_over="ticker_or_cvm",
+)
+
+# bfree_float — share classes with free float and units composition.
+# Fail-fast: every listed company has share rows, so a no-records reply means
+# the identifier does not resolve to a company. Echoes 305 -> ticker, so the
+# vectorizer does not insert one.
+SPEC_BFREE_FLOAT = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/acao",
+    index=Index.RANGE,
+    rename=FREE_FLOAT_FIELDS,
+    empty_ok=False,
+    params=(ParamBind("ticker_or_cvm", "13004", "cvm"),),
+    vectorize_over="ticker_or_cvm",
+)
+
+# bfund_holders — top investment funds holding a company. Vectorizes over the
+# ticker/CVM identifier (13004, resolved); the endpoint does not echo a
+# ticker, so the vectorizer inserts the queried one. Soft: a company no fund
+# holds yields an empty (schema-typed) block.
+SPEC_BFUND_HOLDERS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/carteira/top-fundos",
+    index=Index.RANGE,
+    rename=FUND_HOLDER_FIELDS,
+    schema=FUND_HOLDER_SCHEMA,
     params=(ParamBind("ticker_or_cvm", "13004", "cvm"),),
     vectorize_over="ticker_or_cvm",
 )
@@ -316,6 +349,21 @@ SPEC_BVOLUME = EndpointSpec(
     index=Index.RANGE,
     rename=VOLUME_RENAME,
     schema=VOLUME_SCHEMA,
+    params=(ParamBind("tickers", "10113", "join"),),
+    timeout=15,
+)
+
+# bstats / abstats — per-asset market statistics (bid/ask at the close, last
+# dividend, dividend yield, 52-week range, average turnover; FIIs add net
+# assets). Despite the endpoint name, any B3 symbol works. Single request,
+# multi-symbol in one tag (10113 join); echoes cod_broad -> ticker; unknown
+# symbols are omitted (soft).
+SPEC_BSTATS = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/FIIAnbimaBovespa",
+    index=Index.RANGE,
+    rename=STATS_RENAME,
+    schema=STATS_SCHEMA,
     params=(ParamBind("tickers", "10113", "join"),),
     timeout=15,
 )

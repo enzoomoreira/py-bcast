@@ -8,6 +8,8 @@ from .reference import (
     bquote,
     btickers,
     bshares,
+    bfree_float,
+    bfund_holders,
     bindicators,
     bindicator_meta,
 )
@@ -21,6 +23,8 @@ __all__ = [
     "bquote",
     "btickers",
     "bshares",
+    "bfree_float",
+    "bfund_holders",
     "bindicators",
     "bindicator_meta",
     "bcalendar",

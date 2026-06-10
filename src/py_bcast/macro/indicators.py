@@ -10,6 +10,7 @@ from .._legacy.endpoints import (
     SPEC_BINFLATION,
     SPEC_BMACRO,
     SPEC_BRETURN,
+    SPEC_BSTATS,
     SPEC_BVOLUME,
 )
 from .._legacy._sync.executor import run_spec
@@ -148,6 +149,40 @@ def bvolume(
         >>> df[df["ticker"] == "PETR4.BVMF"]
     """
     return run_spec(SPEC_BVOLUME, session_token=session_token, tickers=tickers)
+
+
+@validate_params
+def bstats(
+    tickers: TickerList,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch a market-statistics snapshot for one or more symbols.
+
+    Uses the FIIAnbimaBovespa endpoint, which despite the name serves any B3
+    symbol (stocks, FIIs, units): bid/ask at the last session's close, last
+    dividend and dividend yield, 52-week range (adjusted), last and average
+    financial volumes, and average daily trade count. FIIs additionally
+    populate ``net_assets``.
+
+    Args:
+        tickers: Single ticker or list (e.g., "HGLG11" or ["PETR4", "HGLG11"]).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), one row per symbol. Columns: ticker, bid,
+        bid_date, ask, ask_date, last_dividend, last_dividend_date,
+        dividend_yield_pct, shares_outstanding, low_52w, low_52w_date,
+        high_52w, high_52w_date, turnover_last, avg_turnover_30d,
+        avg_turnover_100d, avg_turnover_180d, source, net_assets,
+        avg_trades_180d. Unknown symbols are omitted; empty DataFrame with
+        that schema if none resolves.
+
+    Example:
+        >>> df = bstats(["HGLG11", "PETR4"])
+        >>> df[["ticker", "dividend_yield_pct"]]
+    """
+    return run_spec(SPEC_BSTATS, session_token=session_token, tickers=tickers)
 
 
 def binflation(
