@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 import httpx
 import pandas as pd
 
-from .._legacy.columns import DAILY_OHLCV_SCHEMA
+from .._legacy.columns import CONTENT_PROXY_RENAME, DAILY_OHLCV_SCHEMA
 from .._core.constants import BASE_URL
 from .._core.dates import business_days, default_end_date, to_date_str
 from .._core.exceptions import ContentProxyError
@@ -15,7 +15,7 @@ from .._legacy.http import base_params, get_http_client, get_session_token
 from .._core.logging import get_logger
 from .._legacy.multi import vectorize
 from .._core.normalize import ensure_list
-from .._legacy.output import empty_bdh_frame, to_dataframe
+from .._legacy.output import Index, empty_bdh_frame, finalize_frame
 from .._core.retry import http_retry
 from .._core.validation import DateParam, TickerList, validate_params
 from .._legacy.xml_helpers import raise_for_content_proxy_status
@@ -102,7 +102,9 @@ def bdh(
 
     frames = []
     for sym in sorted(results):
-        df = to_dataframe(results[sym])
+        df = finalize_frame(
+            results[sym], index=Index.DATETIME, rename=CONTENT_PROXY_RENAME
+        )
         # Drop tolerance rows with no actual trade data (NaT index)
         df = df[df.index.notna()]
         if df.empty:
@@ -159,7 +161,12 @@ def _bdh_ohlcv_one(
         if tick is not None
         else []
     )
-    df = to_dataframe(rows, date_col="dat", schema=DAILY_OHLCV_SCHEMA)
+    df = finalize_frame(
+        rows,
+        index=Index.DATETIME,
+        rename=CONTENT_PROXY_RENAME,
+        schema=DAILY_OHLCV_SCHEMA,
+    )
     df.insert(0, "ticker", ticker)
     return df
 

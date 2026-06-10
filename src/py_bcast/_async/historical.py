@@ -2,30 +2,32 @@
 
 from __future__ import annotations
 
-import datetime
 import xml.etree.ElementTree as ET
 
 import httpx
 import pandas as pd
 
-from .._legacy.columns import (
-    DAILY_OHLCV_SCHEMA,
-    INTRADAY_BAR_SCHEMA,
-    TICK_SCHEMA,
-)
 from .._core.constants import BASE_URL
-from .._core.dates import business_days, default_end_date, to_date_str, to_datetime_str
+from .._core.dates import (
+    business_days,
+    default_end_date,
+    default_tick_end,
+    to_date_str,
+    to_datetime_str,
+)
 from .._core.exceptions import ContentProxyError
-from .._legacy.http import base_params, get_async_http_client, get_session_token
 from .._core.logging import get_logger
-from .._legacy.multi import vectorize_async
 from .._core.normalize import ensure_list
-from .._legacy.output import empty_bdh_frame, to_dataframe
 from .._core.ratelimit import rate_limit_async
 from .._core.retry import http_retry
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
-from .._legacy.xml_helpers import parse_ticks, raise_for_content_proxy_status
-from ._helpers import async_content_proxy_get
+from .._legacy.columns import DAILY_OHLCV_SCHEMA, CONTENT_PROXY_RENAME
+from .._legacy.endpoints import SPEC_BDI, SPEC_BDT
+from .._legacy.http import base_params, get_async_http_client, get_session_token
+from .._legacy.multi import vectorize_async
+from .._legacy.output import Index, empty_bdh_frame, finalize_frame
+from .._legacy.xml_helpers import raise_for_content_proxy_status
+from .executor import arun_spec
 
 logger = get_logger(__name__)
 
@@ -114,7 +116,9 @@ async def abdh(
 
     frames = []
     for sym in sorted(results):
-        df = to_dataframe(results[sym])
+        df = finalize_frame(
+            results[sym], index=Index.DATETIME, rename=CONTENT_PROXY_RENAME
+        )
         # Drop tolerance rows with no actual trade data (NaT index)
         df = df[df.index.notna()]
         if df.empty:
@@ -161,7 +165,12 @@ async def _abdh_ohlcv_one(
         if tick is not None
         else []
     )
-    df = to_dataframe(rows, date_col="dat", schema=DAILY_OHLCV_SCHEMA)
+    df = finalize_frame(
+        rows,
+        index=Index.DATETIME,
+        rename=CONTENT_PROXY_RENAME,
+        schema=DAILY_OHLCV_SCHEMA,
+    )
     df.insert(0, "ticker", ticker)
     return df
 
@@ -183,33 +192,6 @@ async def abdh_ohlcv(
     )
 
 
-async def _abdt_one(
-    ticker: str,
-    start: str,
-    end: str | None = None,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Get tick-by-tick data for a single symbol."""
-    start_str = to_datetime_str(start)
-    if end is None:
-        dt = datetime.datetime.strptime(start_str, "%Y%m%d%H%M%S")
-        end_str = (dt + datetime.timedelta(hours=1)).strftime("%Y%m%d%H%M%S")
-    else:
-        end_str = to_datetime_str(end)
-
-    root = await async_content_proxy_get(
-        "BaseHistoricaNumerica/HistoricoTick",
-        {"305": ticker, "10071": start_str, "10072": end_str},
-        session_token=session_token,
-        timeout=60,
-    )
-
-    ticks = parse_ticks(root)
-    # API returns newest first — reverse to chronological order
-    ticks.reverse()
-    return to_dataframe(ticks, date_col="dat", time_col="hor", schema=TICK_SCHEMA)
-
-
 @validate_params
 async def abdt(
     ticker: TickerList,
@@ -222,32 +204,14 @@ async def abdt(
     Flat DataFrame with a DatetimeIndex (from dat+hor) and a ``ticker`` column
     (one block per symbol).
     """
-    return await vectorize_async(
-        ticker, lambda t: _abdt_one(t, start, end, session_token)
-    )
-
-
-async def _abdi_one(
-    ticker: str,
-    start_date: str,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Get intraday OHLCV bars for a single symbol."""
-    date_str = to_date_str(start_date)
-    tag_10074 = f"{date_str}0000"
-
-    root = await async_content_proxy_get(
-        "BaseHistoricaNumerica/HistoricoIntraday",
-        {"305": ticker, "10074": tag_10074, "10029": "4"},
+    start_str = to_datetime_str(start)
+    end_str = default_tick_end(start_str) if end is None else to_datetime_str(end)
+    return await arun_spec(
+        SPEC_BDT,
         session_token=session_token,
-        timeout=60,
-    )
-
-    bars = parse_ticks(root)
-    # API returns newest first — reverse to chronological order
-    bars.reverse()
-    return to_dataframe(
-        bars, date_col="dat", time_col="hor", schema=INTRADAY_BAR_SCHEMA
+        ticker=ticker,
+        start=start_str,
+        end=end_str,
     )
 
 
@@ -262,6 +226,9 @@ async def abdi(
     Flat DataFrame with a DatetimeIndex (from dat+hor) and a ``ticker`` column
     (one block per symbol).
     """
-    return await vectorize_async(
-        ticker, lambda t: _abdi_one(t, start_date, session_token)
+    return await arun_spec(
+        SPEC_BDI,
+        session_token=session_token,
+        ticker=ticker,
+        bar_start=f"{to_date_str(start_date)}0000",
     )

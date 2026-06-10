@@ -3,8 +3,7 @@
 Converts raw API responses (a ``list[dict[str, str]]`` or a single record
 ``dict``) into typed pandas DataFrames with the right index and numeric
 coercion. A single :func:`finalize_frame` entry point selects the index policy
-via the :class:`Index` enum; the ``to_*`` helpers are thin adapters over it
-kept for the call sites not yet migrated to the spec-driven executor.
+via the :class:`Index` enum.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from enum import Enum, auto
 
 import pandas as pd
 
-from .columns import BDH_DATA_SCHEMA, CONTENT_PROXY_RENAME
+from .columns import BDH_DATA_SCHEMA
 
 # Server sentinels for "no value" that must not poison numeric coercion.
 # A column of numbers plus one of these (e.g. a no-trade tolerance row whose
@@ -155,9 +154,7 @@ def finalize_frame(
 ) -> pd.DataFrame:
     """Build a typed DataFrame from raw rows under one index policy.
 
-    Single entry point unifying the historical ``to_dataframe`` (DatetimeIndex),
-    ``to_reference_dataframe`` (RangeIndex) and ``to_record_dataframe``
-    (one-row) helpers. The ``index`` enum selects the behaviour:
+    The ``index`` enum selects the behaviour:
 
     - ``RANGE`` / ``DATETIME`` / ``DATETIME_TIME`` take a ``list[dict]``.
     - ``RECORD`` takes a single ``dict`` (one entity).
@@ -217,46 +214,3 @@ def empty_bdh_frame() -> pd.DataFrame:
     df = finalize_frame([], index=Index.DATETIME, schema=BDH_DATA_SCHEMA)
     df.insert(0, "ticker", pd.Series(dtype="object"))
     return df
-
-
-def to_dataframe(
-    rows: list[dict[str, str]],
-    date_col: str = "dat",
-    time_col: str | None = None,
-    rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
-    schema: dict[str, str] | None = None,
-) -> pd.DataFrame:
-    """Adapter: DatetimeIndex frame (see :func:`finalize_frame`)."""
-    index = Index.DATETIME_TIME if time_col else Index.DATETIME
-    return finalize_frame(
-        rows,
-        index=index,
-        rename=rename,
-        schema=schema,
-        date_col=date_col,
-        time_col=time_col,
-    )
-
-
-def to_reference_dataframe(
-    rows: list[dict[str, str]],
-    rename: dict[str, str | None] | None = None,
-    schema: dict[str, str] | None = None,
-) -> pd.DataFrame:
-    """Adapter: RangeIndex reference frame (see :func:`finalize_frame`)."""
-    return finalize_frame(rows, index=Index.RANGE, rename=rename, schema=schema)
-
-
-def to_record_dataframe(
-    record: dict[str, str],
-    rename: dict[str, str | None] | None = CONTENT_PROXY_RENAME,
-    schema: dict[str, str] | None = None,
-    ticker: str | None = None,
-) -> pd.DataFrame:
-    """Adapter: one-row RangeIndex frame from a single record.
-
-    See :func:`finalize_frame`.
-    """
-    return finalize_frame(
-        record, index=Index.RECORD, rename=rename, schema=schema, ticker=ticker
-    )

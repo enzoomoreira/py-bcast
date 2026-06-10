@@ -21,7 +21,7 @@ from .._legacy.endpoints import (
     SPEC_BTICKERS,
 )
 from .._legacy.multi import vectorize_async
-from .._legacy.output import to_record_dataframe
+from .._legacy.output import Index, finalize_frame
 from ._helpers import async_aetp_request
 from .executor import arun_spec
 
@@ -69,7 +69,9 @@ async def _abquote_one(
     )
     rows = rows_to_dicts(parsed)
     record = rows[0] if rows else {}
-    return to_record_dataframe(record, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA)
+    return finalize_frame(
+        record, index=Index.RECORD, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA
+    )
 
 
 async def abquote(

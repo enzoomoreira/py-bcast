@@ -28,6 +28,7 @@ from .columns import (
     INDICATOR_META_FIELDS,
     INDICATOR_META_SCHEMA,
     INFLATION_SCHEMA,
+    INTRADAY_BAR_SCHEMA,
     MACRO_SCHEMA,
     PORTFOLIO_FIELDS,
     PORTFOLIO_LIST_FIELDS,
@@ -37,6 +38,7 @@ from .columns import (
     SECTOR_SCHEMA,
     SHARES_FIELDS,
     SHARES_SCHEMA,
+    TICK_SCHEMA,
     TICKER_FIELDS,
     VOLUME_RENAME,
     VOLUME_SCHEMA,
@@ -326,4 +328,46 @@ SPEC_BINFLATION = EndpointSpec(
     rename=CONTENT_PROXY_RENAME,
     schema=INFLATION_SCHEMA,
     timeout=15,
+)
+
+# ── historical intraday (ContentProxy cp_ticks) ───────────────────────────
+# bdt / abdt — tick-by-tick over a UTC datetime window. The default end
+# (start + 1h) is computed by the wrapper, not a resolve policy. The API
+# returns newest first (cp_reverse restores chronological order). Vectorizes
+# over the symbol (305), which the endpoint does not echo.
+SPEC_BDT = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/HistoricoTick",
+    index=Index.DATETIME_TIME,
+    rename=CONTENT_PROXY_RENAME,
+    schema=TICK_SCHEMA,
+    cp_reverse=True,
+    timeout=60,
+    time_col="hor",
+    params=(
+        ParamBind("ticker", "305", "none"),
+        ParamBind("start", "10071", "datetime"),
+        ParamBind("end", "10072", "datetime"),
+    ),
+    vectorize_over="ticker",
+)
+
+# bdi / abdi — intraday 2-minute bars from a date to now (10029=4 selects
+# bars). Tag 10074 wants YYYYMMDDHHMM where the HHMM tail is required but
+# ignored; the wrapper stamps the "0000" suffix, so the bind is verbatim.
+SPEC_BDI = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/HistoricoIntraday",
+    index=Index.DATETIME_TIME,
+    rename=CONTENT_PROXY_RENAME,
+    schema=INTRADAY_BAR_SCHEMA,
+    static_params={"10029": "4"},
+    cp_reverse=True,
+    timeout=60,
+    time_col="hor",
+    params=(
+        ParamBind("ticker", "305", "none"),
+        ParamBind("bar_start", "10074", "none"),
+    ),
+    vectorize_over="ticker",
 )

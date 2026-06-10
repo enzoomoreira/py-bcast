@@ -95,6 +95,12 @@ def default_end_date() -> str:
     return datetime.date.today().strftime("%Y%m%d")
 
 
+def default_tick_end(start_str: str) -> str:
+    """Default ``bdt``/``abdt`` window end: start + 1 hour (YYYYMMDDHHMMSS)."""
+    dt = datetime.datetime.strptime(start_str, "%Y%m%d%H%M%S")
+    return (dt + datetime.timedelta(hours=1)).strftime("%Y%m%d%H%M%S")
+
+
 def business_days(start: DateLike, end: DateLike) -> list[str]:
     """Generate list of business days (Mon-Fri) between start and end inclusive.
 

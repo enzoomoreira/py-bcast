@@ -20,7 +20,7 @@ from .._legacy.endpoints import (
 )
 from .._legacy.executor import run_spec
 from .._legacy.multi import vectorize
-from .._legacy.output import to_record_dataframe
+from .._legacy.output import Index, finalize_frame
 
 
 def bcompany(
@@ -112,7 +112,9 @@ def _quote_one(
     parsed = aetp_request("fundamental/ativo/cotacao", {"10068": ticker}, session_token)
     rows = rows_to_dicts(parsed)
     record = rows[0] if rows else {}
-    return to_record_dataframe(record, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA)
+    return finalize_frame(
+        record, index=Index.RECORD, rename=QUOTE_FIELDS, schema=QUOTE_SCHEMA
+    )
 
 
 def bquote(
