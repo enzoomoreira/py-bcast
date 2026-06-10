@@ -12,7 +12,13 @@ from __future__ import annotations
 import pandas as pd
 
 from .._core.validation import Ticker, TickerList, validate_params
-from ._sync.reference import index_members_core, info_core, logo_core
+from ._sync.reference import (
+    holiday_tables_core,
+    index_list_core,
+    index_members_core,
+    info_core,
+    logo_core,
+)
 
 
 @validate_params
@@ -44,6 +50,46 @@ def binfo(symbols: TickerList) -> pd.DataFrame:
         >>> binfo(["PETR4", "USDBRL"])[["name", "type", "currency"]]
     """
     return info_core(symbols)
+
+
+def bindexes() -> pd.DataFrame:
+    """List the available market-index codes via Broadcast+.
+
+    The codes feed ``bindex_members``. The legacy ``bindices`` returns a richer
+    list (names + ids); this is the Plus discovery primitive (codes only).
+
+    Requires Broadcast+ backend (see ``binfo``).
+
+    Returns:
+        Single-column DataFrame ``index`` with the available codes (IBOV, IFIX,
+        SMLL, etc.).
+
+    Example:
+        >>> from py_bcast import bindexes, configure
+        >>> configure(terminal="plus")
+        >>> bindexes()["index"].tolist()
+    """
+    return index_list_core()
+
+
+def bholidays() -> pd.DataFrame:
+    """List the holiday-table catalog (country/exchange calendars) via Broadcast+.
+
+    Returns only the table catalog. The per-table holiday DATES endpoint exists
+    but its filter parameter is undiscovered (the server ignores every probed
+    body shape), so the dates themselves are not yet reachable.
+
+    Requires Broadcast+ backend (see ``binfo``).
+
+    Returns:
+        Flat DataFrame with columns: id (table id), name (country/exchange).
+
+    Example:
+        >>> from py_bcast import bholidays, configure
+        >>> configure(terminal="plus")
+        >>> bholidays()[bholidays()["name"] == "Brasil"]
+    """
+    return holiday_tables_core()
 
 
 @validate_params

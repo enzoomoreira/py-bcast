@@ -123,6 +123,44 @@ def index_members_core(index: str) -> pd.DataFrame:
     return df
 
 
+# ── bindexes — available index codes ─────────────────────────────────────────
+
+
+def index_list_core() -> pd.DataFrame:
+    """Fetch the list of available index codes (feeds ``bindex_members``)."""
+    logger.debug("bindexes")
+    r = plus_request("get", "/stock/v1/indexes")
+    codes = r.json()
+    codes = [c for c in codes if isinstance(c, str)] if isinstance(codes, list) else []
+    return pd.DataFrame({"index": pd.Series(codes, dtype="object")})
+
+
+# ── bholidays — holiday-table catalog ────────────────────────────────────────
+
+# NOTE: only the holiday-table CATALOG (country tables) is reachable. The
+# per-table holiday dates endpoint (POST /stock/v1/calendar/holidays) accepts a
+# non-empty body but ignores every filter shape probed (27 variants), always
+# answering "Nenhum filtro de tabela de feriados aplicado" — the filter key is
+# undiscovered, so the dates themselves stay out of reach for now.
+_HOLIDAY_TABLE_COLUMNS = ["id", "name"]
+
+
+def holiday_tables_core() -> pd.DataFrame:
+    """Fetch the catalog of holiday tables (country/exchange calendars)."""
+    logger.debug("bholidays")
+    r = plus_request("get", "/stock/v1/calendar/tables")
+
+    data = r.json()
+    tables = data.get("holidaysTables") or [] if isinstance(data, dict) else []
+    if not tables:
+        return pd.DataFrame(
+            {col: pd.Series(dtype="object") for col in _HOLIDAY_TABLE_COLUMNS}
+        )
+
+    records = [{"id": t.get("id"), "name": t.get("name", "")} for t in tables]
+    return pd.DataFrame(records, columns=_HOLIDAY_TABLE_COLUMNS)
+
+
 # ── blogo — instrument logo ──────────────────────────────────────────────────
 
 
