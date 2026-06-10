@@ -5,6 +5,8 @@ Provides singleton httpx clients (sync + async) with connection pooling.
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from .._core.config import get_settings
@@ -51,11 +53,28 @@ def get_async_http_client() -> httpx.AsyncClient:
 
 
 def close_clients() -> None:
-    """Close the singleton HTTP clients. Used for cleanup/testing."""
+    """Close the singleton HTTP clients. Used for cleanup/testing.
+
+    The async client is closed via ``asyncio.run``, so this must not be called
+    from inside a running event loop — use :func:`aclose_clients` there.
+    """
     global _sync_client, _async_client
     if _sync_client and not _sync_client.is_closed:
         _sync_client.close()
     _sync_client = None
+    if _async_client and not _async_client.is_closed:
+        asyncio.run(_async_client.aclose())
+    _async_client = None
+
+
+async def aclose_clients() -> None:
+    """Async twin of :func:`close_clients`, for use inside an event loop."""
+    global _sync_client, _async_client
+    if _sync_client and not _sync_client.is_closed:
+        _sync_client.close()
+    _sync_client = None
+    if _async_client and not _async_client.is_closed:
+        await _async_client.aclose()
     _async_client = None
 
 
