@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.validation import DateParam, TickerList, validate_params
+from .._core.validation import DateParam, Ticker, TickerList, validate_params
 from .._legacy.endpoints import (
     SPEC_BDI_CDI,
+    SPEC_BFX,
     SPEC_BINFLATION,
     SPEC_BMACRO,
     SPEC_BRETURN,
@@ -84,6 +85,28 @@ async def abvolume(
     ``ticker`` stays a column because it repeats per window.
     """
     return await arun_spec(SPEC_BVOLUME, session_token=session_token, tickers=tickers)
+
+
+@validate_params
+async def abfx(
+    from_currency: Ticker,
+    to_currency: Ticker,
+    amount: float = 1.0,
+    session_token: str | None = None,
+) -> float:
+    """Async version of ``bfx``.
+
+    Spot currency conversion; returns the converted amount as a float.
+    Raises NotFoundError for an unknown currency pair.
+    """
+    df = await arun_spec(
+        SPEC_BFX,
+        session_token=session_token,
+        from_currency=from_currency,
+        to_currency=to_currency,
+        amount=amount,
+    )
+    return float(df["close"].iloc[0])
 
 
 @validate_params

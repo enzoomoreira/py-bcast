@@ -39,7 +39,10 @@ def raise_for_content_proxy_status(
         return
     msg = root.findtext("MESSAGE") or "Unknown error"
     if is_not_found(msg):
-        raise NotFoundError(params.get("305") or params.get("10113"), kind="symbol")
+        identifier = (
+            params.get("305") or params.get("10113") or params.get("Instrumento")
+        )
+        raise NotFoundError(identifier, kind="symbol")
     if not is_no_records(msg):
         logger.error("ContentProxy error on %s: %s", endpoint, msg)
         raise ContentProxyError(

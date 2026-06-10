@@ -32,6 +32,8 @@ _NOT_FOUND_MARKERS = (
     "não existe",
     "ativo não encontrado",
     "empresa não encontrada",
+    # ConversorMoedas replies this for an unknown currency code.
+    "símbolo inválido",
 )
 # Server messages that mean "a valid query simply matched no rows".
 _NO_RECORDS_MARKERS = (

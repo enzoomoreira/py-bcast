@@ -56,6 +56,40 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
 VOLUME_RENAME: dict[str, str | None] = {**CONTENT_PROXY_RENAME, "symbol": "ticker"}
 
 
+# bfund_history: Fundos quota history. Accepts exchange tickers (ETFs/FIIs)
+# and ANBIMA fund ids (e.g. "214248.ANBIMA", the id bfunds returns); the
+# fund-accounting fields (net_asset, inflows/outflows, quote_holders) only
+# populate for ANBIMA ids.
+FUND_HISTORY_RENAME: dict[str, str | None] = {
+    **CONTENT_PROXY_RENAME,
+    "raising_day": "inflows",
+    "redemption_day": "outflows",
+    "total_quote_holder": "quote_holders",
+}
+
+# btreasury: TitulosPublicosUltimos last prices. `last` is the trading yield
+# (% p.a.), unit_price the PU; the echoed symbol comes back bare (no suffix).
+TREASURY_LAST_RENAME: dict[str, str | None] = {
+    "symbol": "ticker",
+    "dat": "date",
+    "last": "rate",
+}
+
+# bfund_returns: FundosRentabilidade per-window returns. ret_anual is the
+# 12-month return (verified against bdh BBSD11 closes, not calendar-year).
+FUND_RETURNS_RENAME: dict[str, str | None] = {
+    "symbol": "ticker",
+    "ret_diario": "return_1d",
+    "ret_mensal": "return_1m",
+    "ret_3meses": "return_3m",
+    "ret_6meses": "return_6m",
+    "ret_anual": "return_12m",
+    "ret_18meses": "return_18m",
+    "ret_2anos": "return_2y",
+    "ret_3anos": "return_3y",
+    "ret_5anos": "return_5y",
+}
+
 # bstats: FIIAnbimaBovespa per-asset market-stats snapshot. Field meanings
 # derived from live values cross-checked against sibling endpoints: ulcp/ulvd
 # straddle the session close (HGLG11 151.8 <= bdh close 151.83 <= 152.0) and
@@ -405,6 +439,29 @@ def _object_schema(fields: dict[str, str | None]) -> dict[str, str]:
 
 # Numeric time-series (paired with an empty DatetimeIndex)
 MACRO_SCHEMA: dict[str, str] = {"close": "float64"}
+FUND_HISTORY_SCHEMA: dict[str, str] = {
+    "close": "float64",
+    "net_asset": "float64",
+    "inflows": "float64",
+    "outflows": "float64",
+    "total_assets": "float64",
+    "quote_holders": "float64",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+}
+TREASURY_HISTORY_SCHEMA: dict[str, str] = {
+    "close": "float64",
+    "high": "float64",
+    "open": "float64",
+    "low": "float64",
+    "calendar_days": "float64",
+    "working_days": "float64",
+    "expiration_date": "object",
+    "unit_price": "float64",
+    "stddev": "float64",
+}
+ACCRUAL_SCHEMA: dict[str, str] = {"accumulated": "float64"}
 CDI_SCHEMA: dict[str, str] = {
     "accumulated": "float64",
     "close": "float64",
@@ -448,6 +505,24 @@ VOLUME_SCHEMA: dict[str, str] = {
     "avg_trades": "float64",
     "months": "float64",
     "dat": "float64",
+}
+TREASURY_LAST_SCHEMA: dict[str, str] = {
+    "ticker": "object",
+    "date": "float64",
+    "rate": "float64",
+    "unit_price": "float64",
+}
+FUND_RETURNS_SCHEMA: dict[str, str] = {
+    "ticker": "object",
+    "return_1d": "float64",
+    "return_1m": "float64",
+    "return_3m": "float64",
+    "return_6m": "float64",
+    "return_12m": "float64",
+    "return_18m": "float64",
+    "return_2y": "float64",
+    "return_3y": "float64",
+    "return_5y": "float64",
 }
 STATS_SCHEMA: dict[str, str] = {
     "ticker": "object",

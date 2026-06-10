@@ -79,7 +79,9 @@ from .fundamental import (
 from .instruments import InstrumentDB, bsearch
 from .ticker import Ticker
 from . import accessor as _accessor  # noqa: F401 — registers the .bcast DataFrame accessor
-from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation, bstats
+from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation, bstats, bfx
+from .fixedincome import btreasury, btreasury_history, baccrual, bsavings
+from .funds import bfund_history, bfund_returns
 from .credit import bcds
 from .news import bnews, bnews_recent, bnews_multimedia, MULTIMEDIA_CATEGORIES
 from ._legacy.session import discover_session_token, clear_token_cache
@@ -136,6 +138,13 @@ __all__ = [
     "bvolume",
     "binflation",
     "bstats",
+    "bfx",
+    "btreasury",
+    "btreasury_history",
+    "baccrual",
+    "bsavings",
+    "bfund_history",
+    "bfund_returns",
     # Reference Data
     "bcompany",
     "bindices",

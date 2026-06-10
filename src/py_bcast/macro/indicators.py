@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.validation import DateParam, TickerList, validate_params
+from .._core.validation import DateParam, Ticker, TickerList, validate_params
 from .._legacy.endpoints import (
     SPEC_BDI_CDI,
+    SPEC_BFX,
     SPEC_BINFLATION,
     SPEC_BMACRO,
     SPEC_BRETURN,
@@ -149,6 +150,48 @@ def bvolume(
         >>> df[df["ticker"] == "PETR4.BVMF"]
     """
     return run_spec(SPEC_BVOLUME, session_token=session_token, tickers=tickers)
+
+
+@validate_params
+def bfx(
+    from_currency: Ticker,
+    to_currency: Ticker,
+    amount: float = 1.0,
+    session_token: str | None = None,
+) -> float:
+    """
+    Convert an amount between currencies at the current spot rate.
+
+    Uses the ConversorMoedas endpoint — a server-side spot calculation
+    (historical conversion is not supported; date parameters are inert).
+
+    Args:
+        from_currency: Source currency code (e.g. "USD").
+        to_currency: Target currency code (e.g. "BRL").
+        amount: Amount in the source currency (default 1.0, which makes the
+            return value the spot rate itself).
+        session_token: BCAA session token
+
+    Returns:
+        The converted amount as a float.
+
+    Raises:
+        NotFoundError: If the currency pair is unknown to the server.
+
+    Example:
+        >>> bfx("USD", "BRL")        # spot rate
+        5.1716
+        >>> bfx("USD", "BRL", 100)   # converted amount
+        517.16
+    """
+    df = run_spec(
+        SPEC_BFX,
+        session_token=session_token,
+        from_currency=from_currency,
+        to_currency=to_currency,
+        amount=amount,
+    )
+    return float(df["close"].iloc[0])
 
 
 @validate_params

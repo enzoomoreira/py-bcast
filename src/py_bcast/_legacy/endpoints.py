@@ -21,9 +21,17 @@ from .columns import (
     DIVIDEND_SCHEMA,
     DY_FIELDS,
     DY_SCHEMA,
+    ACCRUAL_SCHEMA,
     FREE_FLOAT_FIELDS,
+    FUND_HISTORY_RENAME,
+    FUND_HISTORY_SCHEMA,
     FUND_HOLDER_FIELDS,
     FUND_HOLDER_SCHEMA,
+    FUND_RETURNS_RENAME,
+    FUND_RETURNS_SCHEMA,
+    TREASURY_HISTORY_SCHEMA,
+    TREASURY_LAST_RENAME,
+    TREASURY_LAST_SCHEMA,
     INDEX_FIELDS,
     INDEX_SCHEMA,
     INDICATOR_HISTORY_FIELDS,
@@ -351,6 +359,117 @@ SPEC_BVOLUME = EndpointSpec(
     schema=VOLUME_SCHEMA,
     params=(ParamBind("tickers", "10113", "join"),),
     timeout=15,
+)
+
+# bfund_history — investment-fund quota history. Accepts exchange tickers and
+# ANBIMA fund ids ("214248.ANBIMA"); vectorizes over the symbol (305), which
+# the endpoint does not echo, so the vectorizer inserts it. 1789 is the
+# optional end date (absent -> through today).
+SPEC_BFUND_HISTORY = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/Fundos",
+    index=Index.DATETIME,
+    rename=FUND_HISTORY_RENAME,
+    schema=FUND_HISTORY_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("fund", "305", "none"),
+        ParamBind("start_date", "961", "date"),
+        ParamBind("end_date", "1789", "date"),
+    ),
+    vectorize_over="fund",
+)
+
+# bfund_returns — per-window fund returns (1d/1m/3m/6m/12m/18m/2y/3y/5y).
+# Vectorizes over the symbol; echoes symbol -> ticker, so no insert. "n/d"
+# cells are missing-value sentinels (coerce to NaN).
+SPEC_BFUND_RETURNS = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/FundosRentabilidade",
+    index=Index.RANGE,
+    rename=FUND_RETURNS_RENAME,
+    schema=FUND_RETURNS_SCHEMA,
+    params=(ParamBind("fund", "305", "none"),),
+    vectorize_over="fund",
+)
+
+# btreasury — last treasury prices (taxa % a.a. + PU). Single request,
+# multi-symbol in one tag (10113 join, ".ANBIMA" ids); echoes the bare symbol
+# -> ticker. Unknown symbols are omitted (soft).
+SPEC_BTREASURY = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/TitulosPublicosUltimos",
+    index=Index.RANGE,
+    rename=TREASURY_LAST_RENAME,
+    schema=TREASURY_LAST_SCHEMA,
+    params=(ParamBind("symbols", "10113", "join"),),
+)
+
+# btreasury_history — OTC treasury yield history (".TRDM" symbols; values are
+# trading yields % a.a., not prices). Vectorizes over the symbol (305), which
+# the endpoint does not echo. Trading is sparse — quiet papers return few or
+# zero rows.
+SPEC_BTREASURY_HISTORY = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/TitulosPublicos",
+    index=Index.DATETIME,
+    rename=CONTENT_PROXY_RENAME,
+    schema=TREASURY_HISTORY_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("symbol", "305", "none"),
+        ParamBind("start_date", "961", "date"),
+        ParamBind("end_date", "1789", "date"),
+    ),
+    vectorize_over="symbol",
+)
+
+# baccrual — business-day accrual of a fixed annual rate (13539 = % a.a.,
+# compounded over working days/252; verified live: rate=100 over 15 du ->
+# 2**(15/252)-1 = 4.21%). Single request; acum -> accumulated.
+SPEC_BACCRUAL = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/CalculoTaxaPre",
+    index=Index.DATETIME,
+    rename=CONTENT_PROXY_RENAME,
+    schema=ACCRUAL_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("rate", "13539", "none"),
+        ParamBind("start_date", "961", "date"),
+        ParamBind("end_date", "1789", "date"),
+    ),
+)
+
+# bsavings — accumulated poupanca return over a window. Uses DataInicio/
+# DataFim (961 breaks this endpoint with HTTP 500). Single request.
+SPEC_BSAVINGS = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/CalculoPoupanca",
+    index=Index.DATETIME,
+    rename=CONTENT_PROXY_RENAME,
+    schema=ACCRUAL_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("start_date", "DataInicio", "date"),
+        ParamBind("end_date", "DataFim", "date"),
+    ),
+)
+
+# bfx — spot currency conversion (server-side calculation, 1 tick LAST).
+# Date params are inert (always the current rate). The facade unwraps the
+# single cell to a float; an unknown currency replies "Símbolo inválido",
+# which the transport maps to NotFoundError.
+SPEC_BFX = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/ConversorMoedas",
+    index=Index.RANGE,
+    rename=CONTENT_PROXY_RENAME,
+    params=(
+        ParamBind("from_currency", "Instrumento", "none"),
+        ParamBind("to_currency", "Instrumento2", "none"),
+        ParamBind("amount", "Valor", "none"),
+    ),
 )
 
 # bstats / abstats — per-asset market statistics (bid/ask at the close, last
