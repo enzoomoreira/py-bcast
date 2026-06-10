@@ -1,34 +1,35 @@
 # Roadmap — Terminal Antigo (bcsys32.exe)
 
-Backlog de endpoints funcionais descobertos na varredura do ContentProxy que ainda nao tem adapter na lib. Todos retornam dados reais quando chamados diretamente.
+Backlog de endpoints funcionais que ainda nao tem adapter na lib, mais decisoes de API
+deferidas. Status de cada endpoint re-verificado ao vivo em 2026-06-02 (a varredura original
+de 2025 continha erros sistematicos — ver a nota metodologica em [`endpoints.md`](./endpoints.md)).
 
-Ver [`endpoints.md`](./endpoints.md) para o catalogo completo com status de cada endpoint.
+Ver [`endpoints.md`](./endpoints.md) para o catalogo completo com status e params de cada endpoint.
 
 ---
 
 ## Reformulacao de API planejada (deferida para um release deliberado)
 
 O 0.6.0 conformou o **contrato** (DataFrame achatado + coluna `ticker`, multi-ticker,
-`NotFoundError` vs vazio-com-schema, parse BR -> float, paridade sync/async completa). Ficou
-**deferida** uma camada de reformulacao puramente nominal/estrutural, que e *breaking* e por
-isso merece um release proprio (ex.: 0.7.0). Nenhum item abaixo corrige bug — sao melhorias de
-clareza/ergonomia.
+`NotFoundError` vs vazio-com-schema, parse BR -> float, paridade sync/async completa) e a
+**arquitetura** (catalogo `EndpointSpec` declarativo; camada de I/O async-first com a arvore
+sync gerada via unasync — ver [`../architecture.md`](../architecture.md)). Ficou **deferida**
+uma camada de reformulacao puramente nominal/estrutural, que e *breaking* e por isso merece um
+release proprio (ex.: 0.7.0). Nenhum item abaixo corrige bug — sao melhorias de clareza/ergonomia.
 
 | # | Mudanca | Estado atual | Proposta | Risco |
 |---|---------|--------------|----------|-------|
 | 1 | **Naming de historico** | `bdh` retorna so close+settle; `bdh_ohlcv` retorna OHLCV de 1 dia | Ver "Decisao em aberto" abaixo | Breaking nominal |
 | 2 | **Fundir `bdi_cdi` em `bmacro`** | endpoint/funcao separada (`DiCetipAcumulado`) | rotear `bmacro("CDI", ...)` internamente; remover `bdi_cdi` do `__all__` | Breaking nominal |
 | 3 | **Unificar `bportfolios`/`bportfolio`** | duas funcoes | `bportfolio(broker=None)` (lista quando `None`), padrao de `bcompany(cvm=None)` | Breaking nominal |
-| 4 | **Decorator `@accepts_ticker_or_cvm`** | 4 copias do check `isinstance(int) or isdigit() -> resolve_cvm` em `btickers`/`bdividends`/`bdy`/`bindicators` | extrair para `_legacy/resolve.py` | Interno, nao-breaking |
-| 5 | **Renomear colunas cripticas** | algumas colunas seguem nomes do servidor | nomes finance-standard onde ainda ha residuo | Breaking nominal |
-| 6 | **`@http_retry` no caminho async** | os helpers async (`async_content_proxy_get`, `async_aetp_request`, `abdh` inline) nao tem retry | decorator async equivalente a tenacity, ou `AsyncRetrying` | Interno, nao-breaking |
+| 4 | **Renomear colunas cripticas** | algumas colunas seguem nomes do servidor | nomes finance-standard onde ainda ha residuo | Breaking nominal |
+| 5 | **Decisao D — ticker canonico de saida** | so `bdh`/`bvolume` emitem sufixo `.BVMF` (vem do SYMBOL do servidor); o resto e bare | decidir UMA convencao e aplicar no `finalize_frame` (o ponto de aplicacao ja existe) | Breaking de valor |
+| 6 | **Index do `bdy`** | docstring diz DatetimeIndex, codigo usa RangeIndex (preservado na migracao por frame-equality) | decidir o correto; CUIDADO: bdy vetoriza+concat por ticker, DatetimeIndex seria nao-unico entre blocos (como bmacro) | Breaking de valor |
+| 7 | **`@validate_params` uniforme** | parte das publicas sync usa `ensure_*` ad-hoc em vez do decorator | unificar; muda coercao/upper de input — verificar o novo comportamento isoladamente | Comportamental |
 
 ### Decisao em aberto — naming de historico (item 1)
 
-O `PLAN.md` original (gitignorado) propunha **`bdh` -> `bclose`** e **`bdh_ohlcv` -> `bdh`**.
-A intencao mais recente e **unificar num `bhistory` multi-dia** (um historico OHLCV com range de
-datas, em vez de `bdh_ohlcv` ser single-day). As duas direcoes sao incompativeis e precisam ser
-reconciliadas **antes** de executar:
+Duas direcoes incompativeis ja propostas, a reconciliar **antes** de executar:
 
 - **Opcao A (renomeio simples):** `bdh -> bclose`, `bdh_ohlcv -> bdh`. Honesto com Bloomberg
   (BDH = historico), baixo esforco, mas mantem `bdh_ohlcv` como single-day.
@@ -41,18 +42,40 @@ nao tem consumidores externos, entao o churn e so interno + docs + tests).
 
 ---
 
-## Prioridade Alta (parser ja existe, so mapear campos)
+## Pendencias conhecidas (bugs de contrato, nao reformulacao)
 
-Todos os endpoints abaixo usam o binary SOH ou XML — os decoders ja estao implementados em `src/py_bcast/`. O trabalho e apenas mapear os campos de resposta e expor a funcao publica.
+- **`bindicators` viola o eixo valid-but-empty**: levanta `ProtocolError` ("Server returned
+  empty response") para janelas indicador/range que simplesmente nao tem dados (ex.: indicador
+  32 em certos ranges), em vez do empty-frame-with-schema que o contrato promete.
+
+---
+
+## Prioridade Alta (transporte/parser ja existem, so mapear campos)
 
 | # | Endpoint | ID | Tipo | O que retorna | Esforco |
 |---|----------|-----|------|---------------|---------|
-| 1 | **EmpresasHistorico** | 154 | XML | Balanco trimestral completo (1.2MB, 80+ campos: DRE, balanco, fluxo de caixa desde 1995) | Medio — mapear 80+ campos |
-| 2 | **FIIAnbimaBovespa** | 150 | XML | FII: dividend yield, ultimo dividendo, vol medio | Baixo |
-| 3 | **EmpresaAcoesUnits** | 183 | Binary SOH | Acoes ON/PN, free float | Baixo |
-| 4 | **CarteiraTopFundos** | 187 | Binary SOH | Quais fundos investem no ativo (top holders) | Baixo |
-| 5 | **Volatilidades** | 208 | XML | Volatilidade historica por janela (1m, 3m, 6m, 1a, 2a, 3a) | Baixo |
-| 6 | **HistoricoDiarioSimbolos** | 75 | XML | Multi-ticker daily alternativo ao bdh (17KB) | Baixo |
+| 1 | **`bcds` — MarkitOutput2 (CDS/credito)** | 90-94 | XML | Curva de termo de CDS soberano/corporativo (58 entidades + 394 indices). Params 100% decodificados — ver `endpoints.md` sec. 8 e o design abaixo | Baixo — engenharia de params ja feita |
+| 2 | **FIIAnbimaBovespa** | 150 | XML | FII: dividend yield, ultimo dividendo, vol medio (HGLG11: DY 9,2%) | Baixo |
+| 3 | **CarteiraTopFundos** | 187 | Binary SOH | Quais fundos investem no ativo (top holders, com %) | Baixo |
+| 4 | **HistoricoDiarioSimbolos** | 75 | XML | Multi-ticker daily alternativo ao bdh (`10113`=tickers `;`, `961`=start) | Baixo |
+| 5 | **EmpresaAcoesUnits** | 183 | Binary SOH | Acoes ON/PN, free float | Baixo |
+
+### Design proposto — `bcds(entity, date=None, tipo="S")`
+
+Derivado da coleta empirica de 2026-06-02 (terminal vivo); params e schema completos em
+`endpoints.md` sec. 8 (fluxo 91 tipos -> 90 datas -> 93 entidades -> 94 curva).
+
+- Retorna DataFrame **LONG**: uma linha por tenor (6M, 1Y, 2Y, 3Y, 4Y, 5Y, 7Y, 10Y).
+  Colunas: `entity, tenor, spread, var_dia, var_mes, bid_ask` + metadados repetidos
+  (recovery, rating implicito, regiao, moeda). RangeIndex + coluna `tenor` (e curva de
+  uma data, nao serie temporal).
+- **Resolucao automatica da tripla** (IDCDS, TIER, DOCCLAUSE), como `resolve_cvm` faz para
+  ticker: dado `entity` (+`tipo`), consultar 93 ListaCDS(date) e pegar a tripla valida —
+  ela varia por entidade (ex.: BRASIL usa `CR14`, nao `CR`). Mais de uma tripla -> exigir
+  desambiguacao.
+- `bcds()` sem entity -> listar entidades disponiveis (93) ou datas (90).
+- Valores BR com virgula -> `_core/normalize.parse_br_number` (ja existe).
+- Cabe no transporte ContentProxy XML existente; modulo de dominio proprio (ex.: `credit/`).
 
 ---
 
@@ -60,41 +83,38 @@ Todos os endpoints abaixo usam o binary SOH ou XML — os decoders ja estao impl
 
 | # | Endpoint | ID | Tipo | O que retorna |
 |---|----------|-----|------|---------------|
-| 7 | **Fundos** | 76 | XML | Historico de cotas de fundos (OHLC, 24KB) |
-| 8 | **TitulosPublicos** | 77 | XML | Historico de titulos do Tesouro |
+| 6 | **Fundos** | 76 | XML | Historico de cotas de fundos (OHLC, 24KB) |
+| 7 | **TitulosPublicos** | 77 | XML | Historico de titulos do Tesouro — usar simbolo `.ANBIMA`/`.TRDM` (bare `LTN` resolve para `LTN.NYSE`, instrumento errado) |
+| 8 | **TitulosPublicosUltimos** | 141 | XML | Ultimos precos de titulos publicos (mesma nuance de simbolo) |
 | 9 | **CalculoTaxaPre** | 136 | XML | Curva de taxa pre-fixada acumulada (6.5KB) |
 | 10 | **CalculoPoupanca** | 114 | XML | Rendimento poupanca diario (5.7KB) |
-| 11 | **TitulosPublicosUltimos** | 141 | XML | Ultimos precos de titulos publicos |
-| 12 | **FundosRentabilidade** | 82 | XML | Rentabilidade de fundo por CNPJ/codigo |
+| 11 | **FundosRentabilidade** | 82 | XML | Rentabilidade de fundo por CNPJ/codigo |
+| 12 | **ConversorMoedas** | 131 | XML | Conversao spot calculada (`Instrumento`+`Instrumento2`+`Valor`) |
 
 ---
 
 ## Prioridade Baixa (metadados e referencia)
 
-Endpoints de metadados que complementam funcoes ja implementadas:
-
 | # | Endpoint | ID | Tipo | O que retorna |
 |---|----------|-----|------|---------------|
 | 13 | **CarteiraRecomendadaTicker** | 195 | Binary SOH | Em quais carteiras de corretoras um ticker esta presente |
-| 14 | **CarteiraRecomendadaMudancas** | 197 | Binary SOH | Historico de mudancas em uma carteira de corretora |
-| 15 | **UltimosIntraday** | 125 | XML | Ultimo snapshot intraday para um ticker |
-| 16 | **VolumesMediosSemMesAno** | 207 | XML | Volumes medios por semana/mes/ano |
-| 17 | **EmpresasHistorico (aefundamental)** | 69 | Binary SOH | Dados da empresa (complemento ao bcompany) |
-| 18 | **Arquivos (aefundamental)** | 58 | Binary SOH | Lista de documentos/filings da empresa |
+| 14 | **UltimosIntraday** | 125 | XML | Ultimo snapshot intraday para um ticker |
+| 15 | **FechamentoPrimeiro** | 204 | XML | Primeiro fechamento historico (`Instrumento`=ticker) |
+| 16 | **AcionistaDatas** | 193 | XML | Datas de posicoes acionarias |
+| 17 | **ArquivosDemonstrativos** | 205 | XML | PDFs de ITR/demonstrativos (links S3) |
+| 18 | **TimesTrades** | 41 | XML | Times & trades alternativo ao bdt (janela `10071`/`10072` em **UTC**) |
 
 ---
 
-## Endpoints Possivelmente Funcionais (params desconhecidos)
+## Params nao crackados (NAO sao mortos — falta descobrir o parametro)
 
-Endpoints que retornam erro mas que podem funcionar com os parametros corretos:
-
-| Endpoint | ID | Erro atual | Hipotese |
-|----------|-----|-----------|---------|
-| `TimesTrades` | 41 | Empty ticks | Formato de parametro diferente do HistoricoTick |
-| `FundosIndicadores` | 81 | `api_error` | Precisa de ID de fundo especifico |
-| `TabelaRetorno` | 138 | `api_error` | Parametros de benchmark desconhecidos |
-| `TabelaRentabilidade` | 139 | `api_error` | Idem |
-| `ConversorDeMoedas` | 131 | `api_error` | Par de moedas em formato diferente |
+| Endpoint | ID | Estado |
+|----------|-----|--------|
+| `FechamentoFormula` | 83 | Inconsistencia no servidor entre chamadas |
+| `TabelaRetorno` / `TabelaRentabilidade` | 138/139 | Params de benchmark desconhecidos |
+| `CalculoCarteira` | 144 | Provavel enum "Tipo de calculo" do Add-In Excel |
+| `FundosIndicadores` | 81 | Nao re-testado na rodada de 2026-06 |
+| `CarteiraRecomendadaMudancas` | 197 | Vivo (exige `13784`) mas sem registros nas datas testadas; confirmar com broker/data reais |
 
 ---
 
@@ -102,7 +122,9 @@ Endpoints que retornam erro mas que podem funcionar com os parametros corretos:
 
 | Categoria | Endpoints | Motivo |
 |-----------|-----------|--------|
-| `PROPRIETARY` | AEInstrumentos (~58), AEContent | Protocolo binary proprietario Java (error 88007) |
-| `DEAD_BACKEND` | contentProxyOutput (~30), GraphQL indicadores | Backend offline/crashado |
-| `AETP_ONLY` | HistoricoDiario, DiarioEx, UltimosPregoes | Requer pre-registro via protocolo AETP TCP:8100 |
-| `BUG` | Players (id=40) | Bug SQL no servidor |
+| Casca vazia | EmpresasHistorico (154) | Schema de 222 campos (DRE/BP/FC) mas **0 celulas** — financials NAO existem via legacy; para demonstracoes financeiras, auditar o backend Plus |
+| Dataset vazio | VolumesMediosSemMesAno (207), Volatilidades (208) | `success` + `<TICKS>` vazio, definitivo |
+| `PROPRIETARY` | AEInstrumentos (~58), news AETP (27-30, 108, 110, 152, 153) | Protocolo binario proprietario Java (error 88007) |
+| `DEAD_BACKEND` | GraphQL indicadores (166, 167, 182, 214); fundos CVM 133/62/63/74 | Backend offline (500) |
+| `AETP_ONLY` | HistoricoDiario (10), UltimosPregoes (26), DiarioEx (142) | `Query=NONE` mesmo com validacao OK — requer pre-registro via AETP TCP:8100 |
+| `BUG` | Players (40) | Bug SQL no servidor |
