@@ -15,6 +15,7 @@ from .._legacy.endpoints import (
     SPEC_BSTATS,
     SPEC_BVOLUME,
 )
+from .._legacy.multi import vectorize_async
 from .._legacy._async.executor import run_spec as arun_spec
 
 
@@ -28,30 +29,28 @@ async def abmacro(
     """Async version of ``bmacro``.
 
     Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block per
-    symbol).
+    symbol). The special symbol "CDI" routes to DiCetipAcumulado.
     """
-    return await arun_spec(
-        SPEC_BMACRO,
-        session_token=session_token,
-        ticker=ticker,
-        start_date=start_date,
-        end_date=end_date,
-    )
 
+    async def one(symbol: str) -> pd.DataFrame:
+        if symbol == "CDI":
+            df = await arun_spec(
+                SPEC_BDI_CDI,
+                session_token=session_token,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            df.insert(0, "ticker", "CDI")
+            return df
+        return await arun_spec(
+            SPEC_BMACRO,
+            session_token=session_token,
+            ticker=symbol,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
-@validate_params
-async def abdi_cdi(
-    start_date: DateParam,
-    end_date: DateParam,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """Async version of ``bdi_cdi`` (single series, no ticker arg)."""
-    return await arun_spec(
-        SPEC_BDI_CDI,
-        session_token=session_token,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    return await vectorize_async(ticker, one)
 
 
 @validate_params

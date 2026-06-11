@@ -6,12 +6,12 @@ yfinance often want the *wide* layout — a column MultiIndex keyed by ticker, s
 ``df["PETR4"]`` selects one instrument. This accessor offers an opt-in bridge
 without changing the default:
 
-    >>> bdh(["PETR4", "VALE3"], "20260501", "20260520").bcast.wide()["PETR4"]
+    >>> bhistory(["PETR4", "VALE3"], "20260501", "20260520").bcast.wide()["PETR4"]
     >>> wide_df.bcast.long()   # inverse
 
 ``wide()`` requires each (index, ticker) pair to be unique, so it suits the
-time-series frames (``bdh``, ``bmacro``, ``breturn``, ...). The default flat
-layout stays the canonical one.
+time-series frames (``bhistory``, ``bmacro``, ``breturn``, ...). The default
+flat layout stays the canonical one.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class BcastAccessor:
         except ValueError as exc:
             raise ValueError(
                 "bcast.wide() needs unique (index, ticker) pairs; this frame has "
-                "duplicates (use a time-series frame such as bdh/bmacro)."
+                "duplicates (use a time-series frame such as bhistory/bmacro)."
             ) from exc
         # unstack yields (field, ticker); present it ticker-first.
         return pivoted.swaplevel(axis="columns").sort_index(axis="columns")

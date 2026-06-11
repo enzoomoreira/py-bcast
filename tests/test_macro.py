@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from py_bcast import bmacro, bdi_cdi, breturn, bvolume, binflation
+from py_bcast import bmacro, breturn, bvolume, binflation
 
 pytestmark = pytest.mark.legacy_session
 
@@ -60,19 +60,25 @@ class TestBmacro:
         assert isinstance(df.index, pd.DatetimeIndex)
 
 
-class TestBdiCdi:
+class TestBmacroCdi:
     def test_recent(self):
-        df = bdi_cdi("20260501", "20260519")
+        df = bmacro("CDI", "20260501", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
         assert "close" in df.columns
+        assert "accumulated" in df.columns
+        assert (df["ticker"] == "CDI").all()
 
     def test_historical_since_1986(self):
-        df = bdi_cdi("19860601", "19860630")
+        df = bmacro("CDI", "19860601", "19860630")
         assert len(df) >= 1
 
+    def test_mixed_with_macro_symbol(self):
+        df = bmacro(["CDI", "USDBRL"], "20260512", "20260519")
+        assert {"CDI", "USDBRL"} <= set(df["ticker"].unique())
+
     def test_sorted(self):
-        df = bdi_cdi("20260501", "20260519")
+        df = bmacro("CDI", "20260501", "20260519")
         assert df.index.is_monotonic_increasing
 
 

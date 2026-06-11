@@ -125,7 +125,7 @@ def validate_params(fn: Any = None, /) -> Any:
     Usage::
 
         @validate_params
-        def bdh(tickers: TickerList, start_date: DateParam, ...) -> ...:
+        def bhistory(tickers: TickerList, start_date: DateParam, ...) -> ...:
             ...
     """
 

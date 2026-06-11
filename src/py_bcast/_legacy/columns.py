@@ -28,6 +28,7 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
     "total_neg": "cum_trades",
     "tipo_intervalo": "session_type",
     "var": "change_pct",
+    "dat": "date",  # session date where it survives as a column (RANGE frames)
     "dattol": None,  # drop: request artifact with no data value
     "hor": None,  # drop: empty on daily series (consumed as time index intraday)
     "settle_rate": "settle_rate",  # keep (fixed-income only)
@@ -80,7 +81,6 @@ TREASURY_LAST_RENAME: dict[str, str | None] = {
 SNAPSHOT_RENAME: dict[str, str | None] = {
     **CONTENT_PROXY_RENAME,
     "symbol": "ticker",
-    "dat": "date",
     "hor": "time",
 }
 
@@ -89,7 +89,6 @@ SNAPSHOT_RENAME: dict[str, str | None] = {
 FIRST_CLOSE_RENAME: dict[str, str | None] = {
     **CONTENT_PROXY_RENAME,
     "symbol": "ticker",
-    "dat": "date",
 }
 
 # bfund_returns: FundosRentabilidade per-window returns. ret_anual is the
@@ -541,7 +540,7 @@ VOLUME_SCHEMA: dict[str, str] = {
     "avg_turnover": "float64",
     "avg_trades": "float64",
     "months": "float64",
-    "dat": "float64",
+    "date": "float64",
 }
 SNAPSHOT_SCHEMA: dict[str, str] = {
     "ticker": "object",
@@ -651,7 +650,8 @@ CONSENSUS_SCHEMA: dict[str, str] = {
     **{name: "float64" for name in CONSENSUS_FIELDS.values()},
 }
 
-# bdh_ohlcv — one trading day of OHLCV (DatetimeIndex; ticker added by caller)
+# bhistory(fields="ohlcv") — one trading day of OHLCV per request
+# (DatetimeIndex; ticker added by the core)
 DAILY_OHLCV_SCHEMA: dict[str, str] = {
     "close": "float64",
     "settle": "float64",
@@ -667,10 +667,12 @@ DAILY_OHLCV_SCHEMA: dict[str, str] = {
     "cum_trades": "float64",
 }
 
-# bdh — daily close history, flat/long (DatetimeIndex; ticker added by caller)
-BDH_DATA_SCHEMA: dict[str, str] = {
+# bhistory(fields="close") — daily close history, flat/long (DatetimeIndex;
+# ticker inserted by the vectorizer). net_asset populates for funds only.
+BHISTORY_SCHEMA: dict[str, str] = {
     "close": "float64",
     "settle": "float64",
     "settle_rate": "float64",
     "yield": "float64",
+    "net_asset": "float64",
 }

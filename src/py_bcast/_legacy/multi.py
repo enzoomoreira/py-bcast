@@ -10,7 +10,7 @@ Contract:
     - fail-fast: a single item's ``NotFoundError`` propagates (a bad input is
       never silently dropped).
     - ticker column, insert-if-absent: if a per-item frame already carries a
-      ``ticker`` column (bquote/bconsensus/bdh_ohlcv emit one), it is left
+      ``ticker`` column (bquote/bconsensus/ohlcv_one emit one), it is left
       untouched; otherwise the item's identifier is inserted at position 0.
     - index type is preserved (DatetimeIndex for time-series cores, RangeIndex
       for reference cores) — ``pd.concat`` keeps each item's index.

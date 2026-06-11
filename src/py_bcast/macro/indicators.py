@@ -15,6 +15,7 @@ from .._legacy.endpoints import (
     SPEC_BSTATS,
     SPEC_BVOLUME,
 )
+from .._legacy.multi import vectorize
 from .._legacy._sync.executor import run_spec
 
 
@@ -28,18 +29,20 @@ def bmacro(
     """
     Fetch macroeconomic/index historical series for one or more symbols.
 
-    Uses MacroEconomicos endpoint. Supports FX, indices, commodities, rates,
-    and synthetic AETAXAS indicators.
+    Uses the MacroEconomicos endpoint. Supports FX, indices, commodities,
+    rates, and synthetic AETAXAS indicators. The special symbol "CDI" routes
+    to the DiCetipAcumulado endpoint (daily accumulated CDI since 1986),
+    whose block additionally carries an ``accumulated`` column.
 
     Supported symbols include:
         FX: USDBRL, EURUSD, GBPUSD, JPYBRL, etc.
         Indices: IBOV, SPX, DAX, FTSE, NASDAQ, DJI, etc.
         Commodities: GOLD, SILVER, WTI, BRENT, etc.
-        Rates/DI: DI1F26, DI1F27, DI1F28, etc.
+        Rates/DI: CDI, DI1F26, DI1F27, DI1F28, etc.
         AETAXAS: AEIPCA, AEIGPM, AECTIP, AEB052, AEB200, AEFS10, etc.
 
     Args:
-        ticker: Single symbol or list (e.g., "USDBRL" or ["USDBRL", "IBOV"]).
+        ticker: Single symbol or list (e.g., "USDBRL" or ["USDBRL", "CDI"]).
         start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
         end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
         session_token: BCAA session token
@@ -47,50 +50,33 @@ def bmacro(
     Returns:
         Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block
         per symbol). Columns depend on symbol but typically include close,
-        open, high, low, settle, change_pct, trades, volume.
+        open, high, low, settle, change_pct, trades, volume; the "CDI" block
+        adds accumulated.
 
     Example:
         >>> df = bmacro("USDBRL", "20260101", "20260519")
-        >>> df["close"].plot()
+        >>> cdi = bmacro("CDI", "20260101", "20260519")
     """
-    return run_spec(
-        SPEC_BMACRO,
-        session_token=session_token,
-        ticker=ticker,
-        start_date=start_date,
-        end_date=end_date,
-    )
 
+    def one(symbol: str) -> pd.DataFrame:
+        if symbol == "CDI":
+            df = run_spec(
+                SPEC_BDI_CDI,
+                session_token=session_token,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            df.insert(0, "ticker", "CDI")
+            return df
+        return run_spec(
+            SPEC_BMACRO,
+            session_token=session_token,
+            ticker=symbol,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
-@validate_params
-def bdi_cdi(
-    start_date: DateParam,
-    end_date: DateParam,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """
-    Fetch accumulated CDI (DI-CETIP) series.
-
-    Uses DiCetipAcumulado endpoint. Returns daily CDI data since 1986.
-
-    Args:
-        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
-        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
-        session_token: BCAA session token
-
-    Returns:
-        DataFrame with DatetimeIndex. Columns: last (accumulated %), var (daily rate).
-
-    Example:
-        >>> df = bdi_cdi("20260101", "20260519")
-        >>> df["close"].iloc[-1]
-    """
-    return run_spec(
-        SPEC_BDI_CDI,
-        session_token=session_token,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    return vectorize(ticker, one)
 
 
 @validate_params
@@ -144,11 +130,11 @@ def bvolume(
 
     Returns:
         Flat DataFrame (RangeIndex), one row per (ticker, averaging window).
-        Columns: ticker, avg_volume, avg_turnover, avg_trades, months, dat.
+        Columns: ticker, avg_volume, avg_turnover, avg_trades, months, date.
 
     Example:
         >>> df = bvolume(["PETR4", "VALE3"])
-        >>> df[df["ticker"] == "PETR4.BVMF"]
+        >>> df[df["ticker"] == "PETR4"]
     """
     return run_spec(SPEC_BVOLUME, session_token=session_token, tickers=tickers)
 

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.dates import DateLike
-from .._core.normalize import ensure_list
-from .._core.validation import TickerList, validate_params
+from .._core.validation import (
+    CvmCode,
+    DateParam,
+    TickerList,
+    validate_params,
+)
 from .._legacy._async.executor import run_spec as arun_spec
 from .._legacy._async.quote import quote_one
 from .._legacy.endpoints import (
@@ -27,8 +30,9 @@ from .._legacy.endpoints import (
 from .._legacy.multi import vectorize_async
 
 
+@validate_params
 async def abcompany(
-    cvm_code: str | int | None = None,
+    cvm_code: CvmCode | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bcompany``.
@@ -56,8 +60,9 @@ async def abconsensus(
     return await arun_spec(SPEC_BCONSENSUS, session_token=session_token, ticker=ticker)
 
 
+@validate_params
 async def abquote(
-    ticker: str | list[str],
+    ticker: TickerList,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bquote``.
@@ -66,11 +71,10 @@ async def abquote(
     with a ``ticker`` column. Empty DataFrame with schema if no symbol has a
     quote.
     """
-    return await vectorize_async(
-        ensure_list(ticker), lambda t: quote_one(t, session_token)
-    )
+    return await vectorize_async(ticker, lambda t: quote_one(t, session_token))
 
 
+@validate_params
 async def abtickers(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -85,8 +89,9 @@ async def abtickers(
     )
 
 
+@validate_params
 async def abshares(
-    ticker: str | list[str],
+    ticker: TickerList,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bshares``.
@@ -112,6 +117,7 @@ async def abindicator_meta(session_token: str | None = None) -> pd.DataFrame:
     return await arun_spec(SPEC_BINDICATOR_META, session_token=session_token)
 
 
+@validate_params
 async def abfree_float(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -127,6 +133,7 @@ async def abfree_float(
     )
 
 
+@validate_params
 async def abfund_holders(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -142,6 +149,7 @@ async def abfund_holders(
     )
 
 
+@validate_params
 async def abshareholder_dates(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -159,10 +167,11 @@ async def abshareholder_dates(
     )
 
 
+@validate_params
 async def abfilings(
     ticker_or_cvm: str | int | list[str | int],
-    start_date: DateLike,
-    end_date: DateLike,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bfilings``.
@@ -179,11 +188,12 @@ async def abfilings(
     )
 
 
+@validate_params
 async def abindicators(
     ticker_or_cvm: str | int | list[str | int],
     indicator: str | int,
-    start_date: DateLike,
-    end_date: DateLike,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bindicators``.

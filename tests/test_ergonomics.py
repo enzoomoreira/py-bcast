@@ -23,8 +23,8 @@ class TestTickerFacade:
     @pytest.mark.parametrize(
         "method, target, args",
         [
-            ("history", "bdh", ("20260501", "20260520")),
-            ("ohlcv", "bdh_ohlcv", ("20260519",)),
+            ("history", "bhistory", ("20260501", "20260520")),
+            ("ohlcv", "bhistory", ("20260519",)),
             ("intraday", "bdi", ("20260519",)),
             ("ticks", "bdt", ("20260519",)),
             ("dy", "bdy", ("20260101", "20260519")),

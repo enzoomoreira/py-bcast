@@ -7,19 +7,18 @@ and rate limiting shared with the sync path.
 Usage::
 
     import asyncio
-    from py_bcast._async import abdh, abmacro
+    from py_bcast._async import abhistory, abmacro
 
     async def main():
-        data = await abdh("PETR4", "20260501", "20260519")
+        data = await abhistory("PETR4", "20260501", "20260519")
         fx = await abmacro("USDBRL", "20260101", "20260519")
 
     asyncio.run(main())
 """
 
-from .historical import abdh, abdh_ohlcv, abdi, abdt, abticks, abfirst_close
+from .historical import abhistory, abclose, abdi, abdt, abticks, abfirst_close
 from .macro import (
     abmacro,
-    abdi_cdi,
     abreturn,
     abvolume,
     abinflation,
@@ -48,7 +47,6 @@ from .events import (
     abcalendar,
     abdividends,
     abdy,
-    abportfolios,
     abportfolio,
     abportfolios_with,
 )
@@ -70,14 +68,13 @@ from .plus import (
 )
 
 __all__ = [
-    "abdh",
-    "abdh_ohlcv",
+    "abhistory",
+    "abclose",
     "abdi",
     "abdt",
     "abticks",
     "abfirst_close",
     "abmacro",
-    "abdi_cdi",
     "abreturn",
     "abvolume",
     "abinflation",
@@ -106,7 +103,6 @@ __all__ = [
     "abcalendar",
     "abdividends",
     "abdy",
-    "abportfolios",
     "abportfolio",
     "abportfolios_with",
     "abnews",

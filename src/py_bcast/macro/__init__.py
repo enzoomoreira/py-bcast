@@ -2,7 +2,6 @@
 
 from .indicators import (
     bmacro,
-    bdi_cdi,
     breturn,
     bvolume,
     binflation,
@@ -13,7 +12,6 @@ from .indicators import (
 
 __all__ = [
     "bmacro",
-    "bdi_cdi",
     "breturn",
     "bvolume",
     "binflation",

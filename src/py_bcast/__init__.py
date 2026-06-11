@@ -3,12 +3,12 @@ py_bcast — Python client for AE Broadcast market data.
 
 A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - Real-time streaming via DDE (bdp — one or many tickers)
-- Historical data via HTTP (bdh, bdh_ohlcv, bdt, bdi)
-- Macroeconomic series (bmacro, bdi_cdi, breturn, bvolume, binflation)
+- Historical data via HTTP (bhistory, bclose, bdt, bdi, bticks, bfirst_close)
+- Macroeconomic series (bmacro, breturn, bvolume, binflation)
 - Fundamental data (bconsensus, bindicators, bcompany)
 - Corporate events (bcalendar, bdividends, bdy)
 - Reference data (bindices, bsectors, bquote, btickers, bshares)
-- Broker portfolios (bportfolios, bportfolio)
+- Broker portfolios (bportfolio, bportfolios_with)
 - News and multimedia (bnews, bnews_recent, bnews_multimedia)
 - Credit: CDS term-structure curves via Markit (bcds)
 - Broadcast+ reference: instrument metadata, index composition, logos (binfo, bindex_members, bindexes, blogo)
@@ -19,13 +19,13 @@ A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - Instrument database search (bsearch, InstrumentDB)
 
 Quick Start:
-    from py_bcast import bdp, bdh, bdi, bmacro, bconsensus, bsearch
+    from py_bcast import bdp, bhistory, bdi, bmacro, bconsensus, bsearch
 
     # Real-time quote (requires bcsys32.exe running)
     price = bdp("PETR4", "ULT")
 
-    # Historical daily data
-    data = bdh("PETR4", "20260101", "20260520")
+    # Historical daily data (close or OHLCV)
+    data = bhistory("PETR4", "20260101", "20260520")
 
     # Intraday 2-min bars (ALL instruments!)
     bars = bdi("PETR4", "20260519")
@@ -57,7 +57,7 @@ from ._plus.reference import binfo, bindex_members, blogo, bindexes, bholidays
 from ._plus.funds import bfunds, bfund
 from ._plus.news import bsections, bheadlines, bnews_content
 from ._plus.corporate import bcorpevents
-from .historical import bdh, bdh_ohlcv, bdi, bdt, bticks, bfirst_close
+from .historical import bhistory, bclose, bdi, bdt, bticks, bfirst_close
 from .fundamental import (
     bconsensus,
     bcompany,
@@ -75,7 +75,6 @@ from .fundamental import (
     bcalendar,
     bdividends,
     bdy,
-    bportfolios,
     bportfolio,
     bportfolios_with,
 )
@@ -84,7 +83,6 @@ from .ticker import Ticker
 from . import accessor as _accessor  # noqa: F401 — registers the .bcast DataFrame accessor
 from .macro import (
     bmacro,
-    bdi_cdi,
     breturn,
     bvolume,
     binflation,
@@ -122,8 +120,8 @@ __all__ = [
     "BroadcastPlusClient",
     "BroadcastPlusAsyncClient",
     "bdp",
-    "bdh",
-    "bdh_ohlcv",
+    "bhistory",
+    "bclose",
     "bdi",
     "bdt",
     "bticks",
@@ -147,7 +145,6 @@ __all__ = [
     "Ticker",
     # Macro / Fixed Income
     "bmacro",
-    "bdi_cdi",
     "breturn",
     "bvolume",
     "binflation",
@@ -177,7 +174,6 @@ __all__ = [
     "bcalendar",
     "bdividends",
     "bdy",
-    "bportfolios",
     "bportfolio",
     "bportfolios_with",
     # News / Multimedia
@@ -218,4 +214,4 @@ __all__ = [
     "async_api",
 ]
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

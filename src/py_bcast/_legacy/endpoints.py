@@ -22,6 +22,7 @@ from .columns import (
     DY_FIELDS,
     DY_SCHEMA,
     ACCRUAL_SCHEMA,
+    BHISTORY_SCHEMA,
     FILINGS_FIELDS,
     FILINGS_SCHEMA,
     FIRST_CLOSE_RENAME,
@@ -255,9 +256,9 @@ SPEC_BDIVIDENDS_BYCVM = EndpointSpec(
 )
 
 # bdy — dividend-yield series over a date window (10029=1 selects the series).
-# Same dual ticker tags + BYCVM override as bdividends. RangeIndex is preserved
-# (the docstring says DatetimeIndex but the code uses RangeIndex; fixing that
-# is a separate behavior-change pass, not this migration).
+# Same dual ticker tags + BYCVM override as bdividends. RangeIndex is the
+# deliberate contract (decided 2026-06-10): the per-company blocks overlap in
+# dates, so a DatetimeIndex would be non-unique.
 SPEC_BDY = EndpointSpec(
     transport="aetp",
     path="fundamental/empresa/eventos/dividend-yield",
@@ -593,6 +594,27 @@ SPEC_BINFLATION = EndpointSpec(
     rename=CONTENT_PROXY_RENAME,
     schema=INFLATION_SCHEMA,
     timeout=15,
+)
+
+# bhistory(fields="close") / bclose — adjusted daily close history over a
+# window, one request per ticker (HistoricoDiarioSimbolos serves the whole
+# window at once; verified value-identical to the old per-day
+# HistoricoFechamentos loop). The echoed symbol is the server's internal
+# resolved form (PETR4.BVMF, X:SUSDBRL.GTISFX) — dropped, so the vectorizer
+# inserts the caller's own ticker. 1789 is the optional end date.
+SPEC_BHISTORY = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/HistoricoDiarioSimbolos",
+    index=Index.DATETIME,
+    rename={**CONTENT_PROXY_RENAME, "symbol": None},
+    schema=BHISTORY_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("ticker", "10113", "none"),
+        ParamBind("start_date", "961", "date"),
+        ParamBind("end_date", "1789", "date"),
+    ),
+    vectorize_over="ticker",
 )
 
 # ── historical intraday (ContentProxy cp_ticks) ───────────────────────────

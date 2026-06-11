@@ -3,66 +3,73 @@
 import pandas as pd
 import pytest
 
-from py_bcast import bdh, bdh_ohlcv, bdt
+from py_bcast import bclose, bdt, bhistory
 
 pytestmark = pytest.mark.legacy_session
 
 
-class TestBdh:
+class TestBhistoryClose:
     def test_single_ticker(self):
-        df = bdh("PETR4", "20260512", "20260519")
+        df = bhistory("PETR4", "20260512", "20260519")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "PETR4.BVMF" in df["ticker"].values
+        # output ticker is bare (the queried symbol, not the server's echo)
+        assert "PETR4" in df["ticker"].values
         assert "close" in df.columns
         assert pd.notna(df["close"].iloc[0])
 
     def test_multiple_tickers(self):
-        df = bdh(["PETR4", "VALE3"], "20260515", "20260519")
+        df = bhistory(["PETR4", "VALE3"], "20260515", "20260519")
         tickers = set(df["ticker"].unique())
-        assert "PETR4.BVMF" in tickers
-        assert "VALE3.BVMF" in tickers
+        assert "PETR4" in tickers
+        assert "VALE3" in tickers
 
     def test_fx(self):
-        df = bdh("USDBRL", "20260512", "20260519")
-        assert any("USDBRL" in t for t in df["ticker"].unique())
+        df = bhistory("USDBRL", "20260512", "20260519")
+        assert "USDBRL" in df["ticker"].values
 
     def test_sorted_chronologically(self):
-        df = bdh("PETR4", "20260501", "20260519")
-        petr = df[df["ticker"] == "PETR4.BVMF"]
+        df = bhistory("PETR4", "20260501", "20260519")
+        petr = df[df["ticker"] == "PETR4"]
         if not petr.empty:
             assert petr.index.is_monotonic_increasing
 
     def test_empty_range(self):
-        df = bdh("PETR4", "20260518", "20260510")  # end < start
+        df = bhistory("PETR4", "20260518", "20260510")  # end < start
         assert isinstance(df, pd.DataFrame)
         assert df.empty
         assert "ticker" in df.columns  # schema preserved
 
     def test_close_is_float(self):
-        # A no-trade tolerance row carries an "n/d" sentinel; it must not
-        # poison numeric coercion and leave close as str/object.
-        df = bdh("PETR4", "20260501", "20260519")
+        df = bhistory("PETR4", "20260501", "20260519")
         assert pd.api.types.is_float_dtype(df["close"])
 
+    def test_bclose_shortcut_matches(self):
+        a = bhistory("PETR4", "20260512", "20260519")
+        b = bclose("PETR4", "20260512", "20260519")
+        pd.testing.assert_frame_equal(a, b)
 
-class TestBdhOhlcv:
+
+class TestBhistoryOhlcv:
     def test_single_date(self):
-        df = bdh_ohlcv("PETR4", "20260519")
+        df = bhistory("PETR4", "20260519", "20260519", fields="ohlcv")
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 1
         assert df["ticker"].iloc[0] == "PETR4"
         for col in ("close", "high", "low", "open"):
             assert col in df.columns
 
-    def test_multiple(self):
-        df = bdh_ohlcv(["PETR4", "VALE3"], "20260519")
+    def test_multi_day_multi_ticker(self):
+        df = bhistory(["PETR4", "VALE3"], "20260518", "20260519", fields="ohlcv")
         assert isinstance(df, pd.DataFrame)
         assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
+        petr = df[df["ticker"] == "PETR4"]
+        assert len(petr) == 2
+        assert petr.index.is_monotonic_increasing
 
     def test_no_data_returns_empty(self):
         # Very old date (before history start) -> valid query, no rows
-        df = bdh_ohlcv("PETR4", "19000101")
+        df = bhistory("PETR4", "19000101", "19000101", fields="ohlcv")
         assert isinstance(df, pd.DataFrame)
         assert df.empty
         assert "close" in df.columns  # schema preserved

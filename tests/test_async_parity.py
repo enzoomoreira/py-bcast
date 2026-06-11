@@ -104,7 +104,7 @@ def test_every_async_export_maps_to_a_public_sync_function() -> None:
         assert twin.startswith("a"), (
             f"async export {twin!r} does not follow the a-prefix convention"
         )
-        name = twin[1:]  # abdh -> bdh
+        name = twin[1:]  # abhistory -> bhistory
         if name not in py_bcast.__all__:
             orphans.append((twin, name))
     assert not orphans, f"async exports with no public sync counterpart: {orphans}"

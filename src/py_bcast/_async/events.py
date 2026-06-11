@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.dates import DateLike
-from .._core.normalize import ensure_list
-from .._core.validation import CvmCode, DateParam, Ticker, validate_params
+from .._core.exceptions import ValidationError
+from .._core.validation import (
+    CvmCode,
+    DateParam,
+    Ticker,
+    TickerList,
+    validate_params,
+)
 from .._legacy.endpoints import (
     SPEC_BCALENDAR,
     SPEC_BDIVIDENDS,
@@ -36,9 +41,10 @@ async def abcalendar(
     )
 
 
+@validate_params
 async def abdividends(
-    ticker: str | list[str],
-    cvm_code: str | int | None = None,
+    ticker: TickerList,
+    cvm_code: CvmCode | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bdividends``.
@@ -46,7 +52,7 @@ async def abdividends(
     Flat DataFrame with dividend events and a ``ticker`` column (one block per
     company). A scalar ``cvm_code`` is honored only for a single ticker.
     """
-    tickers = [t.strip().upper() for t in ensure_list(ticker)]
+    tickers = ticker  # TickerList: already a normalized, uppercased list
     if cvm_code is not None and len(tickers) == 1:
         return await arun_spec(
             SPEC_BDIVIDENDS_BYCVM,
@@ -57,19 +63,20 @@ async def abdividends(
     return await arun_spec(SPEC_BDIVIDENDS, session_token=session_token, ticker=tickers)
 
 
+@validate_params
 async def abdy(
-    ticker: str | list[str],
-    start_date: DateLike,
-    end_date: DateLike,
-    cvm_code: str | int | None = None,
+    ticker: TickerList,
+    start_date: DateParam,
+    end_date: DateParam,
+    cvm_code: CvmCode | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bdy``.
 
-    Flat DataFrame with a DatetimeIndex, DY values over time, and a ``ticker``
-    column (one block per company).
+    Flat DataFrame (RangeIndex) with a string ``date`` column, the DY values,
+    and a ``ticker`` column (one block per company).
     """
-    tickers = [t.strip().upper() for t in ensure_list(ticker)]
+    tickers = ticker  # TickerList: already a normalized, uppercased list
     if cvm_code is not None and len(tickers) == 1:
         return await arun_spec(
             SPEC_BDY_BYCVM,
@@ -88,22 +95,22 @@ async def abdy(
     )
 
 
-async def abportfolios(session_token: str | None = None) -> pd.DataFrame:
-    """Async version of ``bportfolios``. List of broker recommended portfolios."""
-    return await arun_spec(SPEC_BPORTFOLIOS, session_token=session_token)
-
-
 @validate_params
 async def abportfolio(
-    broker_id: CvmCode,
+    broker_id: CvmCode | None = None,
     date: DateParam | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """Async version of ``bportfolio``.
 
-    Without ``date``: the broker's current portfolios. With ``date``: the
-    composition in force on that date (empty frame before the first one).
+    Without ``broker_id``: the list of brokers that publish portfolios.
+    With ``broker_id``: the broker's current portfolios. Adding ``date``:
+    the composition in force on that date (empty frame before the first).
     """
+    if broker_id is None:
+        if date is not None:
+            raise ValidationError("bportfolio: date requires broker_id")
+        return await arun_spec(SPEC_BPORTFOLIOS, session_token=session_token)
     if date is None:
         return await arun_spec(
             SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id

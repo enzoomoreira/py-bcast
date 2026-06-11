@@ -12,7 +12,6 @@ from enum import Enum, auto
 
 import pandas as pd
 
-from .columns import BDH_DATA_SCHEMA
 
 # Server sentinels for "no value" that must not poison numeric coercion.
 # A column of numbers plus one of these (e.g. a no-trade tolerance row whose
@@ -81,6 +80,21 @@ def coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
         if bool(stripped.str.match(r"0\d", na=False).any()):
             continue
         df[col] = coerced
+    return df
+
+
+def _strip_bvmf_suffix(df: pd.DataFrame) -> pd.DataFrame:
+    """Strip the server-appended ".BVMF" from the ticker column, in place.
+
+    The canonical output ticker is bare ("PETR4"), matching what callers
+    type; only the local-exchange suffix the server echoes is removed.
+    International symbols keep whatever internal form the server emits, and
+    non-string cells (e.g. a CVM-code lookup key) pass through untouched.
+    """
+    if "ticker" in df.columns:
+        df["ticker"] = df["ticker"].map(
+            lambda v: v.removesuffix(".BVMF") if isinstance(v, str) else v
+        )
     return df
 
 
@@ -200,17 +214,20 @@ def finalize_frame(
 
     df = coerce_numeric_columns(df)
     df = _apply_rename(df, rename)
+    df = _strip_bvmf_suffix(df)
 
     if index is Index.RECORD and ticker is not None and "ticker" not in df.columns:
         df.insert(0, "ticker", ticker)
     return df
 
 
-def empty_bdh_frame() -> pd.DataFrame:
-    """Empty flat bdh frame: ticker column + OHLC schema on a DatetimeIndex.
+def empty_history_frame(schema: dict[str, str]) -> pd.DataFrame:
+    """Empty flat history frame: ticker column + schema on a DatetimeIndex.
 
-    Shared by the sync and async ``bdh`` so the empty contract is defined once.
+    Shared by the sync and async ``bhistory`` for the inverted-window
+    early exit (the close endpoint rejects start > end with a server error
+    instead of the family's usual no-records reply).
     """
-    df = finalize_frame([], index=Index.DATETIME, schema=BDH_DATA_SCHEMA)
+    df = finalize_frame([], index=Index.DATETIME, schema=schema)
     df.insert(0, "ticker", pd.Series(dtype="object"))
     return df

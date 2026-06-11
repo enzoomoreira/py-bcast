@@ -19,7 +19,6 @@ from .events import (
     bcalendar,
     bdividends,
     bdy,
-    bportfolios,
     bportfolio,
     bportfolios_with,
 )
@@ -41,7 +40,6 @@ __all__ = [
     "bcalendar",
     "bdividends",
     "bdy",
-    "bportfolios",
     "bportfolio",
     "bportfolios_with",
 ]

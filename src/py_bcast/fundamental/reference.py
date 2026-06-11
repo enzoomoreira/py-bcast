@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.dates import DateLike
-from .._core.normalize import ensure_list
+from .._core.validation import (
+    CvmCode,
+    DateParam,
+    TickerList,
+    validate_params,
+)
 from .._legacy._sync.executor import run_spec
 from .._legacy._sync.quote import quote_one
 from .._legacy.endpoints import (
@@ -25,8 +29,9 @@ from .._legacy.endpoints import (
 from .._legacy.multi import vectorize
 
 
+@validate_params
 def bcompany(
-    cvm_code: str | int | None = None,
+    cvm_code: CvmCode | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -101,8 +106,9 @@ def bsectors(
     return run_spec(SPEC_BSECTORS, session_token=session_token)
 
 
+@validate_params
 def bquote(
-    ticker: str | list[str],
+    ticker: TickerList,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -126,10 +132,10 @@ def bquote(
         >>> q = bquote("PETR4")
         >>> print(q["close"].iloc[0])
     """
-    tickers = ensure_list(ticker)
-    return vectorize(tickers, lambda t: quote_one(t, session_token))
+    return vectorize(ticker, lambda t: quote_one(t, session_token))
 
 
+@validate_params
 def btickers(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -160,8 +166,9 @@ def btickers(
     )
 
 
+@validate_params
 def bshares(
-    ticker: str | list[str],
+    ticker: TickerList,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -185,6 +192,7 @@ def bshares(
     return run_spec(SPEC_BSHARES, session_token=session_token, ticker=ticker)
 
 
+@validate_params
 def bfree_float(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -218,6 +226,7 @@ def bfree_float(
     )
 
 
+@validate_params
 def bfund_holders(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -250,6 +259,7 @@ def bfund_holders(
     )
 
 
+@validate_params
 def bshareholder_dates(
     ticker_or_cvm: str | int | list[str | int],
     session_token: str | None = None,
@@ -282,10 +292,11 @@ def bshareholder_dates(
     )
 
 
+@validate_params
 def bfilings(
     ticker_or_cvm: str | int | list[str | int],
-    start_date: DateLike,
-    end_date: DateLike,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -319,11 +330,12 @@ def bfilings(
     )
 
 
+@validate_params
 def bindicators(
     ticker_or_cvm: str | int | list[str | int],
     indicator: str | int,
-    start_date: DateLike,
-    end_date: DateLike,
+    start_date: DateParam,
+    end_date: DateParam,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """

@@ -1,7 +1,7 @@
 """Object-oriented facade over the functional ``b*`` API.
 
 ``Ticker`` is a thin convenience wrapper for a single instrument: every method
-delegates to the matching functional call (``bdh``, ``bquote``, ...). It holds
+delegates to the matching functional call (``bhistory``, ``bquote``, ...). It holds
 no state beyond the symbol and an optional session token, and adds no new logic
 — it exists purely for discoverability (``Ticker("PETR4").dividends``) for users
 who prefer an object-oriented style (as in yfinance's ``Ticker``).
@@ -21,7 +21,7 @@ from .fundamental import (
     bshares,
     btickers,
 )
-from .historical import bdh, bdh_ohlcv, bdi, bdt
+from .historical import bdi, bdt, bhistory
 
 
 class Ticker:
@@ -30,7 +30,7 @@ class Ticker:
     Example:
         >>> from py_bcast import Ticker
         >>> petr = Ticker("PETR4")
-        >>> petr.history("20260501", "20260520")   # -> bdh
+        >>> petr.history("20260501", "20260520")   # -> bhistory
         >>> petr.dividends                          # -> bdividends
         >>> petr.quote                              # -> bquote
     """
@@ -46,12 +46,20 @@ class Ticker:
     def history(
         self, start_date: DateLike, end_date: DateLike | None = None
     ) -> pd.DataFrame:
-        """Daily close history (delegates to ``bdh``)."""
-        return bdh(self.ticker, start_date, end_date, session_token=self._token)
+        """Daily close history (delegates to ``bhistory``)."""
+        return bhistory(self.ticker, start_date, end_date, session_token=self._token)
 
-    def ohlcv(self, date: DateLike) -> pd.DataFrame:
-        """Single-day OHLCV (delegates to ``bdh_ohlcv``)."""
-        return bdh_ohlcv(self.ticker, date, session_token=self._token)
+    def ohlcv(
+        self, start_date: DateLike, end_date: DateLike | None = None
+    ) -> pd.DataFrame:
+        """Daily OHLCV history (delegates to ``bhistory(fields="ohlcv")``)."""
+        return bhistory(
+            self.ticker,
+            start_date,
+            end_date if end_date is not None else start_date,
+            "ohlcv",
+            session_token=self._token,
+        )
 
     def intraday(self, date: DateLike) -> pd.DataFrame:
         """Intraday bars for a date (delegates to ``bdi``)."""

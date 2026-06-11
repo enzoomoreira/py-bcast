@@ -1,17 +1,106 @@
-"""Historical daily closing prices and OHLCV via ContentProxy."""
+"""Historical daily prices via ContentProxy (close history, OHLCV, first close)."""
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pandas as pd
 
-from .._core.dates import business_days, default_end_date, to_date_str
-from .._core.normalize import ensure_list
+from .._core.dates import default_end_date, to_date_str
 from .._core.validation import DateParam, TickerList, validate_params
-from .._legacy._sync.bdh import bdh_core, bdh_ohlcv_one
+from .._legacy.columns import BHISTORY_SCHEMA, DAILY_OHLCV_SCHEMA
+from .._legacy.endpoints import SPEC_BFIRST_CLOSE, SPEC_BHISTORY
 from .._legacy.multi import vectorize
-from .._legacy.endpoints import SPEC_BFIRST_CLOSE
-from .._legacy.output import empty_bdh_frame
+from .._legacy.output import empty_history_frame
 from .._legacy._sync.executor import run_spec
+from .._legacy._sync.ohlcv import ohlcv_core
+
+
+@validate_params
+def bhistory(
+    tickers: TickerList,
+    start_date: DateParam,
+    end_date: DateParam | None = None,
+    fields: Literal["close", "ohlcv"] = "close",
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch daily price history for one or more tickers.
+
+    The unified historical entry point (Bloomberg-BDH-like):
+
+    - ``fields="close"`` (default): adjusted close/settle series via
+      HistoricoDiarioSimbolos — one request per ticker covering the whole
+      window. Works for ALL instruments (B3 equities/FIIs, FX, indices,
+      commodities, DI futures, AETAXAS). ``bclose`` is a shortcut.
+    - ``fields="ohlcv"``: full OHLCV via HistoricoData — also one request
+      per ticker (the endpoint serves the whole window; the end is cut
+      client-side because its 1789 end tag is ignored).
+
+    Args:
+        tickers: Single ticker or list (e.g., "PETR4" or ["PETR4", "USDBRL"]).
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (default: through today)
+        fields: "close" (default) or "ohlcv".
+        session_token: BCAA session token
+
+    Returns:
+        Flat (long) DataFrame with a DatetimeIndex and a ``ticker`` column
+        holding the queried symbol (one block per ticker). "close" columns:
+        close, settle, settle_rate, yield, net_asset (funds only). "ohlcv"
+        columns: close, settle, settle_rate, low, high, open, trades, volume,
+        turnover, open_interest, vwap, cum_trades. Empty DataFrame with the
+        schema if no data.
+
+    Example:
+        >>> df = bhistory(["PETR4", "VALE3"], "20260101")
+        >>> ohlcv = bhistory("PETR4", "20260501", "20260519", fields="ohlcv")
+    """
+    start_str = to_date_str(start_date)
+    end_str = to_date_str(end_date) if end_date is not None else default_end_date()
+    if start_str > end_str:
+        return empty_history_frame(
+            BHISTORY_SCHEMA if fields == "close" else DAILY_OHLCV_SCHEMA
+        )
+    if fields == "close":
+        return run_spec(
+            SPEC_BHISTORY,
+            session_token=session_token,
+            ticker=tickers,
+            start_date=start_str,
+            end_date=end_str,
+        )
+    return vectorize(
+        tickers, lambda t: ohlcv_core(t, start_str, end_str, session_token)
+    )
+
+
+@validate_params
+def bclose(
+    tickers: TickerList,
+    start_date: DateParam,
+    end_date: DateParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch adjusted daily closing prices — shortcut for ``bhistory(fields="close")``.
+
+    Args:
+        tickers: Single ticker or list (e.g., "PETR4" or ["PETR4", "USDBRL"]).
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (default: through today)
+        session_token: BCAA session token
+
+    Returns:
+        Flat (long) DataFrame with a DatetimeIndex and a ``ticker`` column
+        (one block per ticker). Columns: close, settle, settle_rate, yield,
+        net_asset.
+
+    Example:
+        >>> df = bclose(["PETR4", "VALE3"], "20260101")
+        >>> df[df["ticker"] == "PETR4"]["close"].plot()
+    """
+    return bhistory(tickers, start_date, end_date, "close", session_token)
 
 
 @validate_params
@@ -31,79 +120,12 @@ def bfirst_close(
         session_token: BCAA session token
 
     Returns:
-        Flat DataFrame (RangeIndex), one row per ticker: ticker (echoed with
-        the exchange suffix), date (YYYYMMDD int) and close. Unknown tickers
-        are omitted; empty DataFrame with that schema if none resolves.
+        Flat DataFrame (RangeIndex), one row per ticker: ticker, date
+        (YYYYMMDD int) and close. Unknown tickers are omitted; empty
+        DataFrame with that schema if none resolves.
 
     Example:
         >>> df = bfirst_close("PETR4")
         >>> df[["ticker", "date", "close"]]
     """
     return run_spec(SPEC_BFIRST_CLOSE, session_token=session_token, ticker=ticker)
-
-
-@validate_params
-def bdh(
-    tickers: TickerList,
-    start_date: DateParam,
-    end_date: DateParam | None = None,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """
-    Fetch historical closing prices for one or more tickers.
-
-    Uses HistoricoFechamentos endpoint (works for ALL instruments).
-
-    Args:
-        tickers: Single ticker or list (e.g., "PETR4" or ["PETR4", "VALE3"])
-        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
-        end_date: End date (default: today)
-        session_token: BCAA session token (or set BROADCAST_SESSION env var)
-
-    Returns:
-        Flat (long) DataFrame with a DatetimeIndex and a ``ticker`` column
-        (one block of rows per symbol). Columns: ticker, close, settle,
-        settle_rate, yield. Empty DataFrame with that schema if no data.
-
-    Example:
-        >>> df = bdh(["PETR4", "VALE3"], "20260501", "20260519")
-        >>> df[df["ticker"] == "PETR4.BVMF"]["close"].plot()
-    """
-    tickers = ensure_list(tickers)
-    start_str = to_date_str(start_date)
-    end_str = to_date_str(end_date) if end_date is not None else default_end_date()
-
-    dates = business_days(start_str, end_str)
-    if not dates:
-        return empty_bdh_frame()
-    return bdh_core(tickers, dates, session_token)
-
-
-@validate_params
-def bdh_ohlcv(
-    ticker: TickerList,
-    date: DateParam,
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """
-    Get full OHLCV data for one or more tickers on a single date.
-
-    Uses HistoricoData endpoint.
-
-    Args:
-        ticker: Single ticker or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
-        date: Date (str YYYYMMDD, date, datetime, or Timestamp)
-        session_token: BCAA session token
-
-    Returns:
-        Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one row
-        per ticker). Columns: ticker, close, settle, settle_rate, low, high,
-        open, trades, volume, turnover, open_interest, vwap, cum_trades.
-        Empty DataFrame with that schema if there is no data for the date;
-        NotFoundError for an unknown ticker.
-
-    Example:
-        >>> df = bdh_ohlcv("PETR4", "20260519")
-        >>> print(df["close"].iloc[0], df["high"].iloc[0])
-    """
-    return vectorize(ticker, lambda t: bdh_ohlcv_one(t, date, session_token))

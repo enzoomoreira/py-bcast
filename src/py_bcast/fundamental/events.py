@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.dates import DateLike
-from .._core.normalize import ensure_list
-from .._core.validation import CvmCode, DateParam, validate_params
+from .._core.exceptions import ValidationError
+from .._core.validation import CvmCode, DateParam, TickerList, validate_params
 from .._core.validation import Ticker
 from .._legacy.endpoints import (
     SPEC_BCALENDAR,
@@ -55,9 +54,10 @@ def bcalendar(
     )
 
 
+@validate_params
 def bdividends(
-    ticker: str | list[str],
-    cvm_code: str | int | None = None,
+    ticker: TickerList,
+    cvm_code: CvmCode | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -83,7 +83,7 @@ def bdividends(
         >>> df.tail()
         >>> df = bdividends(["PETR4", "VALE3"])
     """
-    tickers = [t.strip().upper() for t in ensure_list(ticker)]
+    tickers = ticker  # TickerList: already a normalized, uppercased list
     if cvm_code is not None and len(tickers) == 1:
         return run_spec(
             SPEC_BDIVIDENDS_BYCVM,
@@ -94,11 +94,12 @@ def bdividends(
     return run_spec(SPEC_BDIVIDENDS, session_token=session_token, ticker=tickers)
 
 
+@validate_params
 def bdy(
-    ticker: str | list[str],
-    start_date: DateLike,
-    end_date: DateLike,
-    cvm_code: str | int | None = None,
+    ticker: TickerList,
+    start_date: DateParam,
+    end_date: DateParam,
+    cvm_code: CvmCode | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
@@ -117,15 +118,17 @@ def bdy(
         session_token: BCAA session token
 
     Returns:
-        Flat DataFrame with DatetimeIndex, DY values over time, and a
-        ``ticker`` column (one block per company).
+        Flat DataFrame (RangeIndex) with one row per observation: a string
+        ``date`` column, the DY values, and a ``ticker`` column (one block
+        per company). The index stays a RangeIndex because the per-company
+        blocks overlap in dates (a DatetimeIndex would be non-unique).
 
     Example:
         >>> df = bdy("PETR4", "20250101", "20260519")
         >>> df.tail()
         >>> df = bdy(["PETR4", "VALE3"], "20250101", "20260519")
     """
-    tickers = [t.strip().upper() for t in ensure_list(ticker)]
+    tickers = ticker  # TickerList: already a normalized, uppercased list
     if cvm_code is not None and len(tickers) == 1:
         return run_spec(
             SPEC_BDY_BYCVM,
@@ -144,51 +147,33 @@ def bdy(
     )
 
 
-def bportfolios(
-    session_token: str | None = None,
-) -> pd.DataFrame:
-    """
-    Fetch list of broker recommended portfolios.
-
-    Uses aetp/output/fundamental/CarteiraRecomendadaCorretoras.
-    Returns all brokers that publish model portfolios.
-
-    Args:
-        session_token: BCAA session token
-
-    Returns:
-        DataFrame with broker data (ID, name).
-
-    Example:
-        >>> df = bportfolios()
-        >>> df.head()
-    """
-    return run_spec(SPEC_BPORTFOLIOS, session_token=session_token)
-
-
 @validate_params
 def bportfolio(
-    broker_id: CvmCode,
+    broker_id: CvmCode | None = None,
     date: DateParam | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch a broker's recommended portfolios, current or as of a date.
+    Fetch broker recommended portfolios: the broker list, the current
+    composition, or the composition as of a date.
 
-    Without ``date``: uses CarteiraRecomendadaUltima — the broker's current
+    Without ``broker_id``: uses CarteiraRecomendadaCorretoras — the list of
+    brokers that publish model portfolios (id, name, last update).
+
+    With ``broker_id``: uses CarteiraRecomendadaUltima — the broker's current
     portfolios in a single response: the default PADRAO holdings plus themed
     lists (e.g. "Carteira Top 10", "Arrojada", "Dividendos", "Small Caps"),
     distinguished by the ``portfolio_name`` column.
 
-    With ``date``: uses CarteiraRecomendadaMudancas — the composition in
-    force on that date (the latest revision at or before it; the rows' own
-    ``date`` column carries the revision's real date). A date before the
-    broker's first published portfolio returns an empty frame.
+    With ``broker_id`` and ``date``: uses CarteiraRecomendadaMudancas — the
+    composition in force on that date (the latest revision at or before it;
+    the rows' own ``date`` column carries the revision's real date). A date
+    before the broker's first published portfolio returns an empty frame.
 
     Args:
-        broker_id: Broker ID (from bportfolios()).
+        broker_id: Broker ID (omit for the broker list).
         date: Optional reference date for the historical composition
-            (str YYYYMMDD, date, datetime, or Timestamp).
+            (str YYYYMMDD, date, datetime, or Timestamp); requires broker_id.
         session_token: BCAA session token.
 
     Returns:
@@ -200,9 +185,14 @@ def bportfolio(
         the themed-portfolio rows; they are empty for the PADRAO holdings.
 
     Example:
-        >>> df = bportfolio(27)
-        >>> old = bportfolio(107, "20240102")  # composition back then
+        >>> brokers = bportfolio()                # who publishes portfolios
+        >>> df = bportfolio(27)                   # current composition
+        >>> old = bportfolio(107, "20240102")     # composition back then
     """
+    if broker_id is None:
+        if date is not None:
+            raise ValidationError("bportfolio: date requires broker_id")
+        return run_spec(SPEC_BPORTFOLIOS, session_token=session_token)
     if date is None:
         return run_spec(
             SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id

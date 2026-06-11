@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from py_bcast import bcalendar, bdividends, bdy, bportfolios, bportfolio
+from py_bcast import bcalendar, bdividends, bdy, bportfolio
 
 pytestmark = pytest.mark.legacy_session
 
@@ -50,16 +50,16 @@ class TestBdy:
         assert {"PETR4", "VALE3"} <= set(df["ticker"].unique())
 
 
-class TestBportfolios:
+class TestBportfolioList:
     def test_returns_brokers(self):
-        df = bportfolios()
+        df = bportfolio()
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
 
 
 class TestBportfolio:
     def test_first_broker(self):
-        brokers = bportfolios()
+        brokers = bportfolio()
         if not brokers.empty:
             # Get the first broker's ID from whatever column contains it
             first = brokers.iloc[0]

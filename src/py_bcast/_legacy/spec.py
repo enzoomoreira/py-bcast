@@ -5,9 +5,9 @@ to serve one legacy tabular endpoint: transport, path, how public-function
 arguments map to request tags (:class:`ParamBind`), the output index policy,
 rename/schema, error policy, and whether the call vectorizes over one argument.
 
-Endpoints whose response parsing is bespoke (``bdh``/``bdh_ohlcv`` build rows
-from XML by hand) or that are non-tabular (``bnews*``/``bsearch``) are
-intentionally NOT modeled here — see ``temp/B_DESIGN.md`` section 4.
+Endpoints whose response parsing is bespoke (the OHLCV leg of ``bhistory``
+builds rows from XML by hand) or that are non-tabular (``bnews*``/``bsearch``)
+are intentionally NOT modeled here.
 """
 
 from __future__ import annotations
