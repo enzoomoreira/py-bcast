@@ -49,6 +49,38 @@ class BcastAccessor:
         # unstack yields (field, ticker); present it ticker-first.
         return pivoted.swaplevel(axis="columns").sort_index(axis="columns")
 
+    def ohlc(self) -> pd.DataFrame:
+        """Reshape an OHLCV frame for mplfinance/charting libraries.
+
+        Returns the open/high/low/close[/volume] columns renamed to the
+        capitalized ``Open``/``High``/``Low``/``Close``/``Volume`` that
+        ``mplfinance.plot`` expects, in canonical O-H-L-C-V order, keeping the
+        DatetimeIndex. The lib's default lowercase columns already suit
+        pandas-ta/backtrader, so this is an opt-in bridge.
+
+        Raises:
+            ValueError: if the OHLC columns are absent, or the frame holds more
+                than one instrument (filter by ``ticker`` first — charting
+                libraries plot a single instrument).
+        """
+        df = self._df
+        if "ticker" in df.columns and df["ticker"].nunique() > 1:
+            raise ValueError(
+                "bcast.ohlc() needs a single instrument; filter by ticker first "
+                "(e.g. df[df['ticker'] == 'PETR4'])."
+            )
+        rename = {"open": "Open", "high": "High", "low": "Low", "close": "Close"}
+        if not all(col in df.columns for col in rename):
+            raise ValueError(
+                "bcast.ohlc() needs open/high/low/close columns (an OHLCV frame "
+                "such as bhistory(fields='ohlcv') or bdi)."
+            )
+        if "volume" in df.columns:
+            rename["volume"] = "Volume"
+        out = df[list(rename)].rename(columns=rename)
+        order = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in out]
+        return out[order]
+
     def long(self) -> pd.DataFrame:
         """Inverse of :meth:`wide` — collapse the ticker column level back.
 

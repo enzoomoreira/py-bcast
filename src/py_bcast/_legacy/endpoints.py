@@ -48,6 +48,7 @@ from .columns import (
     INDICATOR_HISTORY_SCHEMA,
     INDICATOR_META_FIELDS,
     INDICATOR_META_SCHEMA,
+    INFLATION_RENAME,
     INFLATION_SCHEMA,
     INTRADAY_BAR_SCHEMA,
     MACRO_SCHEMA,
@@ -599,7 +600,7 @@ SPEC_BINFLATION = EndpointSpec(
     transport="cp_ticks",
     path="BaseHistoricaNumerica/Inflacao",
     index=Index.RANGE,
-    rename=CONTENT_PROXY_RENAME,
+    rename=INFLATION_RENAME,
     schema=INFLATION_SCHEMA,
     timeout=15,
 )

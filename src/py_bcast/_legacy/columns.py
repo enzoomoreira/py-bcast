@@ -54,10 +54,11 @@ CONTENT_PROXY_RENAME: dict[str, str | None] = {
 }
 
 
-# bvolume: the shared rename plus symbol -> ticker (the queried key). binflation
-# deliberately keeps `symbol` (a list of distinct indices, not a per-entity
-# lookup key), so the rename is scoped to bvolume rather than shared.
+# bvolume / binflation: the shared rename plus symbol -> ticker (the per-row
+# index/symbol becomes the lib-wide entity column). Scoped here rather than in
+# CONTENT_PROXY_RENAME because the time-series endpoints have no symbol column.
 VOLUME_RENAME: dict[str, str | None] = {**CONTENT_PROXY_RENAME, "symbol": "ticker"}
+INFLATION_RENAME: dict[str, str | None] = {**CONTENT_PROXY_RENAME, "symbol": "ticker"}
 
 
 # bfund_history: Fundos quota history. Accepts exchange tickers (ETFs/FIIs)
@@ -632,7 +633,7 @@ TICK_SCHEMA: dict[str, str] = {  # bdt
 
 # Numeric reference (RangeIndex)
 INFLATION_SCHEMA: dict[str, str] = {
-    "symbol": "object",
+    "ticker": "object",
     **{f"mes{i}": "float64" for i in range(12)},
     "return_3m": "float64",
     "return_6m": "float64",

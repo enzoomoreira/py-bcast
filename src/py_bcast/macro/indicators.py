@@ -259,12 +259,13 @@ def binflation(
         session_token: BCAA session token
 
     Returns:
-        DataFrame with inflation indices. Columns include: symbol, dat, last,
-        var, acum_3m, acum_6m, acum_12m, acum_ano.
+        DataFrame with inflation indices (RangeIndex). Columns: ticker (the
+        index name, e.g. "IPCA"), mes0..mes11 (the monthly values) and the
+        accumulated return_3m, return_6m, return_12m, return_ytd.
 
     Example:
         >>> df = binflation()
-        >>> df[["symbol", "close"]]
+        >>> df[["ticker", "return_12m"]]
     """
     return run_spec(SPEC_BINFLATION, session_token=session_token)
 
