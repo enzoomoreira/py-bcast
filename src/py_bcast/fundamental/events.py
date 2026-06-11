@@ -15,6 +15,7 @@ from .._legacy.endpoints import (
     SPEC_BDY,
     SPEC_BDY_BYCVM,
     SPEC_BPORTFOLIO,
+    SPEC_BPORTFOLIO_AT,
     SPEC_BPORTFOLIOS,
     SPEC_BPORTFOLIOS_WITH,
 )
@@ -168,18 +169,26 @@ def bportfolios(
 @validate_params
 def bportfolio(
     broker_id: CvmCode,
+    date: DateParam | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch a broker's recommended portfolios.
+    Fetch a broker's recommended portfolios, current or as of a date.
 
-    Uses aetp/output/fundamental/CarteiraRecomendadaUltima. One broker returns
-    several portfolios in a single response: the default PADRAO holdings plus
-    themed lists (e.g. "Carteira Top 10", "Arrojada", "Dividendos", "Small
-    Caps"), distinguished by the ``portfolio_name`` column.
+    Without ``date``: uses CarteiraRecomendadaUltima — the broker's current
+    portfolios in a single response: the default PADRAO holdings plus themed
+    lists (e.g. "Carteira Top 10", "Arrojada", "Dividendos", "Small Caps"),
+    distinguished by the ``portfolio_name`` column.
+
+    With ``date``: uses CarteiraRecomendadaMudancas — the composition in
+    force on that date (the latest revision at or before it; the rows' own
+    ``date`` column carries the revision's real date). A date before the
+    broker's first published portfolio returns an empty frame.
 
     Args:
         broker_id: Broker ID (from bportfolios()).
+        date: Optional reference date for the historical composition
+            (str YYYYMMDD, date, datetime, or Timestamp).
         session_token: BCAA session token.
 
     Returns:
@@ -192,9 +201,18 @@ def bportfolio(
 
     Example:
         >>> df = bportfolio(27)
-        >>> df[df["portfolio_name"] == "Carteira Dividendos"][["ticker", "recommendation"]]
+        >>> old = bportfolio(107, "20240102")  # composition back then
     """
-    return run_spec(SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id)
+    if date is None:
+        return run_spec(
+            SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id
+        )
+    return run_spec(
+        SPEC_BPORTFOLIO_AT,
+        session_token=session_token,
+        broker_id=broker_id,
+        date=date,
+    )
 
 
 @validate_params

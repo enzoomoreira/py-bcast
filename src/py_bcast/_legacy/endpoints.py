@@ -335,6 +335,23 @@ SPEC_BFILINGS = EndpointSpec(
     vectorize_over="ticker_or_cvm",
 )
 
+# bportfolio(date=...) — the broker's portfolio AS OF a date. Despite the
+# "mudancas" path, the endpoint returns the composition in force on the
+# requested date (the latest revision <= date, whose real date the rows
+# echo in 13784). A date before the first revision yields no records, which
+# is indistinguishable from an unknown broker — hence soft with schema.
+SPEC_BPORTFOLIO_AT = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/carteira-recomendada/mudancas",
+    index=Index.RANGE,
+    rename=PORTFOLIO_FIELDS,
+    schema=PORTFOLIO_WITH_SCHEMA,
+    params=(
+        ParamBind("broker_id", "10087", "none"),
+        ParamBind("date", "13784", "date"),
+    ),
+)
+
 # bportfolios — brokers that publish model portfolios. Single request.
 SPEC_BPORTFOLIOS = EndpointSpec(
     transport="aetp",

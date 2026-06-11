@@ -613,7 +613,33 @@ DIVIDEND_SCHEMA = _object_schema(DIVIDEND_FIELDS)
 DY_SCHEMA = _object_schema(DY_FIELDS)
 PORTFOLIO_LIST_SCHEMA = _object_schema(PORTFOLIO_LIST_FIELDS)
 FUND_HOLDER_SCHEMA = _object_schema(FUND_HOLDER_FIELDS)
-PORTFOLIO_WITH_SCHEMA = _object_schema(PORTFOLIO_FIELDS)
+# Shared by bportfolios_with and bportfolio(date=...). Spelled out (not
+# _object_schema) so the empty frame matches the populated frames' column
+# order, which follows the server's tag order rather than the field map's.
+PORTFOLIO_WITH_SCHEMA: dict[str, str] = {
+    col: "object"
+    for col in (
+        "broker_id",
+        "date",
+        "ticker",
+        "portfolio_name",
+        "recommendation",
+        "avg_volume_week",
+        "target_price",
+        "eps_quarter",
+        "eps_12m",
+        "ev_ebitda_quarter",
+        "ev_ebitda_12m",
+        "dy_pct",
+        "company",
+        "sector_id",
+        "sector",
+        "subsector_id",
+        "subsector",
+        "segment_id",
+        "segment",
+    )
+}
 SHAREHOLDER_DATES_SCHEMA = _object_schema(SHAREHOLDER_DATES_FIELDS)
 FILINGS_SCHEMA = _object_schema(FILINGS_FIELDS)
 

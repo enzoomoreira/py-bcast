@@ -14,6 +14,7 @@ from .._legacy.endpoints import (
     SPEC_BDY,
     SPEC_BDY_BYCVM,
     SPEC_BPORTFOLIO,
+    SPEC_BPORTFOLIO_AT,
     SPEC_BPORTFOLIOS,
     SPEC_BPORTFOLIOS_WITH,
 )
@@ -95,11 +96,23 @@ async def abportfolios(session_token: str | None = None) -> pd.DataFrame:
 @validate_params
 async def abportfolio(
     broker_id: CvmCode,
+    date: DateParam | None = None,
     session_token: str | None = None,
 ) -> pd.DataFrame:
-    """Async version of ``bportfolio``. Latest recommended portfolio from a broker."""
+    """Async version of ``bportfolio``.
+
+    Without ``date``: the broker's current portfolios. With ``date``: the
+    composition in force on that date (empty frame before the first one).
+    """
+    if date is None:
+        return await arun_spec(
+            SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id
+        )
     return await arun_spec(
-        SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id
+        SPEC_BPORTFOLIO_AT,
+        session_token=session_token,
+        broker_id=broker_id,
+        date=date,
     )
 
 
