@@ -35,7 +35,7 @@ batch = bdp(["PETR4", "VALE3", "ITUB4"], ["ULT", "VAR"])
 > "every tabular function returns a flat DataFrame with a `ticker` column" rule.
 > Like Bloomberg's `BDP`, it is a scalar/point lookup and returns a scalar, a
 > dict of fields, or a dict-of-dicts keyed by ticker — never a DataFrame. Every
-> other public data function (`bdh`, `bmacro`, `bconsensus`, …) follows the
+> other public data function (`bhistory`, `bmacro`, `bconsensus`, …) follows the
 > DataFrame+`ticker` contract.
 
 ### `BroadcastClient`
@@ -84,44 +84,32 @@ with BroadcastClient() as bc:
 
 Requires `BROADCAST_SESSION` environment variable set with a valid BCAA session token.
 
-### `bdh(tickers, start_date, end_date)`
+### `bhistory(tickers, start_date, end_date, fields="close")`
 
-Historical daily closing prices. Works for **all** instruments. Accepts a single
-ticker or a list.
-
-```python
-from py_bcast import bdh
-
-# Single ticker
-df = bdh("PETR4", "20260501", "20260520")   # flat DataFrame, DatetimeIndex
-petr = df[df["ticker"] == "PETR4.BVMF"]
-print(petr["close"])
-
-# Multiple tickers — one flat frame, distinguished by the ticker column
-df = bdh(["PETR4", "VALE3", "USDBRL"], "20260515", "20260520")
-```
-
-**Returns:** a single flat (long) `DataFrame` with a `DatetimeIndex`, one block of rows per symbol, and columns: `ticker`, `close`, `settle`, `settle_rate`, `yield`. Empty DataFrame with that schema if no data.
-
-> **Changed in 0.6.0:** previously returned `dict[symbol, DataFrame]`; now a single flat DataFrame with a `ticker` column.
-
-### `bdh_ohlcv(ticker, date)`
-
-Full OHLCV for one or more tickers on a single date.
+Historico de precos diarios para um ou mais tickers. Ponto de entrada unificado (Bloomberg-BDH-like).
 
 ```python
-from py_bcast import bdh_ohlcv
+from py_bcast import bhistory, bclose
 
-bar = bdh_ohlcv("PETR4", "20260519")
-print(bar["close"].iloc[0], bar["high"].iloc[0], bar["low"].iloc[0])
+# Close/settle (default) — 1 request por ticker para a janela toda
+df = bhistory("PETR4", "20260501", "20260520")
+print(df["close"].tail())
 
-# Multiple tickers on the same date
-df = bdh_ohlcv(["PETR4", "VALE3"], "20260519")
+# Multiple tickers — flat frame, uma coluna ticker
+df = bhistory(["PETR4", "VALE3", "USDBRL"], "20260515", "20260520")
+
+# OHLCV range
+ohlcv = bhistory("PETR4", "20260501", "20260519", fields="ohlcv")
+
+# bclose: atalho para fields="close"
+df = bclose(["PETR4", "VALE3"], "20260101")
 ```
 
-**Returns:** a `DataFrame` with a `DatetimeIndex` (one row per ticker) and columns: `ticker`, `close`, `settle`, `settle_rate`, `low`, `high`, `open`, `trades`, `volume`, `turnover`, `open_interest`, `vwap`, `cum_trades`. Empty DataFrame with that schema if there is no data for the date; `NotFoundError` for an unknown ticker.
+**Retorna (`fields="close"`):** `DataFrame` com `DatetimeIndex`, um bloco por ticker. Colunas: `ticker`, `close`, `settle`, `settle_rate`, `yield`, `net_asset` (fundos). DataFrame vazio com o schema se sem dados.
 
-> **Changed in 0.6.0:** previously returned a `Series`; now a one-row-per-ticker DataFrame.
+**Retorna (`fields="ohlcv"`):** `DataFrame` com `DatetimeIndex`, um bloco por ticker. Colunas: `ticker`, `close`, `settle`, `settle_rate`, `low`, `high`, `open`, `trades`, `volume`, `turnover`, `open_interest`, `vwap`, `cum_trades`.
+
+> **Alterado em 0.7.0 (BREAKING):** `bdh` e `bdh_ohlcv` foram removidos; substitua por `bhistory` ou `bclose`. Ver [`../../compatibility.md`](../../compatibility.md). O ticker de saida e bare (ex.: `PETR4`, nao `PETR4.BVMF`). A perna ohlcv tambem corrige um bug latente do antigo `bdh_ohlcv` que lia apenas o primeiro tick (pregao mais recente, nao a data pedida).
 
 ### `bdi(ticker, start_date)`
 
@@ -219,18 +207,20 @@ df = bmacro(["USDBRL", "IBOV"], "20260101", "20260520")
 
 **Returns:** `DataFrame` with DatetimeIndex sorted chronologically and a `ticker` column. Other columns vary by symbol but typically include: `close`, `open`, `high`, `low`, `settle`, `change_pct`, `trades`, `volume`.
 
-### `bdi_cdi(start_date, end_date)`
+### CDI via `bmacro("CDI", ...)`
 
-Accumulated CDI (DI-CETIP) series. Data available since 1986.
+A serie CDI/DI-CETIP acumulado (desde 1986) e acessada via `bmacro` com o simbolo especial `"CDI"`:
 
 ```python
-from py_bcast import bdi_cdi
+from py_bcast import bmacro
 
-df = bdi_cdi("20260101", "20260520")
-print(df["close"].iloc[-1])  # accumulated %
+cdi = bmacro("CDI", "20260101", "20260520")
+print(cdi["accumulated"].iloc[-1])
 ```
 
-**Returns:** `DataFrame` with DatetimeIndex sorted chronologically. Columns: `close`, `change_pct`, `accumulated`.
+**Returns:** `DataFrame` with DatetimeIndex. Columns: `ticker` (`"CDI"`), `close`, `change_pct`, `accumulated`.
+
+> **Alterado em 0.7.0 (BREAKING):** `bdi_cdi` foi removido. Use `bmacro("CDI", start, end)`. Ver [`../../compatibility.md`](../../compatibility.md).
 
 ### `breturn(ticker, start_date, end_date)`
 
@@ -259,9 +249,10 @@ df = bvolume(["PETR4", "VALE3"])
 print(df[df["symbol"] == "PETR4.BVMF"])
 ```
 
-**Returns:** a flat `DataFrame` (RangeIndex), one row per (symbol, averaging window), with columns: `symbol`, `avg_volume`, `avg_turnover`, `avg_trades`, `months`, `dat`.
+**Returns:** a flat `DataFrame` (RangeIndex), one row per (ticker, averaging window), with columns: `ticker`, `avg_volume`, `avg_turnover`, `avg_trades`, `months`, `date`.
 
 > **Changed in 0.6.0:** `symbol` is now a regular column (it repeats per averaging window, so it can never be a unique index) instead of the DataFrame index.
+> **Changed in 0.7.0:** column `dat` renamed to `date`; column `symbol` renamed to `ticker`.
 
 ### `binflation()`
 
@@ -434,26 +425,41 @@ dy = bdy("PETR4", "20250101", "20260520", cvm_code=9512)  # explicit CVM
 dy = bdy(["PETR4", "VALE3"], "20250101", "20260520")      # list -> one flat frame
 ```
 
-### `bportfolios()`
+> **Contract (desde 0.7.0):** retorna `RangeIndex` (nao `DatetimeIndex`) com uma coluna `date` (string). O multi-ticker vetoriza por empresa; os blocos sobrepoem em datas (DatetimeIndex seria nao-unico).
 
-List of brokers that publish model portfolios.
+### `bportfolio(broker_id=None, date=None)`
 
-```python
-from py_bcast import bportfolios
-
-brokers = bportfolios()
-print(brokers[["broker_id", "name"]])
-```
-
-### `bportfolio(broker_id)`
-
-Latest recommended portfolio from a specific broker.
+Carteiras recomendadas: lista de corretoras, composicao atual ou composicao historica.
 
 ```python
 from py_bcast import bportfolio
 
-holdings = bportfolio(27)
+brokers = bportfolio()              # lista de corretoras (sem broker_id)
+holdings = bportfolio(27)           # composicao atual do broker 27
+old = bportfolio(107, "20240102")   # composicao vigente em 02/jan/2024
 ```
+
+**Retorna (sem `broker_id`):** `DataFrame` com `broker_id`, `name`, `last_update`.
+
+**Retorna (com `broker_id`):** `DataFrame` flat, uma row por acao mantida. Colunas: `broker_id`, `date`, `ticker`, `portfolio_name`, `recommendation`, `target_price`, `dy_pct`, `company`, dados de setor e indicadores fundamentais.
+
+**Com `date`:** retorna a composicao vigente naquela data (ultima revisao <= date). Rows ecoam a data real da revisao. Data anterior a primeira carteira retorna vazio.
+
+> **Alterado em 0.7.0 (BREAKING):** `bportfolios()` foi removido; use `bportfolio()` (sem args). Ver [`../../compatibility.md`](../../compatibility.md).
+
+### `bportfolios_with(ticker)`
+
+Composicao completa de todas as carteiras recomendadas que contem um ticker.
+
+```python
+from py_bcast import bportfolios_with
+
+df = bportfolios_with("PETR4")
+# filtre pela coluna ticker para ver so as rows do PETR4:
+df[df["ticker"] == "PETR4"][["broker_id", "portfolio_name", "date"]]
+```
+
+**Retorna:** `DataFrame` com o mesmo schema do `bportfolio` (todos os holdings de cada carteira que inclui o ticker). Vazio com schema se nenhuma carteira contem o ticker.
 
 ---
 
@@ -484,6 +490,263 @@ case- and accent-insensitively. When an entity lists more than one
 automatically; pass ``tier=``/``docclause=`` to override. Raises
 ``NotFoundError`` for an unknown entity; a valid date with no Markit coverage
 returns an empty DataFrame with schema.
+
+---
+
+## Market Statistics & Intraday Snapshot (HTTP)
+
+### `bstats(tickers)`
+
+Snapshot de estatisticas de mercado para um ou mais simbolos.
+
+```python
+from py_bcast import bstats
+
+df = bstats(["HGLG11", "PETR4"])
+print(df[["ticker", "dividend_yield_pct", "high_52w", "low_52w"]])
+```
+
+Usa FIIAnbimaBovespa (150) — apesar do nome, serve QUALQUER simbolo B3 (acoes, FIIs, units). Multi via join numa unica request.
+
+**Retorna:** `DataFrame` (RangeIndex), uma row por simbolo. Colunas: `ticker`, `bid`, `bid_date`, `ask`, `ask_date`, `last_dividend`, `last_dividend_date`, `dividend_yield_pct`, `shares_outstanding`, `low_52w`, `low_52w_date`, `high_52w`, `high_52w_date`, `turnover_last`, `avg_turnover_30d`, `avg_turnover_100d`, `avg_turnover_180d`, `source`, `net_assets` (FIIs), `avg_trades_180d`. Simbolos desconhecidos sao omitidos.
+
+### `bsnapshot(tickers)`
+
+Snapshot intraday near-real-time para um ou mais simbolos.
+
+```python
+from py_bcast import bsnapshot
+
+df = bsnapshot(["PETR4", "VALE3"])
+print(df[["ticker", "close", "volume", "trades"]])
+```
+
+Usa UltimosIntraday (125). Nao requer canal DDE. Multi via join.
+
+**Retorna:** `DataFrame` (RangeIndex), uma row por simbolo. Colunas: `ticker`, `date`, `time`, `close`, `low`, `high`, `open`, `volume`, `trades`, `turnover`, `open_interest`.
+
+---
+
+## Times & Trades (HTTP)
+
+### `bticks(ticker, start, end=None)`
+
+Times-and-trades com book de topo para simbolos B3.
+
+```python
+from py_bcast import bticks
+
+# 10:00-10:10 Brasilia = 13:00-13:10 UTC
+df = bticks("PETR4", "20260610130000", "20260610131000")
+trades = df[df["type"] == "TRD"]
+quotes = df[df["type"] == "QTE"]
+print(trades[["price", "size", "bid_participant", "ask_participant"]].head())
+```
+
+Usa TimesTrades (41). A janela e interpretada em **UTC** (como `bdt`). Retencao: somente a sessao corrente — dias anteriores retornam vazio. Dado denso (~2k rows/5min em PETR4). Multi via fan-out.
+
+**Retorna:** `DataFrame` com index `DatetimeIndex` tz-aware `America/Sao_Paulo`, ordenado cronologicamente, uma coluna `ticker`. Colunas: `type` (`"TRD"` ou `"QTE"`), `price`, `size`, `bid_price`, `bid_size`, `ask_price`, `ask_size`, `bid_participant`, `ask_participant`, `seq_num`.
+
+---
+
+## Fixed Income (HTTP)
+
+### `btreasury(symbols)`
+
+Ultimo preco de referencia para titulos do Tesouro Nacional.
+
+```python
+from py_bcast import btreasury
+
+df = btreasury(["LTN260701.ANBIMA", "NTNB270515.ANBIMA"])
+print(df[["ticker", "rate", "unit_price"]])
+```
+
+Usa TitulosPublicosUltimos (141) com ids ANBIMA (`<papel><vencimento AAMMDD>.ANBIMA`). Ticker bare (ex: `LTN`) resolve para o instrumento errado — ver limitacoes. Multi via join.
+
+**Retorna:** `DataFrame` (RangeIndex), uma row por titulo. Colunas: `ticker` (bare, ex: `LTN260701`), `date`, `rate` (taxa % a.a.), `unit_price` (PU).
+
+### `btreasury_history(symbol, start, end=None)`
+
+Historico OTC de taxas de negociacao para titulos do Tesouro.
+
+```python
+from py_bcast import btreasury_history
+
+df = btreasury_history("NTNBK27.TRDM", "20260101")
+print(df[["ticker", "close", "working_days"]])
+```
+
+Usa TitulosPublicos (77) com simbolos Trademate (`<papel><mes><AA>.TRDM` — descobertos via `bsearch(exchange="TRDM")`). Os valores OHLC sao TAXAS em % a.a. Negociacao OTC e esparsa.
+
+**Retorna:** `DataFrame` com `DatetimeIndex`, uma coluna `ticker`. Colunas: `close`, `high`, `open`, `low` (taxas % a.a.), `calendar_days`, `working_days`, `expiration_date`, `unit_price`, `stddev`.
+
+### `baccrual(rate, start, end=None)`
+
+Acumulacao de uma taxa pre-fixada em dias uteis (calculadora server-side).
+
+```python
+from py_bcast import baccrual
+
+df = baccrual(14.65, "20260101", "20260601")
+print(df["accumulated"].iloc[-1])
+```
+
+Usa CalculoTaxaPre (136). O param `13539` e a taxa anual em % — o servidor capitaliza pela convencao du/252. Verificado exato: 100% a.a. em 15 du = 2**(15/252)-1 = 4.21%.
+
+**Retorna:** `DataFrame` com `DatetimeIndex`, uma coluna `accumulated` (% acumulado desde `start_date`).
+
+### `bsavings(start, end)`
+
+Poupanca acumulada sobre uma janela.
+
+```python
+from py_bcast import bsavings
+
+df = bsavings("20260101", "20260601")
+print(df["accumulated"].iloc[-1])
+```
+
+Usa CalculoPoupanca (114) via `DataInicio`/`DataFim` (NAO usar `961` — HTTP 500).
+
+**Retorna:** `DataFrame` com `DatetimeIndex`, uma coluna `accumulated` (% acumulado).
+
+---
+
+## Investment Funds — Legacy (HTTP)
+
+### `bfund_history(fund, start, end=None)`
+
+Historico diario de cotas para fundos de investimento.
+
+```python
+from py_bcast import bfund_history
+
+# Por id ANBIMA (os mesmos que bfunds do Plus retorna)
+df = bfund_history("214248.ANBIMA", "20260101")
+print(df[["ticker", "close", "net_asset"]].tail())
+
+# Por ticker de bolsa (ETF/FII)
+df = bfund_history("BBSD11", "20260101")
+```
+
+Usa Fundos (76). Ids ANBIMA populam `net_asset`, `inflows`, `outflows`, `quote_holders`; tickers de bolsa so carregam a cota.
+
+**Retorna:** `DataFrame` com `DatetimeIndex`, uma coluna `ticker`. Colunas: `close`, `net_asset`, `inflows`, `outflows`, `total_assets`, `quote_holders`, `open`, `high`, `low`.
+
+### `bfund_returns(fund)`
+
+Retornos acumulados por janela para fundos de investimento.
+
+```python
+from py_bcast import bfund_returns
+
+df = bfund_returns(["BBSD11", "214248.ANBIMA"])
+print(df[["ticker", "return_12m"]])
+```
+
+Usa FundosRentabilidade (82). `return_12m` verificado como a janela de 12 meses.
+
+**Retorna:** `DataFrame` (RangeIndex), uma row por fundo. Colunas: `ticker`, `return_1d`, `return_1m`, `return_3m`, `return_6m`, `return_12m`, `return_18m`, `return_2y`, `return_3y`, `return_5y` (todos em %).
+
+---
+
+## Macro — Conversao de Moeda
+
+### `bfx(from_currency, to_currency, amount=1.0)`
+
+Conversao spot entre moedas (calculadora server-side).
+
+```python
+from py_bcast import bfx
+
+rate = bfx("USD", "BRL")        # taxa spot atual
+converted = bfx("USD", "BRL", 100)  # 100 USD em BRL
+```
+
+Usa ConversorMoedas (131). Data e inerte — sempre retorna a taxa spot atual, sem conversao historica. Par invalido levanta `NotFoundError`.
+
+**Retorna:** `float` com o valor convertido.
+
+---
+
+## Additional Reference Data (HTTP — aetp/output)
+
+### `bfree_float(ticker_or_cvm)`
+
+Classes de acoes com free float e composicao de units.
+
+```python
+from py_bcast import bfree_float
+
+df = bfree_float("PETR4")   # PETR3 + PETR4 rows
+df = bfree_float("SANB11")  # SANB3 + SANB4 + SANB11 (UNIT) rows
+```
+
+Usa EmpresaAcoesUnits (183). Para UNITs, `unit_on`/`unit_pn` indicam a composicao (ex: SANB11 = 1 ON + 1 PN). Fail-fast para identificadores desconhecidos.
+
+**Retorna:** `DataFrame` (RangeIndex). Colunas: `ticker` (classe), `share_type`, `total_shares`, `float_shares`, `treasury_shares`, `float_pct` (milhares), `unit_on`, `unit_pn`.
+
+### `bfund_holders(ticker_or_cvm)`
+
+Top fundos de investimento que detem acoes de uma empresa.
+
+```python
+from py_bcast import bfund_holders
+
+df = bfund_holders("PETR4")
+print(df[["fund_trade_name", "position_value", "pct_of_fund"]].head())
+```
+
+Usa CarteiraTopFundos (187). Retorna vazio (soft) se nenhum fundo detem o ativo.
+
+**Retorna:** `DataFrame` (RangeIndex). Colunas: `ticker`, `fund_id` (ANBIMA), `fund_trade_name`, `fund_corporate_name`, `cnpj`, `administrator`, `manager`, `category`, `position_value`, `position_quantity`, `pct_of_fund`, `reference_year`, `reference_month`.
+
+### `bshareholder_dates(ticker_or_cvm)`
+
+Datas das composicoes acionarias publicadas para empresas.
+
+```python
+from py_bcast import bshareholder_dates
+
+df = bshareholder_dates("PETR4")
+print(df[["reference_date", "position_date"]])
+```
+
+Usa AcionistaDatas (193). `reference_date` = 1 de janeiro do ano-base; `position_date` = data real da composicao.
+
+**Retorna:** `DataFrame` (RangeIndex). Colunas: `ticker`, `reference_date`, `position_date` (strings ISO date).
+
+### `bfilings(ticker_or_cvm, start, end)`
+
+Links S3 para PDFs de ITR/DFP de empresas.
+
+```python
+from py_bcast import bfilings
+
+df = bfilings("PETR4", "20260101", "20260610")
+for url in df["url"]:
+    print(url)
+```
+
+Usa ArquivosDemonstrativos (205).
+
+**Retorna:** `DataFrame` (RangeIndex). Colunas: `ticker`, `date`, `url`.
+
+### `bfirst_close(ticker)`
+
+Primeiro fechamento historico ajustado para um ou mais tickers.
+
+```python
+from py_bcast import bfirst_close
+
+df = bfirst_close("PETR4")   # PETR4 -> 1994-07-04, 0.17
+print(df[["ticker", "date", "close"]])
+```
+
+Usa FechamentoPrimeiro (204). So aceita ticker B3 bare (sem sufixo).
+
+**Retorna:** `DataFrame` (RangeIndex). Colunas: `ticker`, `date` (int YYYYMMDD), `close`.
 
 ---
 
@@ -651,22 +914,22 @@ Clear cached responses. Without arguments clears the entire cache.
 from py_bcast import cache_invalidate
 
 cache_invalidate()                          # clear all
-cache_invalidate("bdh:PETR4:...")           # clear specific key
+cache_invalidate("bhistory:PETR4:...")       # clear specific key
 ```
 
 ---
 
 ## Async API
 
-All HTTP data functions have async equivalents in the `py_bcast._async` namespace, prefixed with `a` (e.g. `abdh`, `abmacro`). They share the same connection pool, cache, and rate limiter as the sync API, and speak the **same contract**: flat DataFrame with a `ticker` column, multi-ticker input, `NotFoundError` for unknown inputs, empty-with-schema for valid-but-empty queries. (The list cores run concurrently via `asyncio.gather`.)
+All HTTP data functions have async equivalents in the `py_bcast._async` namespace, prefixed with `a` (e.g. `abhistory`, `abmacro`). They share the same connection pool, cache, and rate limiter as the sync API, and speak the **same contract**: flat DataFrame with a `ticker` column, multi-ticker input, `NotFoundError` for unknown inputs, empty-with-schema for valid-but-empty queries. (The list cores run concurrently via `asyncio.gather`.)
 
 ```python
 import asyncio
-from py_bcast._async import abdh, abmacro, abconsensus, abnews_recent
+from py_bcast._async import abhistory, abmacro, abconsensus, abnews_recent
 
 async def main():
     # Historical prices
-    data = await abdh(["PETR4", "VALE3"], "20260501", "20260520")
+    data = await abhistory(["PETR4", "VALE3"], "20260501", "20260520")
 
     # Macro series
     fx = await abmacro("USDBRL", "20260101", "20260520")
@@ -676,7 +939,7 @@ async def main():
 
     # Parallel fetch (asyncio.gather)
     data, fx, c = await asyncio.gather(
-        abdh("PETR4", "20260501", "20260520"),
+        abhistory("PETR4", "20260501", "20260520"),
         abmacro("USDBRL", "20260101", "20260520"),
         abconsensus("PETR4"),
     )
@@ -689,36 +952,50 @@ Alternatively via the namespace:
 ```python
 from py_bcast import async_api
 
-data = asyncio.run(async_api.abdh("PETR4", "20260501", "20260520"))
+data = asyncio.run(async_api.abhistory("PETR4", "20260501", "20260520"))
 ```
 
 **Available async functions:**
 
 | Async | Sync equivalent | Module |
 |-------|----------------|--------|
-| `abdh` | `bdh` | `_async.historical` |
-| `abdh_ohlcv` | `bdh_ohlcv` | `_async.historical` |
+| `abhistory` | `bhistory` | `_async.historical` |
+| `abclose` | `bclose` | `_async.historical` |
 | `abdi` | `bdi` | `_async.historical` |
 | `abdt` | `bdt` | `_async.historical` |
+| `abticks` | `bticks` | `_async.historical` |
+| `abfirst_close` | `bfirst_close` | `_async.historical` |
 | `abmacro` | `bmacro` | `_async.macro` |
-| `abdi_cdi` | `bdi_cdi` | `_async.macro` |
 | `abreturn` | `breturn` | `_async.macro` |
 | `abvolume` | `bvolume` | `_async.macro` |
 | `abinflation` | `binflation` | `_async.macro` |
+| `abstats` | `bstats` | `_async.macro` |
+| `absnapshot` | `bsnapshot` | `_async.macro` |
+| `abfx` | `bfx` | `_async.macro` |
+| `abtreasury` | `btreasury` | `_async.fixedincome` |
+| `abtreasury_history` | `btreasury_history` | `_async.fixedincome` |
+| `abaccrual` | `baccrual` | `_async.fixedincome` |
+| `absavings` | `bsavings` | `_async.fixedincome` |
+| `abfund_history` | `bfund_history` | `_async.funds` |
+| `abfund_returns` | `bfund_returns` | `_async.funds` |
 | `abconsensus` | `bconsensus` | `_async.fundamental` |
 | `abcompany` | `bcompany` | `_async.fundamental` |
 | `abquote` | `bquote` | `_async.fundamental` |
-| `abtickers` | `btickers` | `_async.fundamental` | accepts ticker or CVM code |
+| `abtickers` | `btickers` | `_async.fundamental` |
 | `abshares` | `bshares` | `_async.fundamental` |
 | `abindices` | `bindices` | `_async.fundamental` |
 | `absectors` | `bsectors` | `_async.fundamental` |
-| `abindicators` | `bindicators` | `_async.fundamental` | accepts ticker or CVM code |
+| `abindicators` | `bindicators` | `_async.fundamental` |
 | `abindicator_meta` | `bindicator_meta` | `_async.fundamental` |
+| `abfree_float` | `bfree_float` | `_async.fundamental` |
+| `abfund_holders` | `bfund_holders` | `_async.fundamental` |
+| `abshareholder_dates` | `bshareholder_dates` | `_async.fundamental` |
+| `abfilings` | `bfilings` | `_async.fundamental` |
 | `abcalendar` | `bcalendar` | `_async.events` |
 | `abdividends` | `bdividends` | `_async.events` |
 | `abdy` | `bdy` | `_async.events` |
-| `abportfolios` | `bportfolios` | `_async.events` |
 | `abportfolio` | `bportfolio` | `_async.events` |
+| `abportfolios_with` | `bportfolios_with` | `_async.events` |
 | `abnews` | `bnews` | `_async.news` |
 | `abnews_recent` | `bnews_recent` | `_async.news` |
 | `abnews_multimedia` | `bnews_multimedia` | `_async.news` |
@@ -834,7 +1111,7 @@ Both exceptions append an English **hint** to their `str()` output when the serv
 from py_bcast import ContentProxyError, SessionError, DDEAdviseError, DMLERR_NAMES
 
 try:
-    data = bdh("PETR4", "20260501", "20260520")
+    data = bhistory("PETR4", "20260501", "20260520")
 except SessionError:
     print("Set BROADCAST_SESSION env var")
 except ContentProxyError as e:

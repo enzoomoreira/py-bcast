@@ -58,14 +58,14 @@ Catalogo completo de todos os endpoints HTTP descobertos no ContentProxy (`cp.ae
 
 | Funcionalidade | Status | py-bcast | Notas |
 |---|---|---|---|
-| Historico de fechamento por data | Implementado | `bdh()` | HTTP HistoricoFechamentos |
-| Range de datas (data_ini, data_fim) | Implementado | `bdh()` | Loop automatico por dia |
-| PERIODO=D (diario) | Implementado | `bdh()` | Padrao |
+| Historico de fechamento por data (range) | Implementado | `bhistory()` / `bclose()` | HTTP HistoricoDiarioSimbolos, 1 request para a janela toda |
+| Historico OHLCV (range) | Implementado | `bhistory(fields="ohlcv")` | HTTP HistoricoData, multi-dia |
+| PERIODO=D (diario) | Implementado | `bhistory()` | Padrao |
 | PERIODO=I (intradia 1-240 min) | Implementado | `bdi()` | HTTP HistoricoIntraday, 2-min bars |
 | PERIODO=S (semanal) / PERIODO=M (mensal) | Confirmado | — | Endpoint suporta, nao exposto na lib |
 | NOMINAL=S (serie nominal, sem ajuste) | Confirmado | — | Endpoint `DiarioEx` bloqueado (Query=NONE) |
-| Campos: ULT, FEC, MAX, MIN, ABE, MED, DRF, NEG, QTT, VTT | Implementado | `bdh()`/`bdi()` | |
-| Campos: CAB, AJU, CNG (futuros) | Implementado | `bdh()` | Retornados quando aplicavel |
+| Campos: ULT, FEC, MAX, MIN, ABE, MED, DRF, NEG, QTT, VTT | Implementado | `bhistory()`/`bdi()` | |
+| Campos: CAB, AJU, CNG (futuros) | Implementado | `bhistory()` | Retornados quando aplicavel |
 | ASC/DESC/TITULO/LINHAS (ordenacao, headers, limite) | Fora de escopo | — | Client-side (trivial via Python) |
 
 ### 1.3 `=BCS(ativo; consulta)` — Consultas Estruturadas
@@ -96,16 +96,16 @@ Todos retornam XML com `<RESPONSE><STATUS>success</STATUS>...<TICKS>`.
 | 10 | HistoricoDiario | Bloqueado | — | `AETP_ONLY` — Requer query pre-registrada |
 | 11 | **HistoricoIntraday** | Implementado | 2-min OHLCV bars | `305`=ticker, `10074`=YYYYMMDDHHMM |
 | 12 | **HistoricoTick** | Implementado | Tick-by-tick (intl only) | `305`=ticker, `10071/10072`=YYYYMMDDHHMMSS |
-| 13 | **HistoricoData** | Implementado | OHLCV+VWAP para 1 data | `305`=ticker, `10077`=YYYYMMDD |
+| 13 | **HistoricoData** | Implementado | OHLCV+VWAP multi-dia via `bhistory(fields="ohlcv")` | `305`=ticker, `10077`=YYYYMMDD (start); `1789`=end ignorado pelo servidor, corte client-side |
 | 32 | **HistoricoFechamentos** | Implementado | Closing prices | `10113`=tickers, `DatasTolerancia`=YYYYMMDD |
-| 75 | **HistoricoDiarioSimbolos** | Confirmado | Multi-ticker daily (17KB) | `10113`=tickers sep `;`, `961`=start_date |
+| 75 | **HistoricoDiarioSimbolos** | Implementado | Multi-ticker daily — perna close de `bhistory()` / `bclose()` | `10113`=tickers sep `;`, `961`=start_date, `1789`=end_date (funcional, verificado); cobre todos os instrumentos (B3, FX, indices, AETAXAS, DI futuro, commodities) |
 | 84 | **VolumesMedios** | Implementado | Avg vol 1/2/3/6/12 meses | `10113`=ticker |
 | 95 | **MacroEconomicos** | Implementado | Series macro (FX, indices, AETAXAS) | `305`=ticker, `DataInicio`/`DataFim`=YYYYMMDD |
-| 125 | **UltimosIntraday** | Confirmado | Ultimo snapshot intraday | `10113`=ticker |
+| 125 | **UltimosIntraday** | Implementado | Ultimo snapshot intraday — `bsnapshot(tickers)` | `10113`=ticker; multi via join |
 | 126 | **Inflacao** | Implementado | 17 indices de inflacao, 12 meses | Sem params extras |
 | 137 | **DiCetipAcumulado** | Implementado | CDI/DI acumulado diario (desde 1986) | `DataInicio`/`DataFim`=YYYYMMDD |
 | 140 | **RetornoDiario** | Implementado | Retorno diario ajustado | `305`=ticker, `DataInicio`/`DataFim`=YYYYMMDD |
-| 150 | **FIIAnbimaBovespa** | Confirmado | FII: DY, last div, vol medio, etc. (HGLG11: DVYLD=9.24, ULDV=1.1, QTCT=33.7M) | `10113`=ticker (ex: HGLG11) |
+| 150 | **FIIAnbimaBovespa** | Implementado | Snapshot de estatisticas — `bstats(tickers)` (serve QUALQUER simbolo B3, nao so FIIs) | `10113`=ticker; multi via join |
 | 154 | **EmpresasHistorico** | Vazio/Casca | **CASCA VAZIA** — schema de 222 campos (DRE/BP/FC) mas 0 celula financeira | `305`=ticker, `961`=start_date |
 | 208 | **Volatilidades** | Vazio/Casca | `STATUS=success` porem `<TICKS>` sempre vazio (dataset vazio no servidor) | `10113`=ticker, `12078`=dias |
 
@@ -131,13 +131,13 @@ Todos retornam XML com `<RESPONSE><STATUS>success</STATUS>...<TICKS>`.
 
 | ID | Endpoint | Status | Dados | Params Chave |
 |---|----------|--------|-------|--------------|
-| 76 | **Fundos** | Confirmado | Historico de cotas (OHLC, 24KB) | `305`=ticker, `961`=start |
-| 77 | **TitulosPublicos** | Confirmado | OHLC de titulo do Tesouro (popula via `.TRDM`) | `305`=`LTNF28.TRDM` (NAO bare `LTN`), `961`=start |
-| 82 | **FundosRentabilidade** | Confirmado | Rentabilidade do fundo | `305`=ticker |
-| 114 | **CalculoPoupanca** | Confirmado | Rendimento poupanca diario (5.7KB) | `DataInicio`/`DataFim` (NAO `961` — `961` -> HTTP 500) |
+| 76 | **Fundos** | Implementado | Historico de cotas — `bfund_history(fund, start, end)` | `305`=ticker ou `<id>.ANBIMA`, `961`=start; ids ANBIMA populam net_asset/inflows/outflows |
+| 77 | **TitulosPublicos** | Implementado | Historico OTC de taxas — `btreasury_history(symbol, start, end)` | `305`=`LTNF28.TRDM` (NAO bare `LTN`), `961`=start; OHLC sao TAXAS, negociacao esparsa |
+| 82 | **FundosRentabilidade** | Implementado | Retornos por janela — `bfund_returns(fund)` | `305`=ticker ou `<id>.ANBIMA`; ret_anual = janela de 12 meses |
+| 114 | **CalculoPoupanca** | Implementado | Poupanca acumulada — `bsavings(start, end)` | `DataInicio`/`DataFim` (NAO `961` — `961` -> HTTP 500) |
 | 135 | **CalculoPreco** | Confirmado | Preco unitario renda fixa (popula via `.ANBIMA`) | `305`=`LTN260701.ANBIMA` (NAO bare `LTN`), `961`=start |
-| 136 | **CalculoTaxaPre** | Confirmado | Curva de taxa pre acumulada (6.5KB) | `13539`=notional, `961`=start |
-| 141 | **TitulosPublicosUltimos** | Confirmado | Ultimos precos de titulos (popula via `.ANBIMA`) | `10113` ou `305`=`LTN260701.ANBIMA` (NAO bare `LTN`) |
+| 136 | **CalculoTaxaPre** | Implementado | Accrual de taxa pre — `baccrual(rate, start, end)` | `13539`=taxa anual em % (nao notional — CRACKADO: o servidor capitaliza em du/252); verificado exato: 100% a.a. em 15 du = 2**(15/252)-1 = 4.21% |
+| 141 | **TitulosPublicosUltimos** | Implementado | Ultimo preco de titulos — `btreasury(symbols)` | `10113`=`LTN260701.ANBIMA` (NAO bare `LTN`); multi via join; retorna ticker bare, date, rate, unit_price |
 | 207 | **VolumesMediosSemMesAno** | Vazio/Casca | `STATUS=success` porem `<TICKS>` sempre vazio (dataset vazio no servidor) | `10113`=ticker, `12078`=dias |
 
 > **Armadilha de simbolo (77/135/141).** Tesouro BR vive em DUAS bolsas no `InstrumentDB`; o
@@ -159,12 +159,12 @@ Todos retornam XML com `<RESPONSE><STATUS>success</STATUS>...<TICKS>`.
 |---|----------|------|-----------|
 | 26 | HistoricoUltimosPregoes | `Query=NONE` | `AETP_ONLY` — confirmado: validacao satisfeita (`QuantidadePregoes`+`Precisao`) e ainda assim `Query=NONE` |
 | 40 | Players | SQL bug | `BUG` — "field BVMF not found in tick descriptor" |
-| 81 | FundosIndicadores | `api_error` | `PARAMS` (nao re-testado nesta rodada) |
-| 83 | FechamentoFormula | api_error | `PARAMS` — parede server-side: `Instrumentos`/`12004` aceitos, mas `DataInicio` e rejeitado como "nao encontrado" MESMO presente |
-| 138 | TabelaRetorno | api_error | `PARAMS` — exige "Tipo de calculo"; nome do param nao descoberto (`13487` e variantes nao satisfazem) |
-| 139 | TabelaRentabilidade | api_error | `PARAMS` — mesma parede do 138 (`13487` != tipo de calculo) |
+| 81 | FundosIndicadores | `api_error` | `PARAMS` — avancou: `961` satisfaz a data, servidor passa a pedir "Benchmark nao informado"; nenhuma combinacao de nome/valor testada (Benchmark=, 13486=) satisfaz |
+| 83 | FechamentoFormula | api_error | `PARAMS` — parede server-side: `Instrumentos`/`12004` aceitos, mas `DataInicio` e rejeitado como "nao encontrado" MESMO presente (testado YYYYMMDD e dd/MM/yyyy) |
+| 138 | TabelaRetorno | api_error | `PARAMS` — respondem "Tipo de calculo nao enviado" a todas as chaves testadas (10029, TipoCalculo, TipoDeCalculo, Tipo, TipoRetorno, 12004, 13539) |
+| 139 | TabelaRentabilidade | api_error | `PARAMS` — mesma parede do 138 |
 | 142 | DiarioEx | `Query=NONE` | `AETP_ONLY` |
-| 144 | CalculoCarteira | api_error | `PARAMS` — `13571`+`961` aceitos; falta "Tipo de calculo" (enum nao descoberto apos ~284 tentativas; provavelmente so no Add-In Excel) |
+| 144 | CalculoCarteira | api_error | `PARAMS` — `13571`+`961` aceitos; "Tipo de calculo nao enviado" persiste com as mesmas variantes de 138/139; enum provavelmente so no Add-In Excel |
 
 > **AETP_ONLY genuino (10, 26, 142).** A re-verificacao refutou a hipotese de "so falta param":
 > com a validacao de parametros TOTALMENTE satisfeita (10/26 ainda pediam `Precisao` e
@@ -185,10 +185,10 @@ parametros corretos (verificado 2026-06-02, dados reais):
 
 | ID | Endpoint | Status | Dados | Params Chave |
 |---|----------|--------|-------|--------------|
-| 41 | **TimesTrades** | Confirmado | Times & trades B3/intl (janela UTC) | `305`=ticker, `10071`/`10072`=`YYYYMMDDHHMMSS` **em UTC** |
-| 131 | **ConversorMoedas** | Confirmado | Conversao de moeda **spot** (1 tick, campo `LAST`) | `Instrumento`=de, `Instrumento2`=para, `Valor`=quantia |
+| 41 | **TimesTrades** | Implementado | Times-and-trades com book de topo — `bticks(ticker, start, end)` | `305`=ticker, `10071`/`10072`=`YYYYMMDDHHMMSS` **em UTC**; TRD rows: price/size/seq_num/bid_participant/ask_participant; QTE rows: bid/ask price+size; retenção: somente sessao corrente (dias anteriores retornam vazio) |
+| 131 | **ConversorMoedas** | Implementado | Conversao spot — `bfx(from_currency, to_currency, amount)` | `Instrumento`=de, `Instrumento2`=para, `Valor`=quantia; par invalido -> NotFoundError ("Simbolo invalido"); data e inerte (sempre spot) |
 | 145 | **CalculoInflacao** | Confirmado | Serie de inflacao (22 ticks `DAT`/`ACUM`) | `305`=`AEIPCA` (NAO bare `IPCA`), `961`=start |
-| 204 | **FechamentoPrimeiro** | Confirmado | Primeiro fechamento historico do ativo | `Instrumento`=ticker B3 bare (ex.: `PETR4`, NAO `.BVMF`) |
+| 204 | **FechamentoPrimeiro** | Implementado | Primeiro fechamento historico — `bfirst_close(ticker)` | `Instrumento`=ticker B3 bare (ex.: `PETR4`, NAO `.BVMF`) |
 
 > - **41 TimesTrades**: o "empty ticks para B3" da varredura de 2025 era o **erro de fuso** — a
 >   janela `10071`/`10072` e interpretada em **UTC**, nao BRT. Com janela UTC cobrindo o pregao
@@ -284,7 +284,7 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 | 173 | **EmpresasPorSetores** | Confirmado | Todas empresas de um setor | 14.5KB |
 | 179 | **EmpresaMetadado** | Implementado | Metadados de TODAS as empresas | 101KB |
 | 180 | **EmpresaDados** | Implementado | Empresa: CNPJ, nome, setor, IPO date | 1.2KB |
-| 183 | **EmpresaAcoesUnits** | Confirmado | Acoes ON/PN, free float | 348B |
+| 183 | **EmpresaAcoesUnits** | Implementado | Classes de acoes com free float e composicao de units — `bfree_float(ticker_or_cvm)` | 348B |
 
 ### 5.2 Fundamental — Dividendos / Eventos
 
@@ -292,7 +292,7 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 |---|----------|--------|-------|------|
 | 186 | **EventosJcpDividendos** | Implementado | Historico completo JCP+Div (desde 1995!) | 274B+ |
 | 192 | **EventosDividendYield** | Implementado | DY historico por ex-date | 2.6KB |
-| 193 | **AcionistaDatas** | Confirmado | Datas de composicao acionaria | 1.6KB |
+| 193 | **AcionistaDatas** | Implementado | Datas de composicoes acionarias — `bshareholder_dates(ticker_or_cvm)` | 1.6KB; reference_date = 1 de janeiro do ano-base; position_date = data real da composicao |
 | 211 | **CalendarioEventosCorporativos** | Implementado | Agenda de eventos (AGO, ITR, etc.) | **72KB** |
 
 ### 5.3 Fundamental — Carteira Recomendada
@@ -300,19 +300,14 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
 | 194 | **CarteiraRecomendadaUltima** | Implementado | Ultima carteira de uma corretora | 9.3KB |
-| 195 | **CarteiraRecomendadaTicker** | Confirmado | Em quais carteiras o ticker esta (54 linhas, ref-date real) | `10113`=ticker |
-| 197 | **CarteiraRecomendadaMudancas** | A investigar | Mudancas na carteira — vivo, mas sem registros nas datas testadas | `13784`=dataReferencia + `10087`=idCorretora (ambos obrigatorios) |
+| 195 | **CarteiraRecomendadaTicker** | Implementado | Composicao completa de todas as carteiras que contem o ticker — `bportfolios_with(ticker)` | `10113`=ticker |
+| 197 | **CarteiraRecomendadaMudancas** | Implementado | Composicao historica da carteira — `bportfolio(broker_id, date=...)` | `13784`=dataReferencia + `10087`=idCorretora; apesar do path "mudancas", retorna a composicao VIGENTE na data (ultima revisao <= date); data antes da primeira carteira retorna vazio |
 | 198 | **CarteiraRecomendadaCorretoras** | Implementado | Lista de corretoras com carteiras | 318B |
 
-> **197 CarteiraRecomendadaMudancas — a investigar (nao e falso-positivo simples).** Os "144B
-> Confirmados" pela varredura de 2025 eram um **header de erro de validacao** (campo obrigatorio
-> faltando), nao dados. O endpoint esta **vivo**: exige DOIS params obrigatorios — `13784`
-> (dataReferencia) + `10087` (idCorretora) — e so com `10087` retorna `Campo obrigatorio nao
-> enviado! ...dataReferencia`. Com ambos, responde `Nao foram encontrados registros` (109B, erro
-> bem-formado) para as datas testadas (2026-06-01). Como mudancas de carteira sao eventos esparsos
-> e o par corretora/data nao foi cruzado contra um sibling com registro real (195 expoe ref-date
-> `2025-01-13`), "sem registros" **nao e conclusivo**: NAO confirmavel como funcional, mas tambem
-> **nao bloqueado**. Fica como `A investigar`.
+> **197 CarteiraRecomendadaMudancas — crackado em 2026-06-10.** Pares (corretora, data)
+> colhidos do sibling 195 comprovaram que o endpoint retorna a composicao vigente na data
+> (ultima revisao <= date; as rows ecoam a data real da revisao). Exposto como
+> `bportfolio(broker_id, date=...)`. Data antes da primeira carteira -> vazio.
 
 ### 5.4 Fundamental — Indicadores
 
@@ -343,7 +338,7 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 | 176 | **ArquivosEspecies** | Confirmado | Especies de documentos (54 linhas) | 2.2KB |
 | 177 | **ArquivosTipos** | Confirmado | Tipos de documentos (106 linhas) | 4.4KB |
 | 185 | **IndicadorCategorias** | Confirmado | Categorias de indicadores (12 linhas) | 252B |
-| 205 | **ArquivosDemonstrativos** | Confirmado | Lista de demonstrativos (URLs S3 de PDFs) | requer `13004`=codigoCvm + `13916`=datasIni + `13917`=datasFim |
+| 205 | **ArquivosDemonstrativos** | Implementado | PDFs de ITR/DFP com links S3 — `bfilings(ticker_or_cvm, start, end)` | `13004`=codigoCvm + `13916`=datasIni + `13917`=datasFim |
 | 212 | **TickersEmpresas** | Vazio/Casca | Sem registros (`in_88000`) para PETR4/VALE3 | — |
 
 > **205 era falso-positivo de bytes, mas FUNCIONA com os params certos.** Os "139B Confirmados"
@@ -357,7 +352,7 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
-| 187 | **CarteiraTopFundos** | Confirmado | Top fundos que investem no ativo | 8.5KB |
+| 187 | **CarteiraTopFundos** | Implementado | Top fundos que investem no ativo — `bfund_holders(ticker_or_cvm)` | 8.5KB |
 | 188 | EmpresaDistribuicao | Confirmado | Distribuicao investimentos | 91B (vazio) |
 
 ### 5.7 Ativos / Indices
@@ -514,7 +509,7 @@ de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` unif
 | DDE (Service=BC) | Funcional | Real-time + snapshot |
 | HTTP BaseHistoricaNumerica | Funcional | ~18 endpoints, 9 implementados |
 | HTTP aefundamental | Parcial | Consensus + binary parser |
-| HTTP aetp/output | **~40 funcionais, 14 implementados** | Binary SOH, fonte mais rica |
+| HTTP aetp/output | **~40 funcionais, ~22 implementados** | Binary SOH, fonte mais rica |
 | HTTP IntegracaoTabelas | Parcial | 4 endpoints de commodities/formulas |
 | HTTP AEInstrumentos | 100% bloqueado | `PROPRIETARY` — error 88007 (comprovado em 3 variacoes de `TipoResposta`) |
 | HTTP AEContent | 100% bloqueado | `PROPRIETARY` — error 88007 (News); CentralMultimidia (ASP.NET) e separado e funcional |
@@ -534,9 +529,9 @@ de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` unif
 
 | Status | Count | Descricao |
 |--------|-------|-----------|
-| Implementado na lib | **26 funcoes** | bdp, bdh, bdh_ohlcv, bdi, bdt, bmacro, bdi_cdi, breturn, bvolume, binflation, bconsensus, bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolios, bportfolio, bsearch, InstrumentDB |
-| Funcional, nao implementado | **~38** | Endpoints com dados reais (FIIs, Fundos, TitulosPublicos, Markit/CDS, ClasseAnbima, ConversorMoedas, TimesTrades, etc.). **Sem demonstracoes financeiras** — ver abaixo |
-| Vazio/Casca | **~5** | Vivos mas sem dado utilizavel: 154, 207, 208, 212 (e 102-104 parciais). Nao confirmavel: 197 |
+| Implementado na lib | **~42 funcoes** | bdp, bhistory, bclose, bdi, bdt, bticks, bmacro, breturn, bvolume, binflation, bstats, bsnapshot, bfirst_close, bfx, btreasury, btreasury_history, baccrual, bsavings, bfund_history, bfund_returns, bfree_float, bfund_holders, bshareholder_dates, bfilings, bportfolios_with, bconsensus, bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolio, bcds, bsearch, InstrumentDB |
+| Funcional, nao implementado | **~20** | Endpoints com dados reais nao cobertos por adapter (metadados ANBIMA, ClasseAnbima, MarkitListas, IntegracaoTabelas, etc.). **Sem demonstracoes financeiras** — ver abaixo |
+| Vazio/Casca | **~5** | Vivos mas sem dado utilizavel: 154, 207, 208, 212 (e 102-104 parciais) |
 | Bloqueado/Quebrado | ~68 | Ver categorias abaixo |
 | Fora de escopo | ~8 | Contribuicao, admin, banners |
 
@@ -552,7 +547,7 @@ de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` unif
 | `PROPRIETARY` | ~58 | AEInstrumentos, AEContent (News) | Requer reverse-engineering do protocolo Java binario |
 | `DEAD_BACKEND` | ~34 | contentProxyOutput (maioria 500, exceto 120/116), GraphQL indicadores (AWS offline) | Pode voltar se backend for restaurado |
 | `AETP_ONLY` | ~3 | HistoricoDiario (10), DiarioEx (142), UltimosPregoes (26) | Confirmado: `Query=NONE` mesmo com validacao OK. Requer protocolo AETP TCP:8100 |
-| `PARAMS` | ~5 | 81, 83, 138, 139, 144 (BaseHistoricaNumerica) | Parede de parametro nao crackada (enum/param so no Add-In) |
+| `PARAMS` | ~4 | 81, 83, 138/139, 144 (BaseHistoricaNumerica) | Parede de parametro nao crackada (enum/param so no Add-In); 197 SAIU desta lista |
 | `BUG` | ~1 | Players (SQL error) | Bug no servidor |
 
 > Reducoes vs 2025: `DEAD_BACKEND` e `PARAMS` cairam porque varios "bloqueados" eram

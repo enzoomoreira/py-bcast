@@ -23,7 +23,7 @@ graph LR
         subgraph "Legacy (bcsys32.exe)"
             L_PROTO["_legacy/ (protocolo)<br/>dde, aetp, binary, xml_helpers,<br/>http, session, resolve,<br/>columns, output, multi"]
             L_RT["realtime/<br/>bdp, BroadcastClient"]
-            L_HIST["historical/<br/>bdh, bdi, bdt"]
+            L_HIST["historical/<br/>bhistory, bclose, bdi, bdt, bticks, bfirst_close"]
             L_MACRO["macro/"]
             L_FUND["fundamental/"]
             L_NEWS["news/"]
@@ -112,9 +112,9 @@ arvores para que sync e async continuem compartilhando.
 | `columns.py` | Schemas de coluna e renomeacao dos outputs Legacy (`CONTENT_PROXY_RENAME`, `VOLUME_RENAME`, ...). |
 | `spec.py` | Descritores declarativos de endpoint: `EndpointSpec` / `ParamBind` (transporte, tags, politica de indice/erro, vetorizacao). |
 | `endpoints.py` | Catalogo de `EndpointSpec` — um spec por endpoint migrado, compartilhado pelos executores sync e async. |
-| `output.py` | Finalizacao de DataFrame: `finalize_frame()` (politica de indice via enum `Index`), `empty_bdh_frame()`. |
+| `output.py` | Finalizacao de DataFrame: `finalize_frame()` (politica de indice via enum `Index`, strip de sufixo `.BVMF`), `empty_history_frame()`. |
 | `multi.py` | Fan-out multi-ticker: `vectorize()` / `vectorize_async()` (residuo de concorrencia deliberado, fora do codegen). |
-| `_async/` | FONTE da camada de I/O (async): `transport.py` (`aetp_request`, `content_proxy_get`), `executor.py` (`run_spec`), `resolve.py`, `quote.py`, `bdh.py`. |
+| `_async/` | FONTE da camada de I/O (async): `transport.py` (`aetp_request`, `content_proxy_get`), `executor.py` (`run_spec`), `resolve.py`, `quote.py`, `ohlcv.py` (bhistory OHLCV core), `ticks.py` (bticks core), `markit.py` (CDS). |
 | `_sync/` | Camada de I/O sync GERADA — mesmos modulos/nomes da fonte, tokens async removidos. NAO EDITAR. |
 
 ---

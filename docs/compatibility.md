@@ -7,16 +7,44 @@ Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada 
 
 ---
 
+## Renames e Removals — 0.7.0 (2026-06-10)
+
+Esta versao e **BREAKING** sem shims ou aliases de transicao:
+
+| Antes (0.6.x) | Depois (0.7.0) | Notas |
+|---|---|---|
+| `bdh(tickers, start, end)` | `bhistory(tickers, start, end)` ou `bclose(tickers, start, end)` | Backend mudou: HistoricoDiarioSimbolos (1 req/ticker); valores identicos ao antigo por ticker |
+| `bdh_ohlcv(ticker, date)` | `bhistory(tickers, start, end, fields="ohlcv")` | Agora multi-dia; o antigo tinha bug: lia so o primeiro tick (pregao mais recente) |
+| `bdi_cdi(start, end)` | `bmacro("CDI", start, end)` | Bloco CDI agora carrega coluna `accumulated` extra |
+| `bportfolios()` | `bportfolio()` (sem args) | |
+| `bportfolio(broker_id)` | `bportfolio(broker_id)` | Inalterado |
+| — | `bportfolio(broker_id, date=...)` | Novo: composicao historica |
+| `df["dat"]` em bvolume/binflation/RANGE frames | `df["date"]` | Coluna renomeada |
+| Ticker de saida `"PETR4.BVMF"` em bdh/bvolume | `"PETR4"` (bare) | `finalize_frame` remove o sufixo `.BVMF` universalmente |
+
+---
+
 ## Mapeamento de Funcoes
 
 | Funcao py-bcast | Endpoint Legacy | Endpoint Plus | Status Plus |
 |---|---|---|---|
 | `bdp()` / `BroadcastClient` | DDE `BC/COT/TICKER.FIELD` | WS `startStreamQuote` | **Implementado via `BroadcastPlusClient`** |
 | `BroadcastClient.snapshot()` | DDE `BC/ATIVO/TICKER` | `POST /stock/v1/quote/symbol` | **Implementado via `binfo()`** — metadata; preco via WS |
-| `bdh()` | `BaseHistoricaNumerica/HistoricoFechamentos` | `POST /stock/v1/historical/symbol` | Bloqueado — erro bh_88063 (restricao de assinatura) |
+| `bhistory()` / `bclose()` | `BaseHistoricaNumerica/HistoricoDiarioSimbolos` + `HistoricoData` | `POST /stock/v1/historical/symbol` | Bloqueado — erro bh_88063 (restricao de assinatura) |
 | `bdi()` | `BaseHistoricaNumerica/HistoricoIntraday` | `POST /stock/v1/timesAndTrades` | **Implementado via `btrades()`** — 500 trades/chamada |
 | `bdt()` | `BaseHistoricaNumerica/HistoricoTick` | `POST /stock/v1/historical/tickbytick/symbol` | Bloqueado — mesmo bh_88063 |
-| `bmacro()` | `BaseHistoricaNumerica/MacroEconomicos` | Sem equivalente | Sem suporte no Plus |
+| `bticks()` | `BaseHistoricaNumerica/TimesTrades` | Sem equivalente | Sem suporte no Plus |
+| `bmacro()` | `BaseHistoricaNumerica/MacroEconomicos` + `DiCetipAcumulado` (CDI) | Sem equivalente | Sem suporte no Plus |
+| `bstats()` | `BaseHistoricaNumerica/FIIAnbimaBovespa` | Sem equivalente | Sem suporte no Plus |
+| `bsnapshot()` | `BaseHistoricaNumerica/UltimosIntraday` | Sem equivalente | Sem suporte no Plus |
+| `btreasury()` | `BaseHistoricaNumerica/TitulosPublicosUltimos` | Sem equivalente | Sem suporte no Plus |
+| `btreasury_history()` | `BaseHistoricaNumerica/TitulosPublicos` | Sem equivalente | Sem suporte no Plus |
+| `baccrual()` | `BaseHistoricaNumerica/CalculoTaxaPre` | Sem equivalente | Sem suporte no Plus |
+| `bsavings()` | `BaseHistoricaNumerica/CalculoPoupanca` | Sem equivalente | Sem suporte no Plus |
+| `bfund_history()` | `BaseHistoricaNumerica/Fundos` | Sem equivalente | Sem suporte no Plus |
+| `bfund_returns()` | `BaseHistoricaNumerica/FundosRentabilidade` | Sem equivalente | Sem suporte no Plus |
+| `bfx()` | `BaseHistoricaNumerica/ConversorMoedas` | Sem equivalente | Sem suporte no Plus |
+| `bfirst_close()` | `aetp/output/FechamentoPrimeiro` | Sem equivalente | Sem suporte no Plus |
 | `bconsensus()` | `aefundamental/consenso` | Sem equivalente | Sem suporte no Plus |
 | `bcompany()` | `aetp/output/fundamental/empresa` | Sem equivalente | Sem suporte no Plus |
 | `bindices()` | `aetp/output/ativos/indice` | `GET /stock/v1/indexes` | **Implementado via `bindexes()`** — lista de codigos de indices |
@@ -24,10 +52,14 @@ Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada 
 | `bcalendar()` | `aetp/output/fundamental/calendario` | `GET /stock/v1/calendar/tables` | **Implementado via `bholidays()`** — catalogo de tabelas; datas bloqueadas (param nao descoberto) |
 | `bdividends()` | `aetp/output/fundamental/eventos/jcp-dividendos` | `POST /stock/v1/corporateevents/{symbol}` | **Implementado via `bcorpevents()`** — inclui fatores de ajuste que o legado nao tem |
 | `bdy()` | `aetp/output/fundamental/eventos/dividend-yield` | incluido em `corporateevents` | A implementar |
+| `bfree_float()` | `aetp/output/fundamental/EmpresaAcoesUnits` | Sem equivalente | Sem suporte no Plus |
+| `bfund_holders()` | `aetp/output/fundamental/CarteiraTopFundos` | Sem equivalente | Sem suporte no Plus |
+| `bshareholder_dates()` | `aetp/output/fundamental/AcionistaDatas` | Sem equivalente | Sem suporte no Plus |
+| `bfilings()` | `aetp/output/fundamental/ArquivosDemonstrativos` | Sem equivalente | Sem suporte no Plus |
+| `bportfolio()` | `aetp/output/fundamental/empresa/carteira-recomendada` | Sem equivalente | Sem suporte no Plus |
+| `bportfolios_with()` | `aetp/output/fundamental/CarteiraRecomendadaTicker` | Sem equivalente | Sem suporte no Plus |
 | `bnews()` / `bnews_recent()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | **Implementado via `bsections()`/`bheadlines()`/`bnews_content()`** — 121 secoes, tagging rico |
 | `bsearch()` | `aetp_17.dat` (arquivo local) | `POST /stock/v1/quote/symbol/search` | **Implementado com routing automatico** — schema unificado em `pd.DataFrame` |
-| `bportfolios()` / `bportfolio()` | `aetp/output/fundamental/empresa/carteira-recomendada` | Sem equivalente | Sem suporte no Plus |
-| `bmacro()` / `bdi_cdi()` | `BaseHistoricaNumerica/DiCetipAcumulado` | Sem equivalente | Sem suporte no Plus |
 
 ---
 
@@ -62,11 +94,22 @@ Funcionalidades que existem apenas no Terminal Antigo e nao tem plano de suporte
 
 | Funcao | Endpoint Legacy | Motivo |
 |--------|----------------|--------|
-| `bmacro()` | `MacroEconomicos` | Sem endpoint de macro series no Plus |
+| `bhistory()` / `bclose()` | `HistoricoDiarioSimbolos` + `HistoricoData` | Historico bloqueado no Plus (bh_88063) |
+| `bticks()` | `TimesTrades` | Sem equivalente no Plus |
+| `bmacro()` (incluindo CDI) | `MacroEconomicos` + `DiCetipAcumulado` | Sem endpoint de macro series no Plus |
+| `bstats()` | `FIIAnbimaBovespa` | Sem equivalente no Plus |
+| `bsnapshot()` | `UltimosIntraday` | Sem equivalente no Plus |
+| `btreasury()` / `btreasury_history()` | `TitulosPublicosUltimos` + `TitulosPublicos` | Sem endpoint de tesouro no Plus |
+| `baccrual()` | `CalculoTaxaPre` | Sem equivalente no Plus |
+| `bsavings()` | `CalculoPoupanca` | Sem equivalente no Plus |
+| `bfund_history()` / `bfund_returns()` | `Fundos` + `FundosRentabilidade` | Sem equivalente no Plus |
+| `bfx()` | `ConversorMoedas` | Sem equivalente no Plus |
+| `bfirst_close()` | `FechamentoPrimeiro` | Sem equivalente no Plus |
 | `bconsensus()` | `aefundamental/consenso` | Sem endpoint de consenso no Plus |
 | `bcompany()` | `aetp/output/fundamental/empresa` | Sem endpoint de dados de empresa no Plus |
-| `bportfolios()` / `bportfolio()` | `aetp/output/carteira-recomendada` | Sem equivalente no Plus |
-| `bdi_cdi()` | `DiCetipAcumulado` | Sem endpoint de CDI acumulado no Plus |
+| `bfree_float()` / `bfund_holders()` | `EmpresaAcoesUnits` + `CarteiraTopFundos` | Sem equivalente no Plus |
+| `bshareholder_dates()` / `bfilings()` | `AcionistaDatas` + `ArquivosDemonstrativos` | Sem equivalente no Plus |
+| `bportfolio()` / `bportfolios_with()` | `aetp/output/carteira-recomendada` | Sem equivalente no Plus |
 | `breturn()` | `RetornoDiario` | Sem endpoint de retorno diario no Plus |
 | `bvolume()` | `VolumesMedios` | Sem endpoint de volumes medios no Plus |
 | `binflation()` | `Inflacao` | Sem endpoint de indices de inflacao no Plus |
@@ -88,7 +131,7 @@ Funcionalidades que existem apenas no Terminal Antigo e nao tem plano de suporte
 | Refresh de token | Manual (re-scan) | Auto-refresh via `refreshToken` |
 | Ambiente headless | `BROADCAST_SESSION` env var | `BROADCAST_PLUS_TOKEN` env var |
 | Configuracao headless | — | `configure(plus_login=..., plus_password=...)` |
-| Dados historicos | `bdh()`, `bdi()`, `bdt()` | Historico bloqueado (bh_88063), T&T via `timesAndTrades` |
+| Dados historicos | `bhistory()`, `bdi()`, `bdt()`, `bticks()` | Historico bloqueado (bh_88063), T&T via `timesAndTrades` |
 | Banco de instrumentos | `aetp_17.dat` (623K, local) | Lookup via `quote/symbol` (online) |
 | Market stats streaming | Nao | `subscribe_market` em `BroadcastPlusClient` |
 | Book streaming | Nao | Bloqueado (permissao de conta ausente) |

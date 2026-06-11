@@ -6,10 +6,16 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 
 **Terminal Antigo (`bcsys32.exe`)**
 - **Real-time streaming** via DDE (`bdp`, `subscribe`, `snapshot`)
-- **Historical data** via HTTP (daily OHLCV, intraday bars, tick-by-tick)
-- **Macroeconomic series** — FX, indices, commodities, CDI, inflation, returns
-- **Fundamental data** — analyst consensus, indicators (Market Cap, Beta), company metadata
-- **Corporate events** — dividends, JCP, calendar, dividend yield, broker portfolios
+- **Historical data** via HTTP — daily close/OHLCV range (`bhistory`/`bclose`), intraday bars (`bdi`), tick-by-tick (`bdt`)
+- **Times & trades with top-of-book** (`bticks`) — TRD/QTE rows, broker ids, sessao corrente
+- **Macroeconomic series** — FX, indices, commodities, CDI (`bmacro("CDI",...)`), inflation, returns
+- **Fixed income** — Tesouro prices/yields (`btreasury`/`btreasury_history`), pre-fixado accrual (`baccrual`), poupanca (`bsavings`)
+- **Market stats snapshot** (`bstats`) — DY, last dividend, 52-week range, avg volumes, para qualquer simbolo B3
+- **Intraday snapshot** (`bsnapshot`) — OHLCV near-real-time sem DDE
+- **Investment funds** — historico de cotas (`bfund_history`), retornos por janela (`bfund_returns`)
+- **Spot FX conversion** (`bfx`) — taxa atual entre quaisquer pares
+- **Fundamental data** — analyst consensus, indicators (Market Cap, Beta), company metadata, free float (`bfree_float`), top fund holders (`bfund_holders`), first close (`bfirst_close`)
+- **Corporate events** — dividends, JCP, calendar, dividend yield, broker portfolios (`bportfolio`/`bportfolios_with`), shareholder dates (`bshareholder_dates`), filings S3 links (`bfilings`)
 - **Credit** — sovereign/corporate CDS term-structure curves via Markit (`bcds`)
 - **Reference data** — 1020 companies, 37 indices, 38 sectors, real-time quotes
 - **News & multimedia** — full-text articles, Dow Jones wires, podcasts (no auth needed)
@@ -61,13 +67,13 @@ automaticamente.
 import os
 os.environ["BROADCAST_SESSION"] = "<your_session_token>"
 
-from py_bcast import bdp, bdh, bdi, bmacro, bconsensus, bdividends, bsearch
+from py_bcast import bdp, bhistory, bdi, bmacro, bconsensus, bdividends, bsearch
 
 # Real-time quote
 price = bdp("PETR4", "ULT")
 
 # Historical daily (works for ALL instruments) — flat DataFrame, ticker column
-df = bdh("PETR4", "20260501", "20260520")
+df = bhistory("PETR4", "20260501", "20260520")
 print(df["close"].tail())
 
 # Intraday 2-min bars
@@ -177,13 +183,13 @@ If you prefer the **wide** layout (`df["PETR4"]` selects one instrument), use th
 opt-in `.bcast` accessor — it is a pure reshape, the default stays flat:
 
 ```python
-df = bdh(["PETR4", "VALE3"], "20260501", "20260520")   # flat: ticker column
+df = bhistory(["PETR4", "VALE3"], "20260501", "20260520")   # flat: ticker column
 wide = df.bcast.wide()          # column MultiIndex (ticker, field)
 wide["PETR4"]["close"]          # select one instrument
 wide.bcast.long()               # inverse, back to flat
 ```
 
-`wide()` suits time-series frames (`bdh`, `bmacro`, `breturn`, ...) where each
+`wide()` suits time-series frames (`bhistory`, `bmacro`, `breturn`, ...) where each
 `(date, ticker)` pair is unique.
 
 For an object-oriented style (like yfinance's `Ticker`), `Ticker` is a thin
@@ -193,7 +199,7 @@ facade over the `b*` functions — no new logic, just discoverability:
 from py_bcast import Ticker
 
 petr = Ticker("PETR4")
-petr.history("20260501", "20260520")   # -> bdh
+petr.history("20260501", "20260520")   # -> bhistory
 petr.dividends                          # -> bdividends
 petr.quote                              # -> bquote
 petr.indicators("EBITDA", "20260101", "20260520")  # -> bindicators
@@ -218,7 +224,7 @@ petr.indicators("EBITDA", "20260101", "20260520")  # -> bindicators
 
 ```
 src/py_bcast/
-├── __init__.py         # Public API (58 exported symbols + async_api namespace)
+├── __init__.py         # Public API (85 exported symbols + async_api namespace)
 ├── _core/              # Backend-agnostic infrastructure (both backends)
 │   ├── config.py       # Settings dataclass + configure() (incl. terminal=, plus_login=, plus_password=)
 │   ├── routing.py      # get_active_terminal() — picks legacy vs plus per call
@@ -259,8 +265,10 @@ src/py_bcast/
 │   └── _sync/          # Plus I/O GENERATED from _async/ by scripts/gen_sync.py — do not edit
 ├── _async/             # Async versions of all legacy HTTP data functions
 ├── realtime/client.py  # Legacy DDE: BroadcastClient, bdp (one or many tickers)
-├── historical/         # bdh, bdh_ohlcv, bdi, bdt (legacy ContentProxy)
-├── macro/indicators.py # bmacro, bdi_cdi, breturn, bvolume, binflation
+├── historical/         # bhistory, bclose, bdi, bdt, bticks, bfirst_close (legacy ContentProxy)
+├── fixedincome.py      # btreasury, btreasury_history, baccrual, bsavings
+├── funds.py            # bfund_history, bfund_returns
+├── macro/indicators.py # bmacro (inclui CDI), breturn, bvolume, binflation, bstats, bsnapshot, bfx
 ├── fundamental/        # bconsensus, bcompany, bindices, …, bcalendar, bdividends, …
 ├── news/api.py         # bnews, bnews_recent, bnews_multimedia
 └── instruments/db.py   # InstrumentDB + bsearch (auto-routing legacy/plus)

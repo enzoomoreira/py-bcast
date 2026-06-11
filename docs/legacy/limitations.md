@@ -73,6 +73,24 @@ financial statements and ratios, investigate the **Plus** backend
 
 ---
 
+## Tick Data — TimesTrades (bticks) Retention
+
+`bticks()` usa o endpoint TimesTrades (41) com a mesma convencao de fuso UTC que `bdt`.
+Retencao observada em testes ao vivo (2026-06-10): somente a **sessao corrente** retorna dados;
+dias anteriores retornam vazio mesmo quando o pregao negociou. O dado e denso para papeis
+liquidos (~2k rows por 5 minutos em PETR4). Mantenha janelas curtas.
+
+```python
+# Somente janelas do dia corrente retornam dados
+df = bticks("PETR4", "20260610130000", "20260610131000")   # sessao de hoje: funciona
+df = bticks("PETR4", "20260609130000", "20260609131000")   # D-1: vazio
+```
+
+Para tick-by-tick de instrumentos internacionais (FX, metais, energia, indices globais) com
+retencao mais longa, use `bdt`.
+
+---
+
 ## Tick Data (bdt) Restrictions
 
 `bdt()` works for **both B3/BVMF and international instruments**. PETR4, VALE3 and
@@ -114,10 +132,10 @@ zone trap.
 
 Tick retention for B3 instruments is short and patchy. Recent trading days return
 ticks, but older dates can come back empty **even when the floor traded** (confirmed
-via `bdh`). This is server-side retention/availability, not a client problem and not
+via `bhistory`). This is server-side retention/availability, not a client problem and not
 a pre-registration requirement.
 
-Observed on 2026-06-02 (PETR4/VALE3, `bdh` confirms the floor traded):
+Observed on 2026-06-02 (PETR4/VALE3, `bhistory` confirms the floor traded):
 
 | Date | Floor traded? | Tick data? |
 |------|---------------|------------|
@@ -213,6 +231,24 @@ DataInicio=20260501&DataFim=20260602   # works
 961=20260501                            # -> HTTP 500
 ```
 
+### FundosIndicadores (81) — Benchmark Nao Informado
+
+Avancos em 2026-06-10: `961` satisfaz a data e o servidor passa a responder "Benchmark nao
+informado". Todas as combinacoes testadas de nome/valor de tag para o benchmark (inclusive
+`Benchmark=`, `13486=`) foram recusadas. O param correto nao foi descoberto.
+
+### FechamentoFormula (83) — DataInicio Rejeitado Como Ausente
+
+Inconsistencia server-side: `Instrumentos`/`12004` sao aceitos (o servidor valida o simbolo),
+mas `DataInicio` e sempre rejeitado como "campo obrigatorio nao encontrado" mesmo quando enviado
+nos formatos `YYYYMMDD` e `dd/MM/yyyy`.
+
+### TabelaRetorno / TabelaRentabilidade (138/139) e CalculoCarteira (144) — Tipo de Calculo
+
+Os tres endpoints respondem "Tipo de calculo nao enviado" a todas as chaves testadas: `10029`,
+`TipoCalculo`, `TipoDeCalculo`, `Tipo`, `TipoRetorno`, `12004`, `13539`. O enum correto
+provavelmente so existe no cliente Java do Add-In Excel.
+
 ### Players — Server Bug
 
 The Players endpoint (id=40) has a server-side SQL bug:
@@ -225,20 +261,26 @@ This is an OneTick query issue on the server, not a client problem.
 
 ## B3 Historical — Choosing an Endpoint
 
-`bdh()` (daily) and `bdi()` (intraday bars) work for ALL instruments and have full
-history. `bdt()` (tick) also works for B3, but only for recent dates and only with a
-UTC window (see [Tick Data (bdt) Restrictions](#tick-data-bdt-restrictions)).
+`bhistory()` / `bclose()` (daily) and `bdi()` (intraday bars) work for ALL instruments and have full
+history. `bdt()` (tick-by-tick, internacional) and `bticks()` (times-and-trades B3) also work,
+but only with UTC windows and subject to retention limits.
 
 ```python
 # Daily closing prices (all instruments, full history)
-data = bdh("PETR4", "20250501", "20250520")
+data = bhistory("PETR4", "20250501", "20250520")
+
+# Daily OHLCV range
+ohlcv = bhistory("PETR4", "20250501", "20250520", fields="ohlcv")
 
 # Intraday 2-min bars (all instruments)
 bars = bdi("PETR4", "20260601")
 
-# Tick data — B3 works for recent dates; window must be UTC
+# Times-and-trades B3 — somente sessao corrente, janela UTC
 # (13:00-20:00 UTC = B3 floor 10:00-17:00 BRT)
-ticks = bdt("PETR4", "20260601130000", "20260601140000")  # -> ~24.6k ticks
+ticks = bticks("PETR4", "20260610130000", "20260610131000")
+
+# Tick-by-tick internacional (FX, metais, energia) — retencao mais longa
+fx_ticks = bdt("USDBRL", "20260601130000", "20260601140000")
 ```
 
 For older dates with no tick retention, fall back to `bdi()` for intraday detail.

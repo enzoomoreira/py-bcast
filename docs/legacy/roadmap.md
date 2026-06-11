@@ -8,48 +8,54 @@ Ver [`endpoints.md`](./endpoints.md) para o catalogo completo com status e param
 
 ---
 
-## Reformulacao de API planejada (deferida para um release deliberado)
+## Reformulacao de API executada em 0.7.0 (2026-06-10)
 
-O 0.6.0 conformou o **contrato** (DataFrame achatado + coluna `ticker`, multi-ticker,
-`NotFoundError` vs vazio-com-schema, parse BR -> float, paridade sync/async completa) e a
-**arquitetura** (catalogo `EndpointSpec` declarativo; camada de I/O async-first com a arvore
-sync gerada via unasync — ver [`../architecture.md`](../architecture.md)). Ficou **deferida**
-uma camada de reformulacao puramente nominal/estrutural, que e *breaking* e por isso merece um
-release proprio (ex.: 0.7.0). Nenhum item abaixo corrige bug — sao melhorias de clareza/ergonomia.
+O 0.6.0 conformou o **contrato** e a **arquitetura**. A reformulacao nominal/estrutural deferida
+foi executada integralmente em 0.7.0 como **Opcao B** (unificacao via `bhistory`), sem shims ou
+aliases de transicao. Resumo das decisoes tomadas:
 
-| # | Mudanca | Estado atual | Proposta | Risco |
-|---|---------|--------------|----------|-------|
-| 1 | **Naming de historico** | `bdh` retorna so close+settle; `bdh_ohlcv` retorna OHLCV de 1 dia | Ver "Decisao em aberto" abaixo | Breaking nominal |
-| 2 | **Fundir `bdi_cdi` em `bmacro`** | endpoint/funcao separada (`DiCetipAcumulado`) | rotear `bmacro("CDI", ...)` internamente; remover `bdi_cdi` do `__all__` | Breaking nominal |
-| 3 | **Unificar `bportfolios`/`bportfolio`** | duas funcoes | `bportfolio(broker=None)` (lista quando `None`), padrao de `bcompany(cvm=None)` | Breaking nominal |
-| 4 | **Renomear colunas cripticas** | algumas colunas seguem nomes do servidor | nomes finance-standard onde ainda ha residuo | Breaking nominal |
-| 5 | **Decisao D — ticker canonico de saida** | so `bdh`/`bvolume` emitem sufixo `.BVMF` (vem do SYMBOL do servidor); o resto e bare | decidir UMA convencao e aplicar no `finalize_frame` (o ponto de aplicacao ja existe) | Breaking de valor |
-| 6 | **Index do `bdy`** | docstring diz DatetimeIndex, codigo usa RangeIndex (preservado na migracao por frame-equality) | decidir o correto; CUIDADO: bdy vetoriza+concat por ticker, DatetimeIndex seria nao-unico entre blocos (como bmacro) | Breaking de valor |
-| 7 | **`@validate_params` uniforme** | parte das publicas sync usa `ensure_*` ad-hoc em vez do decorator | unificar; muda coercao/upper de input — verificar o novo comportamento isoladamente | Comportamental |
+1. `bhistory(tickers, start, end, fields="close"|"ohlcv")` substitui `bdh` e `bdh_ohlcv`;
+   `bclose` e o atalho close. A perna close usa HistoricoDiarioSimbolos (1 request por ticker
+   para a janela toda); a perna ohlcv usa HistoricoData, descoberto como multi-dia. Isso tambem
+   corrigiu um bug latente do `bdh_ohlcv`: ele lia apenas o primeiro tick da resposta (o pregao
+   mais recente), nao a data pedida.
+2. `bmacro("CDI", ...)` roteia para DiCetipAcumulado; `bdi_cdi` removido.
+3. `bportfolio(broker_id=None, date=None)` absorve `bportfolios` (lista quando broker omitido);
+   `bportfolios` removido.
+4. Colunas `dat` renomeadas para `date` onde restavam residuos (`bvolume`, `binflation`, RANGE frames).
+5. Tickers de saida bare: `finalize_frame` remove o sufixo `.BVMF` que o servidor anexa.
+6. `bdy` documentado com o contrato real: RangeIndex + coluna `date` (nao DatetimeIndex).
+7. `@validate_params` uniforme em todas as publicas com args (tickers uppercased automaticamente).
 
-### Decisao em aberto — naming de historico (item 1)
-
-Duas direcoes incompativeis ja propostas, a reconciliar **antes** de executar:
-
-- **Opcao A (renomeio simples):** `bdh -> bclose`, `bdh_ohlcv -> bdh`. Honesto com Bloomberg
-  (BDH = historico), baixo esforco, mas mantem `bdh_ohlcv` como single-day.
-- **Opcao B (unificacao, recomendada):** introduzir `bhistory(tickers, start, end, fields=...)`
-  cobrindo close-only e OHLCV multi-dia num so ponto; manter `bclose` como atalho. Resolve a
-  limitacao single-day do `bdh_ohlcv` de uma vez, ao custo de mais desenho.
-
-Recomendacao: **Opcao B**, num release 0.7.0 dedicado, com periodo de deprecation curto (o repo
-nao tem consumidores externos, entao o churn e so interno + docs + tests).
+Ver [`../compatibility.md`](../compatibility.md) para o mapeamento completo de renames.
 
 ---
 
-## Prioridade Alta (transporte/parser ja existem, so mapear campos)
+## Implementado em 2026-06-10
 
-| # | Endpoint | ID | Tipo | O que retorna | Esforco |
-|---|----------|-----|------|---------------|---------|
-| 1 | **FIIAnbimaBovespa** | 150 | XML | FII: dividend yield, ultimo dividendo, vol medio (HGLG11: DY 9,2%) | Baixo |
-| 2 | **CarteiraTopFundos** | 187 | Binary SOH | Quais fundos investem no ativo (top holders, com %) | Baixo |
-| 3 | **HistoricoDiarioSimbolos** | 75 | XML | Multi-ticker daily alternativo ao bdh (`10113`=tickers `;`, `961`=start) | Baixo |
-| 4 | **EmpresaAcoesUnits** | 183 | Binary SOH | Acoes ON/PN, free float | Baixo |
+Todos os itens das antigas listas de prioridade alta, media e baixa foram implementados:
+
+| Endpoint | ID | Funcao py-bcast |
+|----------|----|-----------------|
+| FIIAnbimaBovespa | 150 | `bstats(tickers)` |
+| EmpresaAcoesUnits | 183 | `bfree_float(ticker_or_cvm)` |
+| CarteiraTopFundos | 187 | `bfund_holders(ticker_or_cvm)` |
+| HistoricoDiarioSimbolos | 75 | `bhistory(tickers, ..., fields="close")` (perna close de `bhistory`) |
+| Fundos | 76 | `bfund_history(fund, start, end)` |
+| TitulosPublicos | 77 | `btreasury_history(symbol, start, end)` |
+| TitulosPublicosUltimos | 141 | `btreasury(symbols)` |
+| CalculoTaxaPre | 136 | `baccrual(rate, start, end)` |
+| CalculoPoupanca | 114 | `bsavings(start, end)` |
+| FundosRentabilidade | 82 | `bfund_returns(fund)` |
+| ConversorMoedas | 131 | `bfx(from_currency, to_currency, amount)` |
+| CarteiraRecomendadaTicker | 195 | `bportfolios_with(ticker)` |
+| UltimosIntraday | 125 | `bsnapshot(tickers)` |
+| FechamentoPrimeiro | 204 | `bfirst_close(ticker)` |
+| AcionistaDatas | 193 | `bshareholder_dates(ticker_or_cvm)` |
+| ArquivosDemonstrativos | 205 | `bfilings(ticker_or_cvm, start, end)` |
+| TimesTrades | 41 | `bticks(ticker, start, end)` |
+| CarteiraRecomendadaMudancas | 197 | `bportfolio(broker_id, date=...)` (composicao historica) |
+| HistoricoData | 13 | `bhistory(tickers, ..., fields="ohlcv")` (perna ohlcv de `bhistory`) |
 
 > `bcds` (MarkitOutput2 90-94, CDS/credito) foi IMPLEMENTADO em 2026-06-10 — modulo
 > `credit/` + core nas arvores geradas (`_legacy/_async/markit.py`). Ver `api.md`.
@@ -59,42 +65,14 @@ nao tem consumidores externos, entao o churn e so interno + docs + tests).
 
 ---
 
-## Prioridade Media (renda fixa e fundos)
-
-| # | Endpoint | ID | Tipo | O que retorna |
-|---|----------|-----|------|---------------|
-| 6 | **Fundos** | 76 | XML | Historico de cotas de fundos (OHLC, 24KB) |
-| 7 | **TitulosPublicos** | 77 | XML | Historico de titulos do Tesouro — usar simbolo `.ANBIMA`/`.TRDM` (bare `LTN` resolve para `LTN.NYSE`, instrumento errado) |
-| 8 | **TitulosPublicosUltimos** | 141 | XML | Ultimos precos de titulos publicos (mesma nuance de simbolo) |
-| 9 | **CalculoTaxaPre** | 136 | XML | Curva de taxa pre-fixada acumulada (6.5KB) |
-| 10 | **CalculoPoupanca** | 114 | XML | Rendimento poupanca diario (5.7KB) |
-| 11 | **FundosRentabilidade** | 82 | XML | Rentabilidade de fundo por CNPJ/codigo |
-| 12 | **ConversorMoedas** | 131 | XML | Conversao spot calculada (`Instrumento`+`Instrumento2`+`Valor`) |
-
----
-
-## Prioridade Baixa (metadados e referencia)
-
-| # | Endpoint | ID | Tipo | O que retorna |
-|---|----------|-----|------|---------------|
-| 13 | **CarteiraRecomendadaTicker** | 195 | Binary SOH | Em quais carteiras de corretoras um ticker esta presente |
-| 14 | **UltimosIntraday** | 125 | XML | Ultimo snapshot intraday para um ticker |
-| 15 | **FechamentoPrimeiro** | 204 | XML | Primeiro fechamento historico (`Instrumento`=ticker) |
-| 16 | **AcionistaDatas** | 193 | XML | Datas de posicoes acionarias |
-| 17 | **ArquivosDemonstrativos** | 205 | XML | PDFs de ITR/demonstrativos (links S3) |
-| 18 | **TimesTrades** | 41 | XML | Times & trades alternativo ao bdt (janela `10071`/`10072` em **UTC**) |
-
----
-
 ## Params nao crackados (NAO sao mortos — falta descobrir o parametro)
 
 | Endpoint | ID | Estado |
 |----------|-----|--------|
-| `FechamentoFormula` | 83 | Inconsistencia no servidor entre chamadas |
-| `TabelaRetorno` / `TabelaRentabilidade` | 138/139 | Params de benchmark desconhecidos |
-| `CalculoCarteira` | 144 | Provavel enum "Tipo de calculo" do Add-In Excel |
-| `FundosIndicadores` | 81 | Nao re-testado na rodada de 2026-06 |
-| `CarteiraRecomendadaMudancas` | 197 | Vivo (exige `13784`) mas sem registros nas datas testadas; confirmar com broker/data reais |
+| `FechamentoFormula` | 83 | Parede server-side: le `Instrumentos` (valida simbolo) mas rejeita `DataInicio` como ausente mesmo enviado em YYYYMMDD e dd/MM/yyyy |
+| `TabelaRetorno` / `TabelaRentabilidade` | 138/139 | Respondem "Tipo de calculo nao enviado" a todas as chaves testadas (10029, TipoCalculo, TipoDeCalculo, Tipo, TipoRetorno, 12004, 13539) |
+| `CalculoCarteira` | 144 | Mesma parede "Tipo de calculo nao enviado" com as mesmas variantes; provavel enum so no Add-In Excel |
+| `FundosIndicadores` | 81 | Avancou um passo em 2026-06-10: o param `961` satisfaz a data e o servidor passa a exigir "Benchmark nao informado", mas nenhuma combinacao de nome/valor de tag testada satisfaz (Benchmark=, 13486=, variantes) |
 
 ---
 
