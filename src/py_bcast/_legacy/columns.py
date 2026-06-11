@@ -15,6 +15,9 @@ Naming conventions:
 
 from __future__ import annotations
 
+from .output import is_date_column
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Group A: ContentProxy XML endpoints — universal column rename
 # Applied by output.py functions. Keys map to None = drop column.
@@ -556,12 +559,18 @@ FUND_LIST_FIELDS: dict[str, str | None] = {
 
 
 def _object_schema(fields: dict[str, str | None]) -> dict[str, str]:
-    """Empty-frame schema with every named field-map column as object dtype.
+    """Empty-frame schema from a field map: object dtype, datetime64 for dates.
 
     Fields mapped to None are dropped from the populated frame, so they are
-    excluded from the schema too.
+    excluded from the schema too. Date-named columns (see ``is_date_column``)
+    are typed ``datetime64[ns]`` to match the populated frame, where
+    ``finalize_frame`` coerces them.
     """
-    return {name: "object" for name in fields.values() if name is not None}
+    return {
+        name: ("datetime64[ns]" if is_date_column(name) else "object")
+        for name in fields.values()
+        if name is not None
+    }
 
 
 # Numeric time-series (paired with an empty DatetimeIndex)
@@ -584,7 +593,7 @@ TREASURY_HISTORY_SCHEMA: dict[str, str] = {
     "low": "float64",
     "calendar_days": "float64",
     "working_days": "float64",
-    "expiration_date": "object",
+    "expiration_date": "datetime64[ns]",
     "unit_price": "float64",
     "stddev": "float64",
 }
@@ -636,11 +645,11 @@ VOLUME_SCHEMA: dict[str, str] = {
     "avg_turnover": "float64",
     "avg_trades": "float64",
     "months": "float64",
-    "date": "float64",
+    "date": "datetime64[ns]",
 }
 SNAPSHOT_SCHEMA: dict[str, str] = {
     "ticker": "object",
-    "date": "float64",
+    "date": "datetime64[ns]",
     "time": "object",
     "close": "float64",
     "low": "float64",
@@ -653,12 +662,12 @@ SNAPSHOT_SCHEMA: dict[str, str] = {
 }
 FIRST_CLOSE_SCHEMA: dict[str, str] = {
     "ticker": "object",
-    "date": "float64",
+    "date": "datetime64[ns]",
     "close": "float64",
 }
 TREASURY_LAST_SCHEMA: dict[str, str] = {
     "ticker": "object",
-    "date": "float64",
+    "date": "datetime64[ns]",
     "rate": "float64",
     "unit_price": "float64",
 }
@@ -677,17 +686,17 @@ FUND_RETURNS_SCHEMA: dict[str, str] = {
 STATS_SCHEMA: dict[str, str] = {
     "ticker": "object",
     "bid": "float64",
-    "bid_date": "float64",
+    "bid_date": "datetime64[ns]",
     "ask": "float64",
-    "ask_date": "float64",
+    "ask_date": "datetime64[ns]",
     "last_dividend": "float64",
-    "last_dividend_date": "float64",
+    "last_dividend_date": "datetime64[ns]",
     "dividend_yield_pct": "float64",
     "shares_outstanding": "float64",
     "low_52w": "float64",
-    "low_52w_date": "float64",
+    "low_52w_date": "datetime64[ns]",
     "high_52w": "float64",
-    "high_52w_date": "float64",
+    "high_52w_date": "datetime64[ns]",
     "turnover_last": "float64",
     "avg_turnover_30d": "float64",
     "avg_turnover_100d": "float64",
@@ -712,7 +721,7 @@ FUND_HOLDER_SCHEMA = _object_schema(FUND_HOLDER_FIELDS)
 # _object_schema) so the empty frame matches the populated frames' column
 # order, which follows the server's tag order rather than the field map's.
 PORTFOLIO_WITH_SCHEMA: dict[str, str] = {
-    col: "object"
+    col: ("datetime64[ns]" if is_date_column(col) else "object")
     for col in (
         "broker_id",
         "date",

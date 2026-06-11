@@ -19,6 +19,37 @@ import pandas as pd
 # case-insensitively against the stripped cell value.
 MISSING_VALUE_SENTINELS: frozenset[str] = frozenset({"n/d", "n/a", "nd", "-", "--"})
 
+# Output column names that hold a calendar date and are coerced to datetime64.
+# Detection is by final (post-rename) column name: exactly one of the explicit
+# names below, or any name ending in a date suffix. Server dates arrive as
+# YYYYMMDD (sometimes already coerced to a float by the numeric pass) or as ISO
+# YYYY-MM-DD strings; both are parsed. The predicate is shared with the column
+# schemas so empty frames type these columns as datetime64 too.
+_DATE_COLUMN_SUFFIXES: tuple[str, ...] = ("_date", "_disclosed")
+_DATE_COLUMN_NAMES: frozenset[str] = frozenset(
+    {
+        "date",
+        "ref_date",
+        "reference_date",
+        "position_date",
+        "period_start",
+        "period_end",
+        "annual_period_start",
+        "annual_period_end",
+        "quarter_period_start",
+        "quarter_period_end",
+        "ipo_date",
+        "last_update",
+        "last_updated",
+        "expiration_date",
+    }
+)
+
+
+def is_date_column(name: str) -> bool:
+    """Whether an output column name denotes a calendar date (-> datetime64)."""
+    return name in _DATE_COLUMN_NAMES or name.endswith(_DATE_COLUMN_SUFFIXES)
+
 
 class Index(Enum):
     """Index policy for :func:`finalize_frame`.
@@ -95,6 +126,47 @@ def _strip_bvmf_suffix(df: pd.DataFrame) -> pd.DataFrame:
         df["ticker"] = df["ticker"].map(
             lambda v: v.removesuffix(".BVMF") if isinstance(v, str) else v
         )
+    return df
+
+
+def _coerce_date_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Coerce date-named columns (see :func:`is_date_column`) to datetime64.
+
+    Runs after rename, so it sees the final column names. A date column arrives
+    either as a YYYYMMDD integer/float (the numeric pass already coerced the
+    8-digit token) or as a string (YYYYMMDD or ISO ``YYYY-MM-DD``); both are
+    parsed, with unparseable cells becoming ``NaT`` (never raising). Columns the
+    predicate does not match are left untouched.
+    """
+    for col in df.columns:
+        if not is_date_column(str(col)):
+            continue
+        s = df[col]
+        if pd.api.types.is_datetime64_any_dtype(s):
+            continue
+        if pd.api.types.is_numeric_dtype(s):
+            tokens = s.astype("Int64").astype("string")
+            parsed = pd.to_datetime(tokens, format="%Y%m%d", errors="coerce")
+        else:
+            tokens = s.astype("string").str.strip()
+            parsed = pd.to_datetime(tokens, format="%Y-%m-%d", errors="coerce")
+            # YYYYMMDD fallback (8 digits)
+            retry = (
+                parsed.isna()
+                & tokens.notna()
+                & tokens.str.fullmatch(r"\d{8}", na=False)
+            )
+            if bool(retry.any()):
+                parsed = parsed.where(
+                    ~retry, pd.to_datetime(tokens, format="%Y%m%d", errors="coerce")
+                )
+            # Brazilian "dd/MM/yyyy[ HH:MM:SS.fff]" fallback (e.g. bond maturity)
+            retry = parsed.isna() & tokens.str.contains("/", na=False)
+            if bool(retry.any()):
+                parsed = parsed.where(
+                    ~retry, pd.to_datetime(tokens, dayfirst=True, errors="coerce")
+                )
+        df[col] = parsed.astype("datetime64[ns]")
     return df
 
 
@@ -215,6 +287,7 @@ def finalize_frame(
     df = coerce_numeric_columns(df)
     df = _apply_rename(df, rename)
     df = _strip_bvmf_suffix(df)
+    df = _coerce_date_columns(df)
 
     if index is Index.RECORD and ticker is not None and "ticker" not in df.columns:
         df.insert(0, "ticker", ticker)

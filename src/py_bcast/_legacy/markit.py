@@ -37,7 +37,7 @@ _CURVE_META_FIELDS = {
 }
 
 CDS_ENTITY_SCHEMA: dict[str, str] = {
-    "date": "object",
+    "date": "datetime64[ns]",
     "entity": "object",
     "name": "object",
     "cds_type": "object",
@@ -46,7 +46,7 @@ CDS_ENTITY_SCHEMA: dict[str, str] = {
 }
 
 CDS_CURVE_SCHEMA: dict[str, str] = {
-    "date": "object",
+    "date": "datetime64[ns]",
     "entity": "object",
     "name": "object",
     "cds_type": "object",
@@ -70,7 +70,7 @@ CDS_CURVE_SCHEMA: dict[str, str] = {
 
 
 CDS_INDEX_SCHEMA: dict[str, str] = {
-    "date": "object",
+    "date": "datetime64[ns]",
     "name": "object",
     "redcode": "object",
     "maturity": "object",
