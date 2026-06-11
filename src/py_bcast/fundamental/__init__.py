@@ -10,10 +10,19 @@ from .reference import (
     bshares,
     bfree_float,
     bfund_holders,
+    bshareholder_dates,
+    bfilings,
     bindicators,
     bindicator_meta,
 )
-from .events import bcalendar, bdividends, bdy, bportfolios, bportfolio
+from .events import (
+    bcalendar,
+    bdividends,
+    bdy,
+    bportfolios,
+    bportfolio,
+    bportfolios_with,
+)
 
 __all__ = [
     "bconsensus",
@@ -25,6 +34,8 @@ __all__ = [
     "bshares",
     "bfree_float",
     "bfund_holders",
+    "bshareholder_dates",
+    "bfilings",
     "bindicators",
     "bindicator_meta",
     "bcalendar",
@@ -32,4 +43,5 @@ __all__ = [
     "bdy",
     "bportfolios",
     "bportfolio",
+    "bportfolios_with",
 ]

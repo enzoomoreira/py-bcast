@@ -11,12 +11,14 @@ from .._legacy._sync.quote import quote_one
 from .._legacy.endpoints import (
     SPEC_BCOMPANY_DETAIL,
     SPEC_BCOMPANY_LIST,
+    SPEC_BFILINGS,
     SPEC_BFREE_FLOAT,
     SPEC_BFUND_HOLDERS,
     SPEC_BINDICATOR_META,
     SPEC_BINDICATORS,
     SPEC_BINDICES,
     SPEC_BSECTORS,
+    SPEC_BSHAREHOLDER_DATES,
     SPEC_BSHARES,
     SPEC_BTICKERS,
 )
@@ -245,6 +247,75 @@ def bfund_holders(
     """
     return run_spec(
         SPEC_BFUND_HOLDERS, session_token=session_token, ticker_or_cvm=ticker_or_cvm
+    )
+
+
+def bshareholder_dates(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the dates of the available shareholder compositions for companies.
+
+    Uses aetp/output/fundamental/AcionistaDatas. One row per published
+    shareholder composition: ``reference_date`` marks the base year (always
+    January 1st) and ``position_date`` is the actual date of the composition.
+
+    Args:
+        ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
+            or a list mixing both.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), each block tagged with a ``ticker``
+        column holding the queried identifier. Columns: reference_date,
+        position_date (ISO date strings).
+
+    Example:
+        >>> df = bshareholder_dates("PETR4")
+        >>> df["position_date"].max()
+    """
+    return run_spec(
+        SPEC_BSHAREHOLDER_DATES,
+        session_token=session_token,
+        ticker_or_cvm=ticker_or_cvm,
+    )
+
+
+def bfilings(
+    ticker_or_cvm: str | int | list[str | int],
+    start_date: DateLike,
+    end_date: DateLike,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch financial-statement PDFs (ITR/DFP) for companies over a window.
+
+    Uses aetp/output/fundamental/ArquivosDemonstrativos. One row per filing:
+    the filing date and the S3 link to the PDF document.
+
+    Args:
+        ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
+            or a list mixing both.
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: End date (str YYYYMMDD, date, datetime, or Timestamp)
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), each block tagged with a ``ticker``
+        column holding the queried identifier. Columns: date (ISO string)
+        and url. A window with no filings contributes an empty block.
+
+    Example:
+        >>> df = bfilings("PETR4", "20260101", "20260610")
+        >>> df["url"].tolist()
+    """
+    return run_spec(
+        SPEC_BFILINGS,
+        session_token=session_token,
+        ticker_or_cvm=ticker_or_cvm,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

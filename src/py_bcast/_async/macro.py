@@ -11,6 +11,7 @@ from .._legacy.endpoints import (
     SPEC_BINFLATION,
     SPEC_BMACRO,
     SPEC_BRETURN,
+    SPEC_BSNAPSHOT,
     SPEC_BSTATS,
     SPEC_BVOLUME,
 )
@@ -121,6 +122,19 @@ async def abstats(
     turnover). Unknown symbols are omitted.
     """
     return await arun_spec(SPEC_BSTATS, session_token=session_token, tickers=tickers)
+
+
+@validate_params
+async def absnapshot(
+    tickers: TickerList,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bsnapshot``.
+
+    Flat DataFrame (RangeIndex), one row per symbol with the latest intraday
+    session snapshot (OHLC, volume, trades). Unknown symbols are omitted.
+    """
+    return await arun_spec(SPEC_BSNAPSHOT, session_token=session_token, tickers=tickers)
 
 
 async def abinflation(

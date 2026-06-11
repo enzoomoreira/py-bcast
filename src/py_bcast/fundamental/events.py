@@ -7,6 +7,7 @@ import pandas as pd
 from .._core.dates import DateLike
 from .._core.normalize import ensure_list
 from .._core.validation import CvmCode, DateParam, validate_params
+from .._core.validation import Ticker
 from .._legacy.endpoints import (
     SPEC_BCALENDAR,
     SPEC_BDIVIDENDS,
@@ -15,6 +16,7 @@ from .._legacy.endpoints import (
     SPEC_BDY_BYCVM,
     SPEC_BPORTFOLIO,
     SPEC_BPORTFOLIOS,
+    SPEC_BPORTFOLIOS_WITH,
 )
 from .._legacy._sync.executor import run_spec
 
@@ -193,3 +195,34 @@ def bportfolio(
         >>> df[df["portfolio_name"] == "Carteira Dividendos"][["ticker", "recommendation"]]
     """
     return run_spec(SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id)
+
+
+@validate_params
+def bportfolios_with(
+    ticker: Ticker,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the recommended portfolios that contain a ticker.
+
+    Uses aetp/output/fundamental/CarteiraRecomendadaTicker. Returns the FULL
+    composition of every portfolio (all brokers) whose recommendation list
+    includes the queried ticker — not just the matching rows. Filter by
+    ``broker_id``/``portfolio_name`` or by ``ticker == <query>`` as needed.
+
+    Args:
+        ticker: Single ticker (e.g. "PETR4"). One ticker per call: the rows'
+            ``ticker`` column is each portfolio's per-row stock, so a
+            multi-ticker query would be indistinguishable.
+        session_token: BCAA session token.
+
+    Returns:
+        Flat DataFrame with the same columns as ``bportfolio`` (broker_id,
+        date, ticker, portfolio_name, company, sector data, fundamentals).
+        Empty DataFrame with that schema if no portfolio holds the ticker.
+
+    Example:
+        >>> df = bportfolios_with("PETR4")
+        >>> df[df["ticker"] == "PETR4"][["broker_id", "portfolio_name", "date"]]
+    """
+    return run_spec(SPEC_BPORTFOLIOS_WITH, session_token=session_token, ticker=ticker)

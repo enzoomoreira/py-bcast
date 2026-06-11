@@ -13,12 +13,14 @@ from .._legacy.endpoints import (
     SPEC_BCOMPANY_DETAIL,
     SPEC_BCOMPANY_LIST,
     SPEC_BCONSENSUS,
+    SPEC_BFILINGS,
     SPEC_BFREE_FLOAT,
     SPEC_BFUND_HOLDERS,
     SPEC_BINDICATOR_META,
     SPEC_BINDICATORS,
     SPEC_BINDICES,
     SPEC_BSECTORS,
+    SPEC_BSHAREHOLDER_DATES,
     SPEC_BSHARES,
     SPEC_BTICKERS,
 )
@@ -137,6 +139,43 @@ async def abfund_holders(
     """
     return await arun_spec(
         SPEC_BFUND_HOLDERS, session_token=session_token, ticker_or_cvm=ticker_or_cvm
+    )
+
+
+async def abshareholder_dates(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bshareholder_dates``.
+
+    One row per published shareholder composition (reference_date,
+    position_date), each block tagged with a ``ticker`` column holding the
+    queried identifier.
+    """
+    return await arun_spec(
+        SPEC_BSHAREHOLDER_DATES,
+        session_token=session_token,
+        ticker_or_cvm=ticker_or_cvm,
+    )
+
+
+async def abfilings(
+    ticker_or_cvm: str | int | list[str | int],
+    start_date: DateLike,
+    end_date: DateLike,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bfilings``.
+
+    One row per financial-statement PDF (date, url) in the window, each
+    block tagged with a ``ticker`` column holding the queried identifier.
+    """
+    return await arun_spec(
+        SPEC_BFILINGS,
+        session_token=session_token,
+        ticker_or_cvm=ticker_or_cvm,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

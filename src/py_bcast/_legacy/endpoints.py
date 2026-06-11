@@ -22,6 +22,15 @@ from .columns import (
     DY_FIELDS,
     DY_SCHEMA,
     ACCRUAL_SCHEMA,
+    FILINGS_FIELDS,
+    FILINGS_SCHEMA,
+    FIRST_CLOSE_RENAME,
+    FIRST_CLOSE_SCHEMA,
+    PORTFOLIO_WITH_SCHEMA,
+    SHAREHOLDER_DATES_FIELDS,
+    SHAREHOLDER_DATES_SCHEMA,
+    SNAPSHOT_RENAME,
+    SNAPSHOT_SCHEMA,
     FREE_FLOAT_FIELDS,
     FUND_HISTORY_RENAME,
     FUND_HISTORY_SCHEMA,
@@ -281,6 +290,51 @@ SPEC_BDY_BYCVM = EndpointSpec(
     vectorize_over="ticker",
 )
 
+# bportfolios_with — full portfolios of every broker whose recommended
+# portfolio contains the queried ticker. Single request, single ticker (the
+# rows echo 10068 -> ticker as the portfolio's per-row stock, NOT the query,
+# so a multi-query would be indistinguishable). Same field set as bportfolio.
+# Soft: a ticker no portfolio holds yields an empty (schema-typed) frame.
+SPEC_BPORTFOLIOS_WITH = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/carteira-recomendada/ticker",
+    index=Index.RANGE,
+    rename=PORTFOLIO_FIELDS,
+    schema=PORTFOLIO_WITH_SCHEMA,
+    params=(ParamBind("ticker", "10113", "none"),),
+)
+
+# bshareholder_dates — dates of the available shareholder compositions.
+# Vectorizes over the ticker/CVM identifier; the endpoint does not echo a
+# ticker, so the vectorizer inserts the queried one. Soft.
+SPEC_BSHAREHOLDER_DATES = EndpointSpec(
+    transport="aetp",
+    path="fundamental/acionista/datas",
+    index=Index.RANGE,
+    rename=SHAREHOLDER_DATES_FIELDS,
+    schema=SHAREHOLDER_DATES_SCHEMA,
+    params=(ParamBind("ticker_or_cvm", "13004", "cvm"),),
+    vectorize_over="ticker_or_cvm",
+)
+
+# bfilings — financial-statement PDFs (S3 links) over a date window.
+# Vectorizes over the ticker/CVM identifier; no ticker echo, so the
+# vectorizer inserts the queried one. Soft: a window with no filings is a
+# legitimate empty.
+SPEC_BFILINGS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/arquivos/demonstrativos",
+    index=Index.RANGE,
+    rename=FILINGS_FIELDS,
+    schema=FILINGS_SCHEMA,
+    params=(
+        ParamBind("ticker_or_cvm", "13004", "cvm"),
+        ParamBind("start_date", "13916", "date"),
+        ParamBind("end_date", "13917", "date"),
+    ),
+    vectorize_over="ticker_or_cvm",
+)
+
 # bportfolios — brokers that publish model portfolios. Single request.
 SPEC_BPORTFOLIOS = EndpointSpec(
     transport="aetp",
@@ -485,6 +539,33 @@ SPEC_BSTATS = EndpointSpec(
     schema=STATS_SCHEMA,
     params=(ParamBind("tickers", "10113", "join"),),
     timeout=15,
+)
+
+# bsnapshot — latest intraday session snapshot per symbol (near-real-time
+# OHLC, volume, trades). Single request, multi-symbol in one tag (10113
+# join); echoes symbol -> ticker; unknown symbols are omitted (soft).
+SPEC_BSNAPSHOT = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/UltimosIntraday",
+    index=Index.RANGE,
+    rename=SNAPSHOT_RENAME,
+    schema=SNAPSHOT_SCHEMA,
+    params=(ParamBind("tickers", "10113", "join"),),
+    timeout=15,
+)
+
+# bfirst_close — the symbol's first historical close (adjusted). Takes only
+# the bare B3 ticker via the Instrumento param (suffixed forms do not
+# resolve). Vectorizes over the ticker; echoes symbol -> ticker, so no
+# insert. An unknown ticker replies success with zero ticks (soft).
+SPEC_BFIRST_CLOSE = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/FechamentoPrimeiro",
+    index=Index.RANGE,
+    rename=FIRST_CLOSE_RENAME,
+    schema=FIRST_CLOSE_SCHEMA,
+    params=(ParamBind("ticker", "Instrumento", "none"),),
+    vectorize_over="ticker",
 )
 
 # binflation / abinflation — current inflation indices (single, no params).

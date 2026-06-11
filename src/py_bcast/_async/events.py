@@ -6,7 +6,7 @@ import pandas as pd
 
 from .._core.dates import DateLike
 from .._core.normalize import ensure_list
-from .._core.validation import CvmCode, DateParam, validate_params
+from .._core.validation import CvmCode, DateParam, Ticker, validate_params
 from .._legacy.endpoints import (
     SPEC_BCALENDAR,
     SPEC_BDIVIDENDS,
@@ -15,6 +15,7 @@ from .._legacy.endpoints import (
     SPEC_BDY_BYCVM,
     SPEC_BPORTFOLIO,
     SPEC_BPORTFOLIOS,
+    SPEC_BPORTFOLIOS_WITH,
 )
 from .._legacy._async.executor import run_spec as arun_spec
 
@@ -99,4 +100,19 @@ async def abportfolio(
     """Async version of ``bportfolio``. Latest recommended portfolio from a broker."""
     return await arun_spec(
         SPEC_BPORTFOLIO, session_token=session_token, broker_id=broker_id
+    )
+
+
+@validate_params
+async def abportfolios_with(
+    ticker: Ticker,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bportfolios_with``.
+
+    Full composition of every recommended portfolio containing the ticker
+    (same columns as ``bportfolio``); empty frame with schema if none does.
+    """
+    return await arun_spec(
+        SPEC_BPORTFOLIOS_WITH, session_token=session_token, ticker=ticker
     )

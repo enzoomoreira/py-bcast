@@ -11,6 +11,7 @@ from .._legacy.endpoints import (
     SPEC_BINFLATION,
     SPEC_BMACRO,
     SPEC_BRETURN,
+    SPEC_BSNAPSHOT,
     SPEC_BSTATS,
     SPEC_BVOLUME,
 )
@@ -226,6 +227,36 @@ def bstats(
         >>> df[["ticker", "dividend_yield_pct"]]
     """
     return run_spec(SPEC_BSTATS, session_token=session_token, tickers=tickers)
+
+
+@validate_params
+def bsnapshot(
+    tickers: TickerList,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the latest intraday session snapshot for one or more symbols.
+
+    Uses the UltimosIntraday endpoint: near-real-time OHLC, volume, trade
+    count and turnover without needing the DDE channel. While the session
+    is open the snapshot accumulates the running session; after the close
+    the server was observed serving only the session's last interval.
+
+    Args:
+        tickers: Single ticker or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), one row per symbol: ticker, date, time
+        (snapshot timestamp), close (last), low, high, open, volume, trades,
+        turnover, open_interest. Unknown symbols are omitted; empty
+        DataFrame with that schema if none resolves.
+
+    Example:
+        >>> df = bsnapshot(["PETR4", "VALE3"])
+        >>> df[["ticker", "close", "volume"]]
+    """
+    return run_spec(SPEC_BSNAPSHOT, session_token=session_token, tickers=tickers)
 
 
 def binflation(

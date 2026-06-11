@@ -57,7 +57,7 @@ from ._plus.reference import binfo, bindex_members, blogo, bindexes, bholidays
 from ._plus.funds import bfunds, bfund
 from ._plus.news import bsections, bheadlines, bnews_content
 from ._plus.corporate import bcorpevents
-from .historical import bdh, bdh_ohlcv, bdi, bdt
+from .historical import bdh, bdh_ohlcv, bdi, bdt, bticks, bfirst_close
 from .fundamental import (
     bconsensus,
     bcompany,
@@ -68,6 +68,8 @@ from .fundamental import (
     bshares,
     bfree_float,
     bfund_holders,
+    bshareholder_dates,
+    bfilings,
     bindicators,
     bindicator_meta,
     bcalendar,
@@ -75,11 +77,21 @@ from .fundamental import (
     bdy,
     bportfolios,
     bportfolio,
+    bportfolios_with,
 )
 from .instruments import InstrumentDB, bsearch
 from .ticker import Ticker
 from . import accessor as _accessor  # noqa: F401 — registers the .bcast DataFrame accessor
-from .macro import bmacro, bdi_cdi, breturn, bvolume, binflation, bstats, bfx
+from .macro import (
+    bmacro,
+    bdi_cdi,
+    breturn,
+    bvolume,
+    binflation,
+    bstats,
+    bfx,
+    bsnapshot,
+)
 from .fixedincome import btreasury, btreasury_history, baccrual, bsavings
 from .funds import bfund_history, bfund_returns
 from .credit import bcds
@@ -114,6 +126,8 @@ __all__ = [
     "bdh_ohlcv",
     "bdi",
     "bdt",
+    "bticks",
+    "bfirst_close",
     # Broadcast+ data functions
     "btrades",
     "binfo",
@@ -139,6 +153,7 @@ __all__ = [
     "binflation",
     "bstats",
     "bfx",
+    "bsnapshot",
     "btreasury",
     "btreasury_history",
     "baccrual",
@@ -154,6 +169,8 @@ __all__ = [
     "bshares",
     "bfree_float",
     "bfund_holders",
+    "bshareholder_dates",
+    "bfilings",
     "bindicators",
     "bindicator_meta",
     # Events / Dividends / Portfolios
@@ -162,6 +179,7 @@ __all__ = [
     "bdy",
     "bportfolios",
     "bportfolio",
+    "bportfolios_with",
     # News / Multimedia
     "bcds",
     "bnews",

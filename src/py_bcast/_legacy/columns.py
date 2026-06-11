@@ -75,6 +75,23 @@ TREASURY_LAST_RENAME: dict[str, str | None] = {
     "last": "rate",
 }
 
+# bsnapshot: UltimosIntraday per-symbol session snapshot. hor is the snapshot
+# time (overriding the shared drop) and dat the session date.
+SNAPSHOT_RENAME: dict[str, str | None] = {
+    **CONTENT_PROXY_RENAME,
+    "symbol": "ticker",
+    "dat": "date",
+    "hor": "time",
+}
+
+# bfirst_close: FechamentoPrimeiro — the symbol's first historical close
+# (adjusted). The shared map drops the empty hor and renames last -> close.
+FIRST_CLOSE_RENAME: dict[str, str | None] = {
+    **CONTENT_PROXY_RENAME,
+    "symbol": "ticker",
+    "dat": "date",
+}
+
 # bfund_returns: FundosRentabilidade per-window returns. ret_anual is the
 # 12-month return (verified against bdh BBSD11 closes, not calendar-year).
 FUND_RETURNS_RENAME: dict[str, str | None] = {
@@ -413,6 +430,26 @@ FREE_FLOAT_FIELDS: dict[str, str | None] = {
 }
 
 
+# bshareholder_dates(ticker_or_cvm) — shareholder-composition dates. Field
+# meanings derived empirically from live PETR/VALE rows: 13784 is always
+# January 1st of the base year (12 distinct values across 106 rows) while
+# 13815 holds the actual position dates (all distinct, 2015->today).
+SHAREHOLDER_DATES_FIELDS: dict[str, str] = {
+    "13784": "reference_date",
+    "13815": "position_date",
+}
+
+# bfilings(ticker_or_cvm, start, end) — financial-statement PDFs. 10057/10058
+# echo the requested window (dropped); 13802 is the filing date and 13140 the
+# S3 link to the PDF.
+FILINGS_FIELDS: dict[str, str | None] = {
+    "10057": None,  # drop: echo of the requested start date
+    "10058": None,  # drop: echo of the requested end date
+    "13802": "date",
+    "13140": "url",
+}
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Group C: empty-result schemas (column -> dtype)
 #
@@ -506,6 +543,24 @@ VOLUME_SCHEMA: dict[str, str] = {
     "months": "float64",
     "dat": "float64",
 }
+SNAPSHOT_SCHEMA: dict[str, str] = {
+    "ticker": "object",
+    "date": "float64",
+    "time": "object",
+    "close": "float64",
+    "low": "float64",
+    "high": "float64",
+    "open": "float64",
+    "volume": "float64",
+    "trades": "float64",
+    "turnover": "float64",
+    "open_interest": "float64",
+}
+FIRST_CLOSE_SCHEMA: dict[str, str] = {
+    "ticker": "object",
+    "date": "float64",
+    "close": "float64",
+}
 TREASURY_LAST_SCHEMA: dict[str, str] = {
     "ticker": "object",
     "date": "float64",
@@ -558,6 +613,9 @@ DIVIDEND_SCHEMA = _object_schema(DIVIDEND_FIELDS)
 DY_SCHEMA = _object_schema(DY_FIELDS)
 PORTFOLIO_LIST_SCHEMA = _object_schema(PORTFOLIO_LIST_FIELDS)
 FUND_HOLDER_SCHEMA = _object_schema(FUND_HOLDER_FIELDS)
+PORTFOLIO_WITH_SCHEMA = _object_schema(PORTFOLIO_FIELDS)
+SHAREHOLDER_DATES_SCHEMA = _object_schema(SHAREHOLDER_DATES_FIELDS)
+FILINGS_SCHEMA = _object_schema(FILINGS_FIELDS)
 
 # Single-entity snapshots returned as a one-row DataFrame (RangeIndex)
 QUOTE_SCHEMA = _object_schema(QUOTE_FIELDS)

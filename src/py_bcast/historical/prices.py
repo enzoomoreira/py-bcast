@@ -9,7 +9,37 @@ from .._core.normalize import ensure_list
 from .._core.validation import DateParam, TickerList, validate_params
 from .._legacy._sync.bdh import bdh_core, bdh_ohlcv_one
 from .._legacy.multi import vectorize
+from .._legacy.endpoints import SPEC_BFIRST_CLOSE
 from .._legacy.output import empty_bdh_frame
+from .._legacy._sync.executor import run_spec
+
+
+@validate_params
+def bfirst_close(
+    ticker: TickerList,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the first historical closing price for one or more tickers.
+
+    Uses the FechamentoPrimeiro endpoint. Takes only the bare B3 ticker
+    ("PETR4" — suffixed forms do not resolve); the close is adjusted for
+    corporate events, so old values can be far below the prices of the time.
+
+    Args:
+        ticker: Single bare ticker or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), one row per ticker: ticker (echoed with
+        the exchange suffix), date (YYYYMMDD int) and close. Unknown tickers
+        are omitted; empty DataFrame with that schema if none resolves.
+
+    Example:
+        >>> df = bfirst_close("PETR4")
+        >>> df[["ticker", "date", "close"]]
+    """
+    return run_spec(SPEC_BFIRST_CLOSE, session_token=session_token, ticker=ticker)
 
 
 @validate_params

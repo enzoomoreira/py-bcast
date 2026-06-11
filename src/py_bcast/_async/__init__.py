@@ -16,8 +16,17 @@ Usage::
     asyncio.run(main())
 """
 
-from .historical import abdh, abdh_ohlcv, abdi, abdt
-from .macro import abmacro, abdi_cdi, abreturn, abvolume, abinflation, abstats, abfx
+from .historical import abdh, abdh_ohlcv, abdi, abdt, abticks, abfirst_close
+from .macro import (
+    abmacro,
+    abdi_cdi,
+    abreturn,
+    abvolume,
+    abinflation,
+    abstats,
+    abfx,
+    absnapshot,
+)
 from .fixedincome import abtreasury, abtreasury_history, abaccrual, absavings
 from .funds import abfund_history, abfund_returns
 from .fundamental import (
@@ -28,12 +37,21 @@ from .fundamental import (
     abshares,
     abfree_float,
     abfund_holders,
+    abshareholder_dates,
+    abfilings,
     abindices,
     absectors,
     abindicators,
     abindicator_meta,
 )
-from .events import abcalendar, abdividends, abdy, abportfolios, abportfolio
+from .events import (
+    abcalendar,
+    abdividends,
+    abdy,
+    abportfolios,
+    abportfolio,
+    abportfolios_with,
+)
 from .news import abnews, abnews_recent, abnews_multimedia
 from .credit import abcds
 from .plus import (
@@ -56,6 +74,8 @@ __all__ = [
     "abdh_ohlcv",
     "abdi",
     "abdt",
+    "abticks",
+    "abfirst_close",
     "abmacro",
     "abdi_cdi",
     "abreturn",
@@ -63,6 +83,7 @@ __all__ = [
     "abinflation",
     "abstats",
     "abfx",
+    "absnapshot",
     "abtreasury",
     "abtreasury_history",
     "abaccrual",
@@ -76,6 +97,8 @@ __all__ = [
     "abshares",
     "abfree_float",
     "abfund_holders",
+    "abshareholder_dates",
+    "abfilings",
     "abindices",
     "absectors",
     "abindicators",
@@ -85,6 +108,7 @@ __all__ = [
     "abdy",
     "abportfolios",
     "abportfolio",
+    "abportfolios_with",
     "abnews",
     "abnews_recent",
     "abnews_multimedia",

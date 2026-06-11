@@ -7,7 +7,9 @@ import pandas as pd
 from .._core.dates import default_tick_end, to_date_str, to_datetime_str
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
 from .._legacy.endpoints import SPEC_BDI, SPEC_BDT
+from .._legacy.multi import vectorize
 from .._legacy._sync.executor import run_spec
+from .._legacy._sync.ticks import bticks_core
 
 
 @validate_params
@@ -100,4 +102,50 @@ def bdi(
         session_token=session_token,
         ticker=ticker,
         bar_start=f"{to_date_str(start_date)}0000",
+    )
+
+
+@validate_params
+def bticks(
+    ticker: TickerList,
+    start: DateTimeParam,
+    end: DateTimeParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Get times-and-trades with top-of-book quotes for one or more B3 symbols.
+
+    Uses the TimesTrades endpoint: every trade (type "TRD") and every
+    top-of-book change (type "QTE") in the window. TRD rows carry price,
+    size, seq_num and the buyer/seller broker ids in bid_participant/
+    ask_participant; QTE rows carry bid/ask price and size and the
+    participant ids of the standing orders.
+
+    Like ``bdt``, the request window is interpreted in **UTC** (B3's regular
+    session is 13:00-20:00 UTC). Retention is short — only the current
+    session returned data in live tests; previous days come back empty.
+    The data is dense (thousands of rows per 10 minutes on liquid names),
+    so keep windows tight.
+
+    Args:
+        ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
+        start: Start datetime, UTC (str YYYYMMDDHHMMSS, datetime, or Timestamp)
+        end: End datetime, UTC (default: start + 1 hour)
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame indexed by the exchange timestamp (tz-aware,
+        America/Sao_Paulo), oldest first, with a ``ticker`` column (one
+        block per symbol). Columns: type, price, size, bid_price, bid_size,
+        ask_price, ask_size, bid_participant, ask_participant, seq_num.
+
+    Example:
+        >>> # 10:00-10:10 Brasilia = 13:00-13:10 UTC
+        >>> df = bticks("PETR4", "20260610130000", "20260610131000")
+        >>> trades = df[df["type"] == "TRD"]
+    """
+    start_str = to_datetime_str(start)
+    end_str = default_tick_end(start_str) if end is None else to_datetime_str(end)
+    return vectorize(
+        ticker, lambda t: bticks_core(t, start_str, end_str, session_token)
     )
