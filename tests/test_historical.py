@@ -68,8 +68,10 @@ class TestBhistoryOhlcv:
         assert petr.index.is_monotonic_increasing
 
     def test_no_data_returns_empty(self):
-        # Very old date (before history start) -> valid query, no rows
-        df = bhistory("PETR4", "19000101", "19000101", fields="ohlcv")
+        # In-range window with no trading days (a weekend) -> valid query, no
+        # rows. (A pre-history date is a server DB-gap error, not an empty, and
+        # raises for both legs — same as bhistory(fields="close").)
+        df = bhistory("PETR4", "20260606", "20260607", fields="ohlcv")
         assert isinstance(df, pd.DataFrame)
         assert df.empty
         assert "close" in df.columns  # schema preserved
