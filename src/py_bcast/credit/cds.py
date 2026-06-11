@@ -6,7 +6,7 @@ import pandas as pd
 
 from .._core.validation import DateParam, validate_params
 from .._legacy.markit import normalize_cds_type, to_iso_date
-from .._legacy._sync.markit import bcds_core
+from .._legacy._sync.markit import bcds_core, bcds_indices_core
 
 
 @validate_params
@@ -71,5 +71,39 @@ def bcds(
         normalize_cds_type(cds_type),
         tier,
         docclause,
+        session_token=session_token,
+    )
+
+
+@validate_params
+def bcds_indices(
+    date: DateParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Fetch the Markit CDS index term-structure table from the legacy feed.
+
+    Tradable CDS indices (CDXEM, iTraxx, etc.) — distinct from the single-name
+    curves of ``bcds`` — with their composite price/spread, bid/ask, daily and
+    monthly changes, RED code, maturity and depth.
+
+    Args:
+        date: Curve date (YYYYMMDD, date, datetime, or Timestamp). None
+            resolves to the most recent date the feed has data for.
+        session_token: BCAA session token.
+
+    Returns:
+        Flat DataFrame (RangeIndex), one row per index series: ``date``,
+        ``name``, ``redcode``, ``maturity`` (raw Markit form), ``composite_price``,
+        ``bid_ask_price``, ``composite_spread``, ``bid_ask_spread``,
+        ``change_day``, ``change_month`` and ``depth``. Empty DataFrame with the
+        same schema for a valid date with no coverage.
+
+    Example:
+        >>> from py_bcast import bcds_indices
+        >>> df = bcds_indices()
+        >>> df[["name", "composite_spread"]].head()
+    """
+    return bcds_indices_core(
+        to_iso_date(date) if date is not None else None,
         session_token=session_token,
     )

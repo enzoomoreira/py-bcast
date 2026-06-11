@@ -35,32 +35,24 @@ def parse_binary_response(data: bytes) -> dict:
             record_count=len(records),
         )
 
-    # Record 1 = metadata/status info
-    error_fields = records[1].split(b"\x00")
-    first_field = (
-        error_fields[0].decode("utf-8", errors="replace") if error_fields else ""
-    )
-
-    # Check for error: if 10037 tag exists anywhere, it's an error response
-    if b"10037" in data:
-        all_fields = data.split(b"\x00")
-        msg = ""
-        for i, f in enumerate(all_fields):
-            decoded = f.decode("utf-8", errors="replace")
-            if decoded == "10037" and i + 1 < len(all_fields):
-                msg = all_fields[i + 1].decode("utf-8", errors="replace")
-                break
-        logger.error("Binary protocol error: %s", msg or first_field)
-        raise ProtocolError(
-            f"aefundamental error: {msg or first_field}",
-            error_tag=msg or first_field,
-        )
-
-    # Record 2 = field definitions
+    # Record 2 = field definitions: first element is the field count, the rest
+    # are tag numbers (last may be empty).
     field_record = records[2].split(b"\x00")
-    # First element is field count, rest are tag numbers, last may be empty
     field_tags = [f.decode("utf-8", errors="replace") for f in field_record[1:] if f]
     n_fields = len(field_tags)
+
+    # An error response packs its (tag, value) pairs inline into this record
+    # (e.g. ['2', '10036', 'af_88000', '10037', '<message>', '']), so the
+    # message tag 10037 is followed by the message text among these tokens.
+    # Detecting the error by an exact token here rather than by a substring
+    # scan of the whole payload avoids a false positive when a large data
+    # response happens to contain the bytes "10037" inside a value (e.g. a fund
+    # id or CNPJ in the 10.7 MB fund autocomplete dump).
+    if "10037" in field_tags:
+        idx = field_tags.index("10037")
+        msg = field_tags[idx + 1] if idx + 1 < len(field_tags) else ""
+        logger.error("Binary protocol error: %s", msg)
+        raise ProtocolError(f"aefundamental error: {msg}", error_tag=msg)
 
     # Record 3+ = data rows (before the ETX terminator record)
     rows = []

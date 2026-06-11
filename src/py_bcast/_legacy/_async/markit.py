@@ -15,9 +15,12 @@ from ..._core.exceptions import NotFoundError
 from ..markit import (
     CDS_CURVE_SCHEMA,
     CDS_ENTITY_SCHEMA,
+    CDS_INDEX_SCHEMA,
     curve_record_to_rows,
     entity_rows_to_records,
+    index_records_to_rows,
     latest_cds_date,
+    latest_markit_date,
     markit_records,
     match_cds_entities,
     pick_cds_entity,
@@ -85,3 +88,28 @@ async def bcds_core(
     records = markit_records(root)
     rows = curve_record_to_rows(records[0], chosen, date_iso) if records else []
     return finalize_frame(rows, index=Index.RANGE, schema=CDS_CURVE_SCHEMA)
+
+
+async def bcds_indices_core(
+    date_iso: str | None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Shared core behind ``bcds_indices``/``abcds_indices``.
+
+    Returns the Markit CDS index term-structure table (CDXEM, iTraxx, etc.)
+    for ``date_iso``; with ``date_iso=None`` the most recent date the feed
+    carries is resolved via ListaDatas.
+    """
+    if date_iso is None:
+        root = await content_proxy_get(
+            "MarkitOutput2/ListaDatas", {"13336": "C"}, session_token
+        )
+        date_iso = latest_markit_date(markit_records(root))
+        if date_iso is None:
+            return finalize_frame([], index=Index.RANGE, schema=CDS_INDEX_SCHEMA)
+
+    root = await content_proxy_get(
+        "MarkitOutput2/Indices", {"10047": date_iso}, session_token
+    )
+    rows = index_records_to_rows(markit_records(root), date_iso)
+    return finalize_frame(rows, index=Index.RANGE, schema=CDS_INDEX_SCHEMA)

@@ -11,6 +11,7 @@ from .._legacy.endpoints import (
     SPEC_BSAVINGS,
     SPEC_BTREASURY,
     SPEC_BTREASURY_HISTORY,
+    SPEC_BUNIT_PRICE,
 )
 
 
@@ -83,6 +84,27 @@ async def absavings(
     return await arun_spec(
         SPEC_BSAVINGS,
         session_token=session_token,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+@validate_params
+async def abunit_price(
+    symbol: TickerList,
+    start_date: DateParam,
+    end_date: DateParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bunit_price``.
+
+    Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block per
+    symbol): accumulated_return, unit_price (PU) and change_pct.
+    """
+    return await arun_spec(
+        SPEC_BUNIT_PRICE,
+        session_token=session_token,
+        symbol=symbol,
         start_date=start_date,
         end_date=end_date,
     )

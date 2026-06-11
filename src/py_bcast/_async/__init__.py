@@ -22,12 +22,19 @@ from .macro import (
     abreturn,
     abvolume,
     abinflation,
+    abinflation_history,
     abstats,
     abfx,
     absnapshot,
 )
-from .fixedincome import abtreasury, abtreasury_history, abaccrual, absavings
-from .funds import abfund_history, abfund_returns
+from .fixedincome import (
+    abtreasury,
+    abtreasury_history,
+    abaccrual,
+    absavings,
+    abunit_price,
+)
+from .funds import abfund_history, abfund_returns, abfund_list
 from .fundamental import (
     abconsensus,
     abcompany,
@@ -37,9 +44,11 @@ from .fundamental import (
     abfree_float,
     abfund_holders,
     abshareholder_dates,
+    abstatement_dates,
     abfilings,
     abindices,
     absectors,
+    absector_members,
     abindicators,
     abindicator_meta,
 )
@@ -51,7 +60,7 @@ from .events import (
     abportfolios_with,
 )
 from .news import abnews, abnews_recent, abnews_multimedia
-from .credit import abcds
+from .credit import abcds, abcds_indices
 from .plus import (
     abtrades,
     abinfo,
@@ -78,6 +87,7 @@ __all__ = [
     "abreturn",
     "abvolume",
     "abinflation",
+    "abinflation_history",
     "abstats",
     "abfx",
     "absnapshot",
@@ -85,8 +95,10 @@ __all__ = [
     "abtreasury_history",
     "abaccrual",
     "absavings",
+    "abunit_price",
     "abfund_history",
     "abfund_returns",
+    "abfund_list",
     "abconsensus",
     "abcompany",
     "abquote",
@@ -95,9 +107,11 @@ __all__ = [
     "abfree_float",
     "abfund_holders",
     "abshareholder_dates",
+    "abstatement_dates",
     "abfilings",
     "abindices",
     "absectors",
+    "absector_members",
     "abindicators",
     "abindicator_meta",
     "abcalendar",
@@ -109,6 +123,7 @@ __all__ = [
     "abnews_recent",
     "abnews_multimedia",
     "abcds",
+    "abcds_indices",
     "abtrades",
     "abinfo",
     "abindex_members",

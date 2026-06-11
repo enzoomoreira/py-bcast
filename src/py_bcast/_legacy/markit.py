@@ -69,6 +69,35 @@ CDS_CURVE_SCHEMA: dict[str, str] = {
 }
 
 
+CDS_INDEX_SCHEMA: dict[str, str] = {
+    "date": "object",
+    "name": "object",
+    "redcode": "object",
+    "maturity": "object",
+    "composite_price": "float64",
+    "bid_ask_price": "float64",
+    "composite_spread": "float64",
+    "bid_ask_spread": "float64",
+    "change_day": "float64",
+    "change_month": "float64",
+    "depth": "float64",
+}
+
+# MarkitOutput2/Indices RECORD field -> output column. The textual fields keep
+# their raw Markit values (the maturity stays the "dd-Mon-yy" form the feed
+# emits); the rest are BR-formatted decimals parsed at shaping time.
+_INDEX_TEXT_FIELDS = {"NOME": "name", "REDCODE": "redcode", "MATURITY": "maturity"}
+_INDEX_NUM_FIELDS = {
+    "COMPOSITE_PRICE": "composite_price",
+    "BID_ASK_PRICE": "bid_ask_price",
+    "COMPOSITE_SPREAD": "composite_spread",
+    "BID_ASK_SPREAD": "bid_ask_spread",
+    "VAR_DIA": "change_day",
+    "VAR_MES": "change_month",
+    "DEPTH": "depth",
+}
+
+
 def markit_records(root: ET.Element) -> list[dict[str, str]]:
     """Parse ``LIST_RECORD > RECORD`` rows into dicts (tag -> text).
 
@@ -93,6 +122,35 @@ def normalize_cds_type(cds_type: str) -> str:
 def to_iso_date(yyyymmdd: str) -> str:
     """Convert the lib-standard YYYYMMDD date string to Markit's YYYY-MM-DD."""
     return f"{yyyymmdd[:4]}-{yyyymmdd[4:6]}-{yyyymmdd[6:]}"
+
+
+def latest_markit_date(date_rows: list[dict[str, str]]) -> str | None:
+    """Most recent ListaDatas date overall (used by the CDS index listing).
+
+    ISO dates order lexicographically, so ``max`` is the latest regardless of
+    server order. The index feed is not split by sovereign/corporate type.
+    """
+    dates = [r["DATA"] for r in date_rows if r.get("DATA")]
+    return max(dates) if dates else None
+
+
+def index_records_to_rows(
+    records: list[dict[str, str]], date_iso: str
+) -> list[dict[str, object]]:
+    """Shape MarkitOutput2/Indices RECORD rows into the public columns.
+
+    The ``date`` column carries the resolved ISO date (the per-record DATA is
+    the localized "dd-Mon-yy" form); numeric fields are BR-formatted decimals.
+    """
+    rows: list[dict[str, object]] = []
+    for record in records:
+        row: dict[str, object] = {"date": date_iso}
+        for src, out in _INDEX_TEXT_FIELDS.items():
+            row[out] = record.get(src) or ""
+        for src, out in _INDEX_NUM_FIELDS.items():
+            row[out] = parse_br_number(record.get(src) or "")
+        rows.append(row)
+    return rows
 
 
 def latest_cds_date(date_rows: list[dict[str, str]], cds_type: str) -> str | None:

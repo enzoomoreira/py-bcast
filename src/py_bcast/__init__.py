@@ -63,12 +63,14 @@ from .fundamental import (
     bcompany,
     bindices,
     bsectors,
+    bsector_members,
     bquote,
     btickers,
     bshares,
     bfree_float,
     bfund_holders,
     bshareholder_dates,
+    bstatement_dates,
     bfilings,
     bindicators,
     bindicator_meta,
@@ -86,13 +88,14 @@ from .macro import (
     breturn,
     bvolume,
     binflation,
+    binflation_history,
     bstats,
     bfx,
     bsnapshot,
 )
-from .fixedincome import btreasury, btreasury_history, baccrual, bsavings
-from .funds import bfund_history, bfund_returns
-from .credit import bcds
+from .fixedincome import btreasury, btreasury_history, baccrual, bsavings, bunit_price
+from .funds import bfund_history, bfund_returns, bfund_list
+from .credit import bcds, bcds_indices
 from .news import bnews, bnews_recent, bnews_multimedia, MULTIMEDIA_CATEGORIES
 from ._legacy.session import discover_session_token, clear_token_cache
 from ._plus.session import discover_plus_token, clear_plus_token_cache
@@ -151,22 +154,27 @@ __all__ = [
     "bstats",
     "bfx",
     "bsnapshot",
+    "binflation_history",
     "btreasury",
     "btreasury_history",
     "baccrual",
     "bsavings",
+    "bunit_price",
     "bfund_history",
     "bfund_returns",
+    "bfund_list",
     # Reference Data
     "bcompany",
     "bindices",
     "bsectors",
+    "bsector_members",
     "bquote",
     "btickers",
     "bshares",
     "bfree_float",
     "bfund_holders",
     "bshareholder_dates",
+    "bstatement_dates",
     "bfilings",
     "bindicators",
     "bindicator_meta",
@@ -178,6 +186,7 @@ __all__ = [
     "bportfolios_with",
     # News / Multimedia
     "bcds",
+    "bcds_indices",
     "bnews",
     "bnews_recent",
     "bnews_multimedia",

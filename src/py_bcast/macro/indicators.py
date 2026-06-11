@@ -9,6 +9,7 @@ from .._legacy.endpoints import (
     SPEC_BDI_CDI,
     SPEC_BFX,
     SPEC_BINFLATION,
+    SPEC_BINFLATION_HISTORY,
     SPEC_BMACRO,
     SPEC_BRETURN,
     SPEC_BSNAPSHOT,
@@ -266,3 +267,42 @@ def binflation(
         >>> df[["symbol", "close"]]
     """
     return run_spec(SPEC_BINFLATION, session_token=session_token)
+
+
+@validate_params
+def binflation_history(
+    symbol: TickerList,
+    start_date: DateParam,
+    end_date: DateParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the accumulated-inflation series for one or more inflation indices.
+
+    Uses the CalculoInflacao endpoint with the synthetic AE inflation symbols
+    (``AEIPCA``, ``AEIGPM``, ``AEINPC``, etc. — the same family ``bmacro``
+    accepts). Returns the index compounded from the window start, mirroring the
+    accumulated shape of ``baccrual`` / ``bsavings``. Unlike ``binflation``
+    (the latest monthly snapshot), this is a daily time series.
+
+    Args:
+        symbol: Single inflation symbol or list (e.g. "AEIPCA").
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: Optional end date (default: through today).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block
+        per symbol) and an ``accumulated`` column (% since start_date).
+
+    Example:
+        >>> df = binflation_history("AEIPCA", "20250101")
+        >>> df["accumulated"].iloc[-1]
+    """
+    return run_spec(
+        SPEC_BINFLATION_HISTORY,
+        session_token=session_token,
+        symbol=symbol,
+        start_date=start_date,
+        end_date=end_date,
+    )

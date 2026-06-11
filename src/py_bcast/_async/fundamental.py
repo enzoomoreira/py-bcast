@@ -23,8 +23,10 @@ from .._legacy.endpoints import (
     SPEC_BINDICATORS,
     SPEC_BINDICES,
     SPEC_BSECTORS,
+    SPEC_BSECTOR_MEMBERS,
     SPEC_BSHAREHOLDER_DATES,
     SPEC_BSHARES,
+    SPEC_BSTATEMENT_DATES,
     SPEC_BTICKERS,
 )
 from .._legacy.multi import vectorize_async
@@ -210,4 +212,35 @@ async def abindicators(
         indicator=indicator,
         start_date=start_date,
         end_date=end_date,
+    )
+
+
+async def absector_members(
+    sector_id: int,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bsector_members``.
+
+    Every company under a B3 sector id (RangeIndex). Empty frame for an
+    unpopulated (subsector/segment) id.
+    """
+    return await arun_spec(
+        SPEC_BSECTOR_MEMBERS, session_token=session_token, sector_id=sector_id
+    )
+
+
+@validate_params
+async def abstatement_dates(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bstatement_dates``.
+
+    The latest annual (DFP) and quarterly (ITR) statement dates per company,
+    each row tagged with a ``ticker`` column. NotFoundError if unknown.
+    """
+    return await arun_spec(
+        SPEC_BSTATEMENT_DATES,
+        session_token=session_token,
+        ticker_or_cvm=ticker_or_cvm,
     )

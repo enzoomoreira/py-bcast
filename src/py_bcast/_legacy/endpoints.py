@@ -57,12 +57,20 @@ from .columns import (
     RETURN_SCHEMA,
     SECTOR_FIELDS,
     SECTOR_SCHEMA,
+    SECTOR_MEMBERS_FIELDS,
+    SECTOR_MEMBERS_SCHEMA,
     SHARES_FIELDS,
     SHARES_SCHEMA,
+    STATEMENT_DATES_FIELDS,
+    STATEMENT_DATES_SCHEMA,
     STATS_RENAME,
     STATS_SCHEMA,
     TICK_SCHEMA,
     TICKER_FIELDS,
+    UNIT_PRICE_RENAME,
+    UNIT_PRICE_SCHEMA,
+    FUND_LIST_FIELDS,
+    FUND_LIST_SCHEMA,
     VOLUME_RENAME,
     VOLUME_SCHEMA,
 )
@@ -657,4 +665,82 @@ SPEC_BDI = EndpointSpec(
         ParamBind("bar_start", "10074", "none"),
     ),
     vectorize_over="ticker",
+)
+
+# ── fundamental screening / metadata (aetp) ───────────────────────────────
+# bsector_members — every company classified under a B3 sector. Single request
+# keyed by the top-level sector id (13798); subsector/segment ids return empty.
+# The rows do not echo a ticker (the entity is the company's CVM), so no insert.
+# Soft: an unpopulated sector id is a legitimate empty frame.
+SPEC_BSECTOR_MEMBERS = EndpointSpec(
+    transport="aetp",
+    path="fundamental/empresa/setores",
+    index=Index.RANGE,
+    rename=SECTOR_MEMBERS_FIELDS,
+    schema=SECTOR_MEMBERS_SCHEMA,
+    params=(ParamBind("sector_id", "13798", "none"),),
+)
+
+# bstatement_dates — the dates of a company's latest annual (DFP) and quarterly
+# (ITR) statements. Vectorizes over the ticker/CVM identifier (13004, resolved);
+# the endpoint does not echo a ticker, so the vectorizer inserts the queried
+# one. Fail-fast: an unknown identifier yields no record.
+SPEC_BSTATEMENT_DATES = EndpointSpec(
+    transport="aetp",
+    path="fundamental/demonstrativo/ultimo",
+    index=Index.RANGE,
+    rename=STATEMENT_DATES_FIELDS,
+    schema=STATEMENT_DATES_SCHEMA,
+    empty_ok=False,
+    params=(ParamBind("ticker_or_cvm", "13004", "cvm"),),
+    vectorize_over="ticker_or_cvm",
+)
+
+# bfund_list — the legacy fund universe (autocomplete dump, ~45k rows). Binary
+# transport, no entity params; the facade filters by name client-side. The
+# server caches the dump (it serves the whole catalog every call).
+SPEC_BFUND_LIST = EndpointSpec(
+    transport="binary",
+    path="contentProxyOutput/ContentProxyServlet/Fundos/Fundo/buscarFundosAutoComplete",
+    index=Index.RANGE,
+    rename=FUND_LIST_FIELDS,
+    schema=FUND_LIST_SCHEMA,
+    static_params={"10023": "4"},
+)
+
+# bunit_price — CalculoPreco daily unit-price (PU) + accumulated-return series
+# for a fixed-income reference symbol (".ANBIMA"/".TRDM"). Vectorizes over the
+# symbol (305), which the endpoint does not echo. 1789 is the optional end date.
+SPEC_BUNIT_PRICE = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/CalculoPreco",
+    index=Index.DATETIME,
+    rename=UNIT_PRICE_RENAME,
+    schema=UNIT_PRICE_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("symbol", "305", "none"),
+        ParamBind("start_date", "961", "date"),
+        ParamBind("end_date", "1789", "date"),
+    ),
+    vectorize_over="symbol",
+)
+
+# binflation_history — CalculoInflacao accumulated-inflation series for a macro
+# inflation symbol (e.g. "AEIPCA", "AEIGPM"). Same accumulated shape as
+# baccrual/bsavings (dat -> DatetimeIndex, acum -> accumulated). Vectorizes over
+# the symbol (305), which the endpoint does not echo.
+SPEC_BINFLATION_HISTORY = EndpointSpec(
+    transport="cp_ticks",
+    path="BaseHistoricaNumerica/CalculoInflacao",
+    index=Index.DATETIME,
+    rename=CONTENT_PROXY_RENAME,
+    schema=ACCRUAL_SCHEMA,
+    cp_sort_by="dat",
+    params=(
+        ParamBind("symbol", "305", "none"),
+        ParamBind("start_date", "961", "date"),
+        ParamBind("end_date", "1789", "date"),
+    ),
+    vectorize_over="symbol",
 )

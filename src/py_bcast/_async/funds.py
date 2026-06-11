@@ -6,7 +6,8 @@ import pandas as pd
 
 from .._core.validation import DateParam, TickerList, validate_params
 from .._legacy._async.executor import run_spec as arun_spec
-from .._legacy.endpoints import SPEC_BFUND_HISTORY, SPEC_BFUND_RETURNS
+from .._legacy.endpoints import SPEC_BFUND_HISTORY, SPEC_BFUND_RETURNS, SPEC_BFUND_LIST
+from ..funds import _filter_fund_list
 
 
 @validate_params
@@ -41,3 +42,17 @@ async def abfund_returns(
     accumulated returns (%); incomplete windows are NaN.
     """
     return await arun_spec(SPEC_BFUND_RETURNS, session_token=session_token, fund=fund)
+
+
+async def abfund_list(
+    query: str | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bfund_list``.
+
+    The legacy fund universe (one cached call), optionally filtered by a
+    case/accent-insensitive name substring. The ``symbol`` column feeds
+    ``abfund_history`` / ``abfund_returns``.
+    """
+    df = await arun_spec(SPEC_BFUND_LIST, session_token=session_token)
+    return _filter_fund_list(df, query)

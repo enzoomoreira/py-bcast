@@ -6,7 +6,8 @@ import pandas as pd
 
 from ._core.validation import DateParam, TickerList, validate_params
 from ._legacy._sync.executor import run_spec
-from ._legacy.endpoints import SPEC_BFUND_HISTORY, SPEC_BFUND_RETURNS
+from ._legacy.endpoints import SPEC_BFUND_HISTORY, SPEC_BFUND_RETURNS, SPEC_BFUND_LIST
+from ._legacy.resolve_state import _strip_accents
 
 
 @validate_params
@@ -77,4 +78,43 @@ def bfund_returns(
     return run_spec(SPEC_BFUND_RETURNS, session_token=session_token, fund=fund)
 
 
-__all__ = ["bfund_history", "bfund_returns"]
+def _filter_fund_list(df: pd.DataFrame, query: str | None) -> pd.DataFrame:
+    """Filter the fund universe by a case/accent-insensitive name substring."""
+    if not query:
+        return df
+    needle = _strip_accents(str(query)).upper()
+    mask = df["name"].map(lambda v: needle in _strip_accents(str(v)).upper())
+    return df[mask].reset_index(drop=True)
+
+
+def bfund_list(
+    query: str | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    List the legacy fund universe, optionally filtered by name.
+
+    Uses the BuscarFundosAutoComplete endpoint, which serves the whole CVM fund
+    catalog (~45k funds) in one cached call; ``query`` filters it client-side by
+    a case/accent-insensitive name substring. The ``symbol`` column is the
+    ``<id>.ANBIMA`` form that ``bfund_history`` / ``bfund_returns`` consume, so
+    this is the discovery path for those functions on the legacy backend.
+
+    Args:
+        query: Optional name substring (e.g. "Petrobras", min. a few chars to
+            be useful). None returns the full universe.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), one row per fund: name, legal_name,
+        anbima_id, cnpj, symbol (``<id>.ANBIMA``) and anbima_class.
+
+    Example:
+        >>> funds = bfund_list("Tesouro Selic")
+        >>> hist = bfund_history(funds["symbol"].iloc[0], "20260101")
+    """
+    df = run_spec(SPEC_BFUND_LIST, session_token=session_token)
+    return _filter_fund_list(df, query)
+
+
+__all__ = ["bfund_history", "bfund_returns", "bfund_list"]

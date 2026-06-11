@@ -11,6 +11,7 @@ from ._legacy.endpoints import (
     SPEC_BSAVINGS,
     SPEC_BTREASURY,
     SPEC_BTREASURY_HISTORY,
+    SPEC_BUNIT_PRICE,
 )
 
 
@@ -157,4 +158,50 @@ def bsavings(
     )
 
 
-__all__ = ["btreasury", "btreasury_history", "baccrual", "bsavings"]
+@validate_params
+def bunit_price(
+    symbol: TickerList,
+    start_date: DateParam,
+    end_date: DateParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the daily unit-price (PU) series for fixed-income reference symbols.
+
+    Uses the CalculoPreco endpoint with ANBIMA daily reference ids
+    (``<paper><maturity>.ANBIMA``, e.g. "LTN260701.ANBIMA") or Trademate
+    symbols (".TRDM"). Complements ``btreasury`` (last snapshot) and
+    ``btreasury_history`` (trading yields): here the series is the bond's PU
+    and its accumulated return since the window start.
+
+    Args:
+        symbol: Single reference id or list (e.g. "LTN260701.ANBIMA").
+        start_date: Start date (str YYYYMMDD, date, datetime, or Timestamp)
+        end_date: Optional end date (default: through today).
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame with a DatetimeIndex and a ``ticker`` column (one block
+        per symbol). Columns: accumulated_return (% since start), unit_price
+        (PU) and change_pct (day-over-day).
+
+    Example:
+        >>> df = bunit_price("LTN260701.ANBIMA", "20260101")
+        >>> df[["ticker", "unit_price"]].tail()
+    """
+    return run_spec(
+        SPEC_BUNIT_PRICE,
+        session_token=session_token,
+        symbol=symbol,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+__all__ = [
+    "btreasury",
+    "btreasury_history",
+    "baccrual",
+    "bsavings",
+    "bunit_price",
+]

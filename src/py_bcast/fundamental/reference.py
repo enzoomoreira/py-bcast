@@ -22,8 +22,10 @@ from .._legacy.endpoints import (
     SPEC_BINDICATORS,
     SPEC_BINDICES,
     SPEC_BSECTORS,
+    SPEC_BSECTOR_MEMBERS,
     SPEC_BSHAREHOLDER_DATES,
     SPEC_BSHARES,
+    SPEC_BSTATEMENT_DATES,
     SPEC_BTICKERS,
 )
 from .._legacy.multi import vectorize
@@ -401,3 +403,72 @@ def bindicator_meta(
         >>> df.head()
     """
     return run_spec(SPEC_BINDICATOR_META, session_token=session_token)
+
+
+def bsector_members(
+    sector_id: int,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch every company classified under a B3 sector.
+
+    Uses aetp/output/fundamental/empresa/setores. Takes a top-level sector id
+    (the ``sector_id`` column of ``bsectors()``); subsector/segment ids return
+    an empty frame. Useful for sector screening — pair it with ``bcompany`` /
+    ``bindicators`` / ``bstats`` over the returned ``cvm_code`` / ticker.
+
+    Args:
+        sector_id: B3 sector id (int, e.g. 1 for "Bens Industriais"). See
+            ``bsectors()``.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), one row per company: cvm_code, trade_name,
+        corporate_name, cnpj, the B3 sector/subsector/segment names and ids,
+        the reporting period (ref_year, ref_quarter, period_start/end) and
+        logo_url. Empty DataFrame with that schema for an unpopulated sector id.
+
+    Example:
+        >>> df = bsector_members(1)
+        >>> df[["cvm_code", "trade_name", "segment"]].head()
+    """
+    return run_spec(
+        SPEC_BSECTOR_MEMBERS, session_token=session_token, sector_id=sector_id
+    )
+
+
+@validate_params
+def bstatement_dates(
+    ticker_or_cvm: str | int | list[str | int],
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch the dates of a company's latest financial statements.
+
+    Uses aetp/output/fundamental/demonstrativo/ultimo. One row per company with
+    the most recent annual (DFP) and quarterly (ITR) statements: each period's
+    start/end and the date it was disclosed, plus the latest statement's basis
+    (``C`` consolidated / ``I`` individual) and type (``A`` annual / ``T``
+    quarterly).
+
+    Args:
+        ticker_or_cvm: Ticker (str, e.g. "PETR4"), CVM code (int, e.g. 9512),
+            or a list mixing both.
+        session_token: BCAA session token
+
+    Returns:
+        Flat DataFrame (RangeIndex), each row tagged with a ``ticker`` column
+        holding the queried identifier. Columns: annual_period_start,
+        annual_period_end, annual_disclosed, quarter, quarter_period_start,
+        quarter_period_end, quarter_disclosed, basis, last_type, last_disclosed.
+        Raises NotFoundError if any identifier is unknown (fail-fast).
+
+    Example:
+        >>> df = bstatement_dates("PETR4")
+        >>> df[["ticker", "quarter_period_end", "quarter_disclosed"]]
+    """
+    return run_spec(
+        SPEC_BSTATEMENT_DATES,
+        session_token=session_token,
+        ticker_or_cvm=ticker_or_cvm,
+    )

@@ -6,7 +6,7 @@ import pandas as pd
 
 from .._core.validation import DateParam, validate_params
 from .._legacy.markit import normalize_cds_type, to_iso_date
-from .._legacy._async.markit import bcds_core
+from .._legacy._async.markit import bcds_core, bcds_indices_core
 
 
 @validate_params
@@ -29,5 +29,21 @@ async def abcds(
         normalize_cds_type(cds_type),
         tier,
         docclause,
+        session_token=session_token,
+    )
+
+
+@validate_params
+async def abcds_indices(
+    date: DateParam | None = None,
+    session_token: str | None = None,
+) -> pd.DataFrame:
+    """Async version of ``bcds_indices``.
+
+    The Markit CDS index term-structure table (CDXEM, iTraxx, etc.) for the
+    date, RangeIndex; None resolves to the most recent date the feed carries.
+    """
+    return await bcds_indices_core(
+        to_iso_date(date) if date is not None else None,
         session_token=session_token,
     )

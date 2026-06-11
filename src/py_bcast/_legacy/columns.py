@@ -136,6 +136,15 @@ STATS_RENAME: dict[str, str | None] = {
     "davl": None,  # drop: sparse FII-only date, meaning unconfirmed
 }
 
+# bunit_price: CalculoPreco daily series for a fixed-income reference symbol
+# (".ANBIMA"/".TRDM"). dat is the DatetimeIndex; last is the unit price (PU),
+# acum the accumulated return since the window start, var the day's change.
+UNIT_PRICE_RENAME: dict[str, str | None] = {
+    "last": "unit_price",
+    "acum": "accumulated_return",
+    "var": "change_pct",
+}
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Group B: AETP binary endpoints — per-endpoint tag-to-name maps
@@ -448,6 +457,88 @@ FILINGS_FIELDS: dict[str, str | None] = {
     "13140": "url",
 }
 
+# bsector_members(sector_id) — every company classified under a B3 sector.
+# Mirrors the bcompany list fields plus the B3 hierarchy of the sector and the
+# reporting period the row reflects. 13824 is the company logo URL (as in the
+# company list); 12088 is the trade name, 13112 the corporate name.
+SECTOR_MEMBERS_FIELDS: dict[str, str] = {
+    "13004": "cvm_code",
+    "12088": "trade_name",
+    "13112": "corporate_name",
+    "13102": "cnpj",
+    "13798": "sector_id",
+    "13702": "sector",
+    "13799": "subsector_id",
+    "13703": "subsector",
+    "13800": "segment_id",
+    "13704": "segment",
+    "13008": "ref_year",
+    "13009": "ref_quarter",
+    "13265": "period_start",
+    "13266": "period_end",
+    "13824": "logo_url",
+}
+
+# bstatement_dates(ticker_or_cvm) — the dates of a company's most recent annual
+# (DFP) and quarterly (ITR) financial statements and when each was disclosed.
+# The response carries a second, duplicate block (13750-13759/14081/14082)
+# splitting individual vs consolidated views whose assignment is not confirmed
+# from the wire, so it is dropped rather than guessed; the kept block is the
+# headline last-statement summary. 13006 is the basis of the latest statement
+# (C=consolidated, I=individual) and 13007 its type (A=annual, T=quarterly).
+STATEMENT_DATES_FIELDS: dict[str, str | None] = {
+    "13740": "annual_period_start",
+    "13741": "annual_period_end",
+    "14079": "annual_disclosed",
+    "13744": "quarter_period_start",
+    "13745": "quarter_period_end",
+    "13747": "quarter",
+    "14080": "quarter_disclosed",
+    "13006": "basis",
+    "13007": "last_type",
+    "14083": "last_disclosed",
+    # Dropped: the duplicate individual/consolidated block and the redundant
+    # year/fiscal-period echoes — kept fields fully describe the last filings.
+    "13742": None,
+    "13743": None,
+    "13746": None,
+    "13748": None,
+    "13749": None,
+    "13825": None,
+    "13781": None,
+    "13750": None,
+    "13751": None,
+    "13752": None,
+    "13753": None,
+    "14081": None,
+    "13754": None,
+    "13755": None,
+    "13756": None,
+    "13757": None,
+    "13758": None,
+    "13759": None,
+    "14082": None,
+}
+
+# bfund_list(query) — the legacy fund universe (autocomplete dump). 305 is the
+# "<id>.ANBIMA" symbol bfund_history/bfund_returns consume; 13103 the bare
+# ANBIMA id, 13102 the CNPJ (zero-padded, kept string), 13174 the ANBIMA class.
+# The alternate codes (13169 "FI<id>", 13158 "C0000<id>") duplicate the id and
+# are dropped; 13154 (administrator) is blank across the dump.
+FUND_LIST_FIELDS: dict[str, str | None] = {
+    "12088": "name",
+    "13112": "legal_name",
+    "13103": "anbima_id",
+    "13102": "cnpj",
+    "305": "symbol",
+    "13174": "anbima_class",
+    "13154": None,  # drop: administrator, blank across the dump
+    "13115": None,  # drop: unconfirmed flag
+    "13169": None,  # drop: "FI<id>" code, redundant with symbol/anbima_id
+    "13158": None,  # drop: "C0000<id>" code, redundant
+    "12069": None,  # drop: blank
+}
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Group C: empty-result schemas (column -> dtype)
@@ -498,6 +589,11 @@ TREASURY_HISTORY_SCHEMA: dict[str, str] = {
     "stddev": "float64",
 }
 ACCRUAL_SCHEMA: dict[str, str] = {"accumulated": "float64"}
+UNIT_PRICE_SCHEMA: dict[str, str] = {
+    "accumulated_return": "float64",
+    "unit_price": "float64",
+    "change_pct": "float64",
+}
 CDI_SCHEMA: dict[str, str] = {
     "accumulated": "float64",
     "close": "float64",
@@ -641,6 +737,9 @@ PORTFOLIO_WITH_SCHEMA: dict[str, str] = {
 }
 SHAREHOLDER_DATES_SCHEMA = _object_schema(SHAREHOLDER_DATES_FIELDS)
 FILINGS_SCHEMA = _object_schema(FILINGS_FIELDS)
+SECTOR_MEMBERS_SCHEMA = _object_schema(SECTOR_MEMBERS_FIELDS)
+STATEMENT_DATES_SCHEMA = _object_schema(STATEMENT_DATES_FIELDS)
+FUND_LIST_SCHEMA = _object_schema(FUND_LIST_FIELDS)
 
 # Single-entity snapshots returned as a one-row DataFrame (RangeIndex)
 QUOTE_SCHEMA = _object_schema(QUOTE_FIELDS)
