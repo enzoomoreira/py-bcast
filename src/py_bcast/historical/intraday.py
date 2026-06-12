@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .._core.dates import default_tick_end, to_date_str, to_datetime_str
+from .._core.dates import default_tick_end, to_date_str, to_utc_datetime_str
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
 from .._legacy.endpoints import SPEC_BDI, SPEC_BDT
 from .._legacy.multi import vectorize
@@ -27,11 +27,10 @@ def bdt(
     precious metals (GOLD, SILVER), energy (WTI), indices (DAX, FTSE, VIX,
     DXY), treasuries (US10Y, US2Y).
 
-    The request window is interpreted in **UTC**, while B3's floor session
-    runs 10:00-17:00 in Brasilia time. So the B3 regular session is
-    13:00-20:00 UTC in ``start``/``end`` and in the returned timestamps. A
-    Brasilia-clock window (e.g. start "...100000") lands in pre-market and
-    returns no rows. International feeds trade ~24h, so any hour works.
+    The request window and the returned timestamps are in **Brasilia time**
+    (America/Sao_Paulo): B3's floor session runs 10:00-17:00, so a window like
+    start "...100000" covers the open. International feeds trade ~24h, so any
+    hour works.
 
     B3 tick history is short and irregular: recent dates return data, older
     dates can come back empty even when the floor traded (use ``bdi`` for
@@ -40,22 +39,22 @@ def bdt(
 
     Args:
         ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "USDBRL"]).
-        start: Start datetime, UTC (str YYYYMMDDHHMMSS, datetime, or Timestamp)
-        end: End datetime, UTC (default: start + 1 hour)
+        start: Start datetime, Brasilia time (str YYYYMMDDHHMMSS, datetime, or
+            Timestamp)
+        end: End datetime, Brasilia time (default: start + 1 hour)
         session_token: BCAA session token
 
     Returns:
-        Flat DataFrame with a DatetimeIndex (from dat+hor) and a ``ticker``
-        column (one block per symbol). Numeric columns: close, size, trades,
-        open_interest, calendar_days, working_days.
+        Flat DataFrame with a tz-aware DatetimeIndex (America/Sao_Paulo) and a
+        ``ticker`` column (one block per symbol). Numeric columns: price, size,
+        trades, open_interest, calendar_days, working_days.
 
     Example:
-        >>> # B3 floor open: 13:00 UTC = 10:00 Brasilia
-        >>> df = bdt("PETR4", "20260601130000", "20260601140000")
-        >>> df["close"].plot()
+        >>> df = bdt("PETR4", "20260601100000", "20260601110000")
+        >>> df["price"].plot()
     """
-    start_str = to_datetime_str(start)
-    end_str = default_tick_end(start_str) if end is None else to_datetime_str(end)
+    start_str = to_utc_datetime_str(start)
+    end_str = default_tick_end(start_str) if end is None else to_utc_datetime_str(end)
     return run_spec(
         SPEC_BDT,
         session_token=session_token,
@@ -83,9 +82,9 @@ def bdi(
         session_token: BCAA session token
 
     Returns:
-        Flat DataFrame with a DatetimeIndex (from dat+hor) and a ``ticker``
-        column (one block per symbol). Numeric columns: open, high, low,
-        close, volume, trades, turnover, open_interest, cum_trades,
+        Flat DataFrame with a tz-aware DatetimeIndex (America/Sao_Paulo) and a
+        ``ticker`` column (one block per symbol). Numeric columns: open, high,
+        low, close, volume, trades, turnover, open_interest, cum_trades,
         session_type.
 
         session_type values:
@@ -121,16 +120,17 @@ def bticks(
     ask_participant; QTE rows carry bid/ask price and size and the
     participant ids of the standing orders.
 
-    Like ``bdt``, the request window is interpreted in **UTC** (B3's regular
-    session is 13:00-20:00 UTC). Retention is short — only the current
-    session returned data in live tests; previous days come back empty.
-    The data is dense (thousands of rows per 10 minutes on liquid names),
-    so keep windows tight.
+    Like ``bdt``, the request window and the returned timestamps are in
+    **Brasilia time** (America/Sao_Paulo). Retention is short — only the
+    current session returned data in live tests; previous days come back
+    empty. The data is dense (thousands of rows per 10 minutes on liquid
+    names), so keep windows tight.
 
     Args:
         ticker: Single symbol or list (e.g., "PETR4" or ["PETR4", "VALE3"]).
-        start: Start datetime, UTC (str YYYYMMDDHHMMSS, datetime, or Timestamp)
-        end: End datetime, UTC (default: start + 1 hour)
+        start: Start datetime, Brasilia time (str YYYYMMDDHHMMSS, datetime, or
+            Timestamp)
+        end: End datetime, Brasilia time (default: start + 1 hour)
         session_token: BCAA session token
 
     Returns:
@@ -140,12 +140,11 @@ def bticks(
         ask_price, ask_size, bid_participant, ask_participant, seq_num.
 
     Example:
-        >>> # 10:00-10:10 Brasilia = 13:00-13:10 UTC
-        >>> df = bticks("PETR4", "20260610130000", "20260610131000")
+        >>> df = bticks("PETR4", "20260610100000", "20260610101000")
         >>> trades = df[df["type"] == "TRD"]
     """
-    start_str = to_datetime_str(start)
-    end_str = default_tick_end(start_str) if end is None else to_datetime_str(end)
+    start_str = to_utc_datetime_str(start)
+    end_str = default_tick_end(start_str) if end is None else to_utc_datetime_str(end)
     return vectorize(
         ticker, lambda t: bticks_core(t, start_str, end_str, session_token)
     )

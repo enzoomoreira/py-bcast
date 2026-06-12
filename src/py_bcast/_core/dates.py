@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import datetime
 from typing import Union
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 # Type alias for any date-like input
 DateLike = Union[str, datetime.date, datetime.datetime, pd.Timestamp]
+
+# The exchange wall-clock timezone the intraday windows are expressed in.
+SAO_PAULO_TZ = ZoneInfo("America/Sao_Paulo")
 
 
 def to_date_str(value: DateLike) -> str:
@@ -88,6 +92,20 @@ def to_datetime_str(value: DateLike) -> str:
             "%Y%m%d%H%M%S"
         )
     raise TypeError(f"Cannot convert {type(value).__name__} to datetime string.")
+
+
+def to_utc_datetime_str(value: DateLike) -> str:
+    """Read a São Paulo wall-clock datetime and return the UTC wire string.
+
+    The intraday endpoints (bdt/bticks) take their window in UTC, but the
+    public API speaks Brasília time: a caller's ``...100000`` means 10:00 in
+    São Paulo. This interprets the value in ``America/Sao_Paulo`` and converts
+    it to the UTC ``YYYYMMDDHHMMSS`` the server expects (Brazil has no DST, so
+    it is a fixed -03:00, but the zone handles historical transitions).
+    """
+    naive = to_datetime_str(value)
+    ts = pd.Timestamp(datetime.datetime.strptime(naive, "%Y%m%d%H%M%S"))
+    return ts.tz_localize(SAO_PAULO_TZ).tz_convert("UTC").strftime("%Y%m%d%H%M%S")
 
 
 def default_end_date() -> str:

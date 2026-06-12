@@ -153,6 +153,7 @@ async def _run_single(
         schema=spec.schema,
         date_col=spec.date_col,
         time_col=spec.time_col,
+        index_tz=spec.index_tz,
     )
 
 

@@ -74,3 +74,7 @@ class EndpointSpec:
     # Datetime index column names (DATETIME / DATETIME_TIME policies).
     date_col: str = "dat"
     time_col: str | None = None
+    # When set, the (UTC) datetime index is localized to UTC and converted to
+    # this IANA timezone (e.g. "America/Sao_Paulo" for the intraday endpoints,
+    # whose wire timestamps are UTC). None -> naive index.
+    index_tz: str | None = None

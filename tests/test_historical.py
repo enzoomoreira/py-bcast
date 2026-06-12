@@ -82,9 +82,11 @@ class TestBdt:
         df = bdt("USDBRL", "20260519100000", "20260519101000")
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 1
-        assert "close" in df.columns
+        assert "price" in df.columns
         assert "ticker" in df.columns
         assert df["ticker"].iloc[0] == "USDBRL"
+        # window and index are Brasilia time (tz-aware)
+        assert str(df.index.tz) == "America/Sao_Paulo"
 
     def test_multiple(self):
         df = bdt(["USDBRL", "EURUSD"], "20260519100000", "20260519101000")

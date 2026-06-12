@@ -149,6 +149,10 @@ UNIT_PRICE_RENAME: dict[str, str | None] = {
     "var": "change_pct",
 }
 
+# bdt: HistoricoTick is trade-level, so its `last` is the trade price -> price
+# (matching bticks/btrades), not a bar close. bdi keeps `close` (it is a bar).
+TICK_RENAME: dict[str, str | None] = {**CONTENT_PROXY_RENAME, "last": "price"}
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Group B: AETP binary endpoints — per-endpoint tag-to-name maps
@@ -623,7 +627,7 @@ INTRADAY_BAR_SCHEMA: dict[str, str] = {  # bdi
     "session_type": "float64",
 }
 TICK_SCHEMA: dict[str, str] = {  # bdt
-    "close": "float64",
+    "price": "float64",
     "size": "float64",
     "trades": "float64",
     "open_interest": "float64",

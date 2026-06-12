@@ -10,7 +10,7 @@ from .._core.dates import (
     default_end_date,
     default_tick_end,
     to_date_str,
-    to_datetime_str,
+    to_utc_datetime_str,
 )
 from .._core.validation import DateParam, DateTimeParam, TickerList, validate_params
 from .._legacy._async.executor import run_spec as arun_spec
@@ -74,11 +74,12 @@ async def abdt(
 ) -> pd.DataFrame:
     """Async version of ``bdt``. Fetch tick-by-tick data.
 
-    Flat DataFrame with a DatetimeIndex (from dat+hor) and a ``ticker`` column
-    (one block per symbol).
+    Window and output are in Brasilia time; flat DataFrame with a tz-aware
+    DatetimeIndex (America/Sao_Paulo) and a ``ticker`` column (one block per
+    symbol). Trade price is the ``price`` column.
     """
-    start_str = to_datetime_str(start)
-    end_str = default_tick_end(start_str) if end is None else to_datetime_str(end)
+    start_str = to_utc_datetime_str(start)
+    end_str = default_tick_end(start_str) if end is None else to_utc_datetime_str(end)
     return await arun_spec(
         SPEC_BDT,
         session_token=session_token,
@@ -96,8 +97,8 @@ async def abdi(
 ) -> pd.DataFrame:
     """Async version of ``bdi``. Fetch intraday bars.
 
-    Flat DataFrame with a DatetimeIndex (from dat+hor) and a ``ticker`` column
-    (one block per symbol).
+    Flat DataFrame with a tz-aware DatetimeIndex (America/Sao_Paulo) and a
+    ``ticker`` column (one block per symbol).
     """
     return await arun_spec(
         SPEC_BDI,
@@ -117,11 +118,11 @@ async def abticks(
     """Async version of ``bticks``. Times-and-trades with top-of-book quotes.
 
     Flat DataFrame indexed by the exchange timestamp (America/Sao_Paulo)
-    with a ``ticker`` column; the request window is interpreted in UTC and
+    with a ``ticker`` column; the request window is in Brasilia time and
     retention covers only the current session.
     """
-    start_str = to_datetime_str(start)
-    end_str = default_tick_end(start_str) if end is None else to_datetime_str(end)
+    start_str = to_utc_datetime_str(start)
+    end_str = default_tick_end(start_str) if end is None else to_utc_datetime_str(end)
     return await vectorize_async(
         ticker, lambda t: bticks_core(t, start_str, end_str, session_token)
     )

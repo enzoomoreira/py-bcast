@@ -237,6 +237,7 @@ def finalize_frame(
     date_col: str = "dat",
     time_col: str | None = None,
     ticker: str | None = None,
+    index_tz: str | None = None,
 ) -> pd.DataFrame:
     """Build a typed DataFrame from raw rows under one index policy.
 
@@ -259,6 +260,8 @@ def finalize_frame(
         date_col: Date column name for the datetime policies (default "dat").
         time_col: Time column name for ``DATETIME_TIME``.
         ticker: For ``RECORD`` only: inserted as ``ticker`` if absent.
+        index_tz: For the datetime policies, localize the (UTC) index to UTC
+            and convert it to this IANA timezone (e.g. "America/Sao_Paulo").
 
     Returns:
         A typed DataFrame following the requested index policy.
@@ -274,7 +277,7 @@ def finalize_frame(
             return pd.DataFrame()
         empty = _empty_frame(schema)
         if index in (Index.DATETIME, Index.DATETIME_TIME):
-            empty.index = pd.DatetimeIndex([])
+            empty.index = pd.DatetimeIndex([], tz=index_tz)
         return empty
 
     df = pd.DataFrame(rows)
@@ -288,6 +291,9 @@ def finalize_frame(
     df = _apply_rename(df, rename)
     df = _strip_bvmf_suffix(df)
     df = _coerce_date_columns(df)
+
+    if index_tz is not None and isinstance(df.index, pd.DatetimeIndex):
+        df.index = df.index.tz_localize("UTC").tz_convert(index_tz)
 
     if index is Index.RECORD and ticker is not None and "ticker" not in df.columns:
         df.insert(0, "ticker", ticker)
