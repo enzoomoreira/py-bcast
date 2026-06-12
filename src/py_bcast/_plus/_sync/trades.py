@@ -13,8 +13,10 @@ logger = get_logger(__name__)
 _ENDPOINT = "/stock/v1/timesAndTrades"
 
 # Flat schema (column order) for the times & trades frame. ``ticker`` leads so
-# results from several symbols stack cleanly; exchange ids and ``is_trade`` are
-# non-numeric.
+# results from several symbols stack cleanly. The bid/ask ``exchangeId`` field
+# is, in the B3 book, the id of the BROKER on each side (verified against the
+# broker registry — every value resolves there), so it is surfaced as
+# ``ask_broker_id``/``bid_broker_id`` and joins with ``bbrokers()``.
 _TRADE_COLUMNS = [
     "ticker",
     "price",
@@ -24,10 +26,10 @@ _TRADE_COLUMNS = [
     "is_trade",
     "ask_price",
     "ask_size",
-    "ask_exchange_id",
+    "ask_broker_id",
     "bid_price",
     "bid_size",
-    "bid_exchange_id",
+    "bid_broker_id",
 ]
 
 
@@ -71,10 +73,10 @@ def trades_core(ticker: str, date_str: str) -> pd.DataFrame:
                 "is_trade": row.get("isTrade", True),
                 "ask_price": ask.get("price"),
                 "ask_size": ask.get("size"),
-                "ask_exchange_id": ask.get("exchangeId"),
+                "ask_broker_id": ask.get("exchangeId"),
                 "bid_price": bid.get("price"),
                 "bid_size": bid.get("size"),
-                "bid_exchange_id": bid.get("exchangeId"),
+                "bid_broker_id": bid.get("exchangeId"),
             }
         )
 
@@ -86,12 +88,15 @@ def trades_core(ticker: str, date_str: str) -> pd.DataFrame:
     ).dt.tz_convert("America/Sao_Paulo")
     df.index.name = None
 
-    # Coerce numeric columns. is_trade is bool; exchange IDs are venue codes
-    # (identifiers, not quantities), so they stay strings.
-    _non_numeric = {"is_trade", "ask_exchange_id", "bid_exchange_id"}
+    # Coerce numeric columns. is_trade is bool; the broker ids are categorical
+    # integer identifiers surfaced as nullable Int64 (so they join cleanly with
+    # ``bbrokers()`` and never render as 114.0); the rest are float quantities.
+    _broker_id = {"ask_broker_id", "bid_broker_id"}
     for col in df.columns:
-        if col not in _non_numeric:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+        if col == "is_trade":
+            continue
+        coerced = pd.to_numeric(df[col], errors="coerce")
+        df[col] = coerced.astype("Int64") if col in _broker_id else coerced
 
     # Tag with the queried symbol (after numeric coercion so it stays a string).
     df.insert(0, "ticker", ticker)

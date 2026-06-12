@@ -18,13 +18,14 @@ class TestBtrades:
         df = btrades("PETR4", default_end_date())
         assert isinstance(df, pd.DataFrame)
 
-    def test_exchange_id_columns(self):
-        # B8: the bid/ask exchangeId is retained as a string venue code
-        # (an identifier, not a quantity, so it is not coerced to numeric).
+    def test_broker_id_columns(self):
+        # The bid/ask exchangeId field is, in the B3 book, the broker on each
+        # side; surfaced as ask_broker_id/bid_broker_id (nullable Int64 so the
+        # frame joins with bbrokers() on broker id).
         df = btrades("PETR4", default_end_date())
         if df.empty:
             pytest.skip("no trades available for the date")
-        assert "ask_exchange_id" in df.columns
-        assert "bid_exchange_id" in df.columns
-        # Kept as a string identifier, never coerced to a numeric quantity.
-        assert not pd.api.types.is_numeric_dtype(df["ask_exchange_id"])
+        assert "ask_broker_id" in df.columns
+        assert "bid_broker_id" in df.columns
+        assert df["ask_broker_id"].dtype == "Int64"
+        assert df["bid_broker_id"].dtype == "Int64"

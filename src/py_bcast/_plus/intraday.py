@@ -38,10 +38,10 @@ def btrades(
             is_trade    — True for actual trades (vs quotes)
             ask_price       — best ask at trade time
             ask_size        — ask quantity
-            ask_exchange_id — venue code for the ask (string identifier)
+            ask_broker_id   — broker on the ask side (Int64; joins with bbrokers)
             bid_price       — best bid at trade time
             bid_size        — bid quantity
-            bid_exchange_id — venue code for the bid (string identifier)
+            bid_broker_id   — broker on the bid side (Int64; joins with bbrokers)
         Empty DataFrame (same columns + tz-aware index) if no trades found.
 
     Raises:

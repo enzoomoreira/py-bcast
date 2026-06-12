@@ -13,6 +13,8 @@ import pandas as pd
 
 from .._core.validation import Ticker, TickerList, validate_params
 from ._sync.reference import (
+    brokers_core,
+    exchanges_core,
     holiday_tables_core,
     index_list_core,
     index_members_core,
@@ -90,6 +92,48 @@ def bholidays() -> pd.DataFrame:
         >>> bholidays()[bholidays()["name"] == "Brasil"]
     """
     return holiday_tables_core()
+
+
+def bbrokers() -> pd.DataFrame:
+    """List the broker registry (id -> short name) via Broadcast+.
+
+    The ids are the same id space as the ``ask_broker_id``/``bid_broker_id``
+    columns of ``btrades`` (the broker on each side of the book), so the two
+    frames join on broker id.
+
+    Requires Broadcast+ backend (see ``binfo``).
+
+    Returns:
+        Flat DataFrame with columns: id (Int64 broker id), name (short name,
+        e.g. "XP", "BTG PACTUAL").
+
+    Example:
+        >>> from py_bcast import bbrokers, btrades, configure
+        >>> configure(terminal="plus")
+        >>> trades = btrades("PETR4", "20260611")
+        >>> trades.merge(bbrokers(), left_on="ask_broker_id", right_on="id")
+    """
+    return brokers_core()
+
+
+def bexchanges() -> pd.DataFrame:
+    """List the exchange registry (id, name, delay) via Broadcast+.
+
+    The ids decode ``binfo``'s ``exchange_id`` column; ``delay`` is the data
+    delay in minutes for that venue (0 = real-time).
+
+    Requires Broadcast+ backend (see ``binfo``).
+
+    Returns:
+        Flat DataFrame with columns: id (Int64 exchange id), name (e.g.
+        "Bovespa", "Nasdaq"), delay (Int64 minutes).
+
+    Example:
+        >>> from py_bcast import bexchanges, configure
+        >>> configure(terminal="plus")
+        >>> bexchanges()[bexchanges()["delay"] == 0]  # real-time venues
+    """
+    return exchanges_core()
 
 
 @validate_params

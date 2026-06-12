@@ -176,3 +176,56 @@ def logo_core(symbol: str) -> bytes:
         raise NotFoundError(symbol, kind="logo")
 
     return r.content
+
+
+# ── bbrokers — broker registry ───────────────────────────────────────────────
+
+# The id/name registry of brokerage houses. The ids are the same space as the
+# ``ask_broker_id``/``bid_broker_id`` columns of ``btrades`` (the broker on each
+# side of the book), so the two frames join on broker id.
+_BROKER_COLUMNS = ["id", "name"]
+
+
+def brokers_core() -> pd.DataFrame:
+    """Fetch the broker registry (id -> short name)."""
+    logger.debug("bbrokers")
+    r = plus_request("get", "/stock/v1/brokerages")
+
+    rows = r.json()
+    rows = rows if isinstance(rows, list) else []
+    if not rows:
+        return pd.DataFrame({col: pd.Series(dtype="object") for col in _BROKER_COLUMNS})
+
+    records = [{"id": b.get("id"), "name": b.get("shortName", "")} for b in rows]
+    df = pd.DataFrame(records, columns=_BROKER_COLUMNS)
+    df["id"] = pd.to_numeric(df["id"], errors="coerce").astype("Int64")
+    return df
+
+
+# ── bexchanges — exchange registry ───────────────────────────────────────────
+
+# The id/name/delay registry of exchanges. ``delay`` is the data delay in
+# minutes (0 = real-time). The ids decode ``binfo``'s ``exchange_id`` column.
+_EXCHANGE_COLUMNS = ["id", "name", "delay"]
+
+
+def exchanges_core() -> pd.DataFrame:
+    """Fetch the exchange registry (id, name, delay in minutes)."""
+    logger.debug("bexchanges")
+    r = plus_request("get", "/stock/v1/exchanges")
+
+    rows = r.json()
+    rows = rows if isinstance(rows, list) else []
+    if not rows:
+        return pd.DataFrame(
+            {col: pd.Series(dtype="object") for col in _EXCHANGE_COLUMNS}
+        )
+
+    records = [
+        {"id": e.get("id"), "name": e.get("name", ""), "delay": e.get("delay")}
+        for e in rows
+    ]
+    df = pd.DataFrame(records, columns=_EXCHANGE_COLUMNS)
+    df["id"] = pd.to_numeric(df["id"], errors="coerce").astype("Int64")
+    df["delay"] = pd.to_numeric(df["delay"], errors="coerce").astype("Int64")
+    return df

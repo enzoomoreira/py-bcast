@@ -11,6 +11,8 @@ from .._plus._async.corporate import corpevents_core
 from .._plus._async.funds import fund_core, funds_core
 from .._plus._async.news import content_core, headlines_core, sections_core
 from .._plus._async.reference import (
+    brokers_core,
+    exchanges_core,
     holiday_tables_core,
     index_list_core,
     index_members_core,
@@ -52,6 +54,24 @@ async def abindex_members(index: Ticker) -> pd.DataFrame:
     Raises NotFoundError if the index code does not exist.
     """
     return await index_members_core(index)
+
+
+async def abbrokers() -> pd.DataFrame:
+    """Async version of ``bbrokers``. Broker registry via Broadcast+.
+
+    DataFrame with columns id, name. The id space matches ``btrades``'
+    ask_broker_id/bid_broker_id.
+    """
+    return await brokers_core()
+
+
+async def abexchanges() -> pd.DataFrame:
+    """Async version of ``bexchanges``. Exchange registry via Broadcast+.
+
+    DataFrame with columns id, name, delay (minutes). The id decodes ``binfo``'s
+    exchange_id column.
+    """
+    return await exchanges_core()
 
 
 @validate_params

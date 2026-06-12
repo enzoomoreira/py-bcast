@@ -40,7 +40,7 @@ Catalogo completo de todos os endpoints REST e WebSocket descobertos via scan de
 | Endpoint | Metodo | Status | Body / Params | Descricao |
 |---|---|---|---|---|
 | `/stock/v1/quote/symbol` | POST | **Implementado** (`binfo`) | `{"Symbols": ["PETR4"]}` | Metadata de instrumento: nome, tipo, exchange, flags — **nunca retorna preco, preco via WS** |
-| `/stock/v1/timesAndTrades` | POST | **Implementado** (`btrades`) | `{"Symbol": "PETR4", "Date": "20260526"}` | Times & Trades intraday (max 500/chamada) |
+| `/stock/v1/timesAndTrades` | POST | **Implementado** (`btrades`) | `{"Symbol": "PETR4", "Date": "20260526"}` | Times & Trades intraday (max 500/chamada). O campo `ask.exchangeId`/`bid.exchangeId` e, no book da B3, o id da **corretora** de cada ponta (todos os valores resolvem no registro de corretoras), exposto como `ask_broker_id`/`bid_broker_id` (Int64, faz join com `bbrokers`) |
 | `/stock/v1/logo/{symbol}` | GET | **Implementado** (`blogo`) | `?v=7.4.4&width=48&maxHeight=48&crop=true` | Logo PNG do instrumento (2-4KB) |
 
 ### 2.2 Eventos Corporativos
@@ -54,10 +54,10 @@ Catalogo completo de todos os endpoints REST e WebSocket descobertos via scan de
 | Endpoint | Metodo | Status | Descricao |
 |---|---|---|---|
 | `/stock/v1/fields` | GET | Confirmado (83KB) | Todos os campos com nome, tipo, descricao |
-| `/stock/v1/markets` | GET | Confirmado | Tipos de mercado (A Vista, Futuro, etc.) |
-| `/stock/v1/exchanges` | GET | Confirmado | Bolsas com delay em minutos |
-| `/stock/v1/instrumentTypes` | GET | Confirmado | Tipos de instrumento (Acao, Fundo, RF, etc.) |
-| `/stock/v1/brokerages` | GET | Confirmado | Lista de corretoras |
+| `/stock/v1/markets` | GET | Confirmado | Tipos de mercado (A Vista, Futuro, etc.) — redundante com a coluna `market` de `binfo` |
+| `/stock/v1/exchanges` | GET | **Implementado** (`bexchanges`) | Bolsas (id, nome, delay em minutos); decodifica `exchange_id` de `binfo` |
+| `/stock/v1/instrumentTypes` | GET | Confirmado | Tipos de instrumento (Acao, Fundo, RF, etc.) — redundante com a coluna `type` de `binfo` |
+| `/stock/v1/brokerages` | GET | **Implementado** (`bbrokers`) | Registro de corretoras (id, nome); decodifica `ask_broker_id`/`bid_broker_id` de `btrades` |
 | `/stock/v1/indexes` | GET | **Implementado** (`bindexes`) | Codigos de todos os indices disponiveis |
 | `/stock/v1/indexes/{index}` | GET | **Implementado** (`bindex_members`) | Composicao de indice com pesos de relevancia |
 | `/stock/v1/datetime` | GET | Confirmado | Timestamp Unix do servidor |
@@ -225,6 +225,8 @@ Cada funcao da lib precisa de adapter dedicado para o backend Plus.
 |---|---|---|
 | `GET /stock/v1/indexes/{index}` | `bindex_members` | Composicao de indice com pesos de relevancia (IBOV: 79 membros, IFIX: 107) |
 | `GET /stock/v1/logo/{symbol}` | `blogo` | Logo PNG do instrumento (2-4KB) |
+| `GET /stock/v1/brokerages` | `bbrokers` | Registro de corretoras (84 corretoras); decodifica os ids de ponta de `btrades` |
+| `GET /stock/v1/exchanges` | `bexchanges` | Registro de bolsas (46 bolsas) com delay por praca; decodifica `exchange_id` de `binfo` |
 | `POST /funds/v1/search` | `bfunds` | Busca de fundos por nome (min. 3 chars) |
 | `GET /funds/v1/{id}` | `bfund` | Detalhe de fundo — rentabilidade, taxas, CNPJ, ANBIMA |
 | WS `startStreamMarket` | `subscribe_market` | Tabelas ao vivo da Bovespa (maiores altas/baixas, volume, Ibovespa) |

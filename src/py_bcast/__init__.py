@@ -11,7 +11,7 @@ A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - Broker portfolios (bportfolio, bportfolios_with)
 - News and multimedia (bnews, bnews_recent, bnews_multimedia)
 - Credit: CDS term-structure curves via Markit (bcds)
-- Broadcast+ reference: instrument metadata, index composition, logos (binfo, bindex_members, bindexes, blogo)
+- Broadcast+ reference: instrument metadata, index composition, logos, broker and exchange registries (binfo, bindex_members, bindexes, blogo, bbrokers, bexchanges)
 - Broadcast+ funds: investment-fund search and detail (bfunds, bfund)
 - Broadcast+ news: sections, headlines, article content with tagging (bsections, bheadlines, bnews_content)
 - Broadcast+ corporate events with adjustment factors (bcorpevents)
@@ -53,7 +53,15 @@ from .realtime import BroadcastClient, bdp
 from ._plus.realtime import BroadcastPlusClient
 from ._plus.realtime_async import BroadcastPlusAsyncClient
 from ._plus.intraday import btrades
-from ._plus.reference import binfo, bindex_members, blogo, bindexes, bholidays
+from ._plus.reference import (
+    binfo,
+    bindex_members,
+    bbrokers,
+    bexchanges,
+    blogo,
+    bindexes,
+    bholidays,
+)
 from ._plus.funds import bfunds, bfund
 from ._plus.news import bsections, bheadlines, bnews_content
 from ._plus.corporate import bcorpevents
@@ -133,6 +141,8 @@ __all__ = [
     "btrades",
     "binfo",
     "bindex_members",
+    "bbrokers",
+    "bexchanges",
     "bindexes",
     "blogo",
     "bfunds",
