@@ -4,13 +4,13 @@ py_bcast — Python client for AE Broadcast market data.
 A professional, blpapi-like interface for Agência Estado's Broadcast terminal:
 - Real-time streaming via DDE (bdp — one or many tickers)
 - Historical data via HTTP (bhistory, bclose, bdt, bdi, bticks, bfirst_close)
-- Macroeconomic series (bmacro, breturn, bvolume, binflation)
-- Fundamental data (bconsensus, bindicators, bcompany)
+- Macroeconomic series (bmacro, breturn, bvolume, binflation, binflation_history)
+- Fundamental data (bconsensus, bindicators, bcompany, bstatement_dates)
 - Corporate events (bcalendar, bdividends, bdy)
-- Reference data (bindices, bsectors, bquote, btickers, bshares)
+- Reference data (bindices, bsectors, bsector_members, bquote, btickers, bshares)
 - Broker portfolios (bportfolio, bportfolios_with)
 - News and multimedia (bnews, bnews_recent, bnews_multimedia)
-- Credit: CDS term-structure curves via Markit (bcds)
+- Credit: CDS term-structure curves and indices via Markit (bcds, bcds_indices)
 - Broadcast+ reference: instrument metadata, index composition, logos, broker and exchange registries (binfo, bindex_members, bindexes, blogo, bbrokers, bexchanges)
 - Broadcast+ funds: investment-fund search and detail (bfunds, bfund)
 - Broadcast+ news: sections, headlines, article content with tagging (bsections, bheadlines, bnews_content)
@@ -233,4 +233,4 @@ __all__ = [
     "async_api",
 ]
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"

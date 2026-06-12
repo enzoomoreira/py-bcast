@@ -7,6 +7,37 @@ Mapeamento cruzado de funcionalidades entre os dois backends. Mostra o que cada 
 
 ---
 
+## Renames e Removals — 0.8.0 (2026-06-12)
+
+Esta versao e **BREAKING** sem shims ou aliases de transicao. Foco: padronizacao de outputs (nomes de coluna, dtypes de data, timezone) para integracao limpa com o ecossistema pandas / matplotlib / mplfinance.
+
+| Antes (0.7.x) | Depois (0.8.0) | Notas |
+|---|---|---|
+| `bdt` coluna `close` (preco de negociacao) | `price` | Preco de trade unificado para `price` (alinha com `bticks`/`btrades`); `bdi` mantem `close` (e fechamento de barra) |
+| `btrades` coluna `last` (Plus) | `price` | Mesmo nome unificado no backend Plus |
+| `btrades` colunas `ask_exchange_id`/`bid_exchange_id` (string, Plus) | `ask_broker_id`/`bid_broker_id` (Int64) | O campo `exchangeId` do book e, na B3, o id da corretora de cada ponta; agora faz join com `bbrokers()` |
+| `bindex_members` coluna `symbol` (Plus) | `ticker` | Padronizacao do nome de instrumento |
+| `bindexes` coluna `index` (Plus) | `code` | Igual ao nome de coluna do legacy `bindices` |
+| `binflation` coluna `symbol` | `ticker` | Padronizacao do nome de instrumento |
+| `bdt`/`bdi` index naive | `DatetimeIndex` tz-aware `America/Sao_Paulo` | Saida tz-aware; `bdt` interpreta a janela de entrada como horario de Brasilia |
+| Colunas de data como `float64`/`object` (`*_date`, `*_disclosed`, `period_*`, `expiration_date`, ...) | `datetime64[ns]` | Coercao de data centralizada em `finalize_frame` (16 funcoes) |
+
+### Novas funcoes (aditivas)
+
+| Funcao | Backend | Descricao |
+|---|---|---|
+| `bsector_members(sector_id)` | Legacy | Empresas classificadas sob um setor da B3 (EmpresasPorSetores) |
+| `bstatement_dates(ticker_or_cvm)` | Legacy | Datas dos ultimos demonstrativos anual (DFP) e trimestral (ITR) |
+| `bunit_price(symbol, start, end)` | Legacy | Serie de preco unitario (PU) + retorno acumulado de RF (CalculoPreco) |
+| `binflation_history(symbol, start, end)` | Legacy | Serie acumulada de indice de inflacao (CalculoInflacao) |
+| `bfund_list(query)` | Legacy | Universo de fundos via autocomplete, filtrado por nome (binary) |
+| `bcds_indices(date=None)` | Legacy | Indices de CDS Markit na data mais recente |
+| `bbrokers()` | Plus | Registro de corretoras (id, name); decodifica os broker ids de `btrades` |
+| `bexchanges()` | Plus | Registro de bolsas (id, name, delay em minutos); decodifica `exchange_id` de `binfo` |
+| `df.bcast.ohlc()` | accessor | View OHLCV capitalizada (Open/High/Low/Close/Volume) para mplfinance |
+
+---
+
 ## Renames e Removals — 0.7.0 (2026-06-10)
 
 Esta versao e **BREAKING** sem shims ou aliases de transicao:
@@ -71,6 +102,8 @@ Endpoints que nao tem equivalente no Terminal Antigo:
 |---|---|---|
 | `GET /stock/v1/indexes/{index}` | `bindex_members(index)` | Composicao de indice com pesos de relevancia (IBOV: 79 membros, IFIX: 107) |
 | `GET /stock/v1/logo/{symbol}` | `blogo(symbol)` | Logo PNG do instrumento (2-4KB) |
+| `GET /stock/v1/brokerages` | `bbrokers()` | Registro de corretoras (84 corretoras); decodifica `ask_broker_id`/`bid_broker_id` de `btrades` |
+| `GET /stock/v1/exchanges` | `bexchanges()` | Registro de bolsas (46 bolsas) com delay por praca; decodifica `exchange_id` de `binfo` |
 | `POST /funds/v1/search` | `bfunds(query)` | Busca de fundos por nome (min. 3 chars) — rentabilidade, taxas, CNPJ, ANBIMA |
 | `GET /funds/v1/{id}` | `bfund(fund_id)` | Detalhe de fundo por id numerico |
 | `GET /news/v1/sections` | `bsections()` | Catalogo de 121 secoes de noticias |

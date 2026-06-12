@@ -25,9 +25,10 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 - **Real-time streaming** via WebSocket (`BroadcastPlusClient` / asyncio `BroadcastPlusAsyncClient`) com auth refresh transparente
 - **Market stats streaming** — `subscribe_market` transmite tabelas ao vivo da Bovespa: maiores altas/baixas, volume financeiro, evolucao do Ibovespa
 - **Instrument metadata** (`binfo`) — nome, tipo, exchange, flags, CVM code; nunca retorna preco (preco exclusivo via WebSocket)
-- **Times & trades** (`btrades`) — ultimos 500 trades em fuso `America/Sao_Paulo`
+- **Times & trades** (`btrades`) — ultimos 500 trades em fuso `America/Sao_Paulo`; `ask_broker_id`/`bid_broker_id` fazem join com `bbrokers()`
 - **Index composition** (`bindexes` + `bindex_members`) — lista de indices e composicao com pesos de relevancia; sem equivalente no terminal antigo
 - **Instrument logo** (`blogo`) — bytes PNG do logo; sem equivalente no terminal antigo
+- **Broker & exchange registries** (`bbrokers` + `bexchanges`) — corretoras (id, nome) e bolsas (id, nome, delay); decodificam os ids de `btrades` e `binfo`
 - **Corporate events with adjustment factors** (`bcorpevents`) — dividendos, JCP, splits + `add_factor`, `calculated_factor`, `multiplicative_factor` que o `bdividends` legado nao expoe
 - **Investment funds** (`bfunds` / `bfund`) — busca e detalhe: rentabilidade, taxas, CNPJ, ANBIMA; sem equivalente no terminal antigo
 - **News (Plus feed)** (`bsections` + `bheadlines` + `bnews_content`) — 121 secoes, manchetes paginadas, corpo HTML + tagging estruturado (autores, entidades, topicos, localizacoes)
@@ -107,6 +108,7 @@ with BroadcastClient() as bc:
 from py_bcast import (
     BroadcastPlusClient,
     binfo, bindexes, bindex_members, blogo,
+    bbrokers, bexchanges,
     bfunds, bfund,
     bsections, bheadlines, bnews_content,
     bcorpevents, bholidays,
@@ -257,7 +259,7 @@ src/py_bcast/
 │   ├── http.py         # Plus httpx client singletons (sync + async) + auth headers
 │   ├── realtime.py     # BroadcastPlusClient (WebSocket /stock/ws) — quotes + market stats
 │   ├── intraday.py     # btrades() facade — POST /stock/v1/timesAndTrades
-│   ├── reference.py    # binfo, bindexes, bindex_members, blogo, bholidays
+│   ├── reference.py    # binfo, bindexes, bindex_members, blogo, bholidays, bbrokers, bexchanges
 │   ├── funds.py        # bfunds, bfund — POST /funds/v1/search, GET /funds/v1/{id}
 │   ├── news.py         # bsections, bheadlines, bnews_content
 │   ├── corporate.py    # bcorpevents — POST /stock/v1/corporateevents/{symbol}
