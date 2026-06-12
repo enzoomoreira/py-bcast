@@ -16,7 +16,7 @@ _ENDPOINT = "/stock/v1/timesAndTrades"
 # non-numeric.
 _TRADE_COLUMNS = [
     "ticker",
-    "last",
+    "price",
     "size",
     "tendency",
     "sequence",
@@ -63,7 +63,7 @@ async def trades_core(ticker: str, date_str: str) -> pd.DataFrame:
         records.append(
             {
                 "unix_time_ms": row.get("unixTime"),
-                "last": row.get("last"),
+                "price": row.get("last"),
                 "size": row.get("size"),
                 "tendency": row.get("tendency"),
                 "sequence": row.get("sequence"),

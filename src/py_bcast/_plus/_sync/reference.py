@@ -95,7 +95,7 @@ def info_core(symbols: list[str]) -> pd.DataFrame:
 
 # ── bindex_members — index composition ───────────────────────────────────────
 
-_INDEX_COLUMNS = ["index", "symbol", "relevance"]
+_INDEX_COLUMNS = ["index", "ticker", "relevance"]
 
 
 def index_members_core(index: str) -> pd.DataFrame:
@@ -115,7 +115,7 @@ def index_members_core(index: str) -> pd.DataFrame:
         return pd.DataFrame({col: pd.Series(dtype="object") for col in _INDEX_COLUMNS})
 
     records = [
-        {"index": index, "symbol": m.get("symbol", ""), "relevance": m.get("relevance")}
+        {"index": index, "ticker": m.get("symbol", ""), "relevance": m.get("relevance")}
         for m in members
     ]
     df = pd.DataFrame(records, columns=_INDEX_COLUMNS)
@@ -132,7 +132,7 @@ def index_list_core() -> pd.DataFrame:
     r = plus_request("get", "/stock/v1/indexes")
     codes = r.json()
     codes = [c for c in codes if isinstance(c, str)] if isinstance(codes, list) else []
-    return pd.DataFrame({"index": pd.Series(codes, dtype="object")})
+    return pd.DataFrame({"code": pd.Series(codes, dtype="object")})
 
 
 # ── bholidays — holiday-table catalog ────────────────────────────────────────

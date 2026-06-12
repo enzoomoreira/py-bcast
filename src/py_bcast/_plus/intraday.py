@@ -31,7 +31,7 @@ def btrades(
     Returns:
         DataFrame with DatetimeIndex (America/Sao_Paulo timezone) and columns:
             ticker      — instrument code (the queried symbol)
-            last        — trade price
+            price       — trade price
             size        — trade quantity
             tendency    — price tendency (0 = unchanged, 1 = up, -1 = down)
             sequence    — server sequence number
@@ -52,6 +52,6 @@ def btrades(
         >>> from py_bcast import btrades, configure
         >>> configure(terminal="plus")
         >>> df = btrades("PETR4", "20260525")
-        >>> print(df[["last", "size"]].head())
+        >>> print(df[["price", "size"]].head())
     """
     return trades_core(ticker, to_date_str(date))

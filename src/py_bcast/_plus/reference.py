@@ -61,13 +61,13 @@ def bindexes() -> pd.DataFrame:
     Requires Broadcast+ backend (see ``binfo``).
 
     Returns:
-        Single-column DataFrame ``index`` with the available codes (IBOV, IFIX,
-        SMLL, etc.).
+        Single-column DataFrame ``code`` with the available index codes (IBOV,
+        IFIX, SMLL, etc.), matching the legacy ``bindices`` column name.
 
     Example:
         >>> from py_bcast import bindexes, configure
         >>> configure(terminal="plus")
-        >>> bindexes()["index"].tolist()
+        >>> bindexes()["code"].tolist()
     """
     return index_list_core()
 
@@ -106,8 +106,8 @@ def bindex_members(index: Ticker) -> pd.DataFrame:
             index list for valid codes.
 
     Returns:
-        Flat DataFrame with columns: index (the queried code), symbol, relevance.
-        One row per member.
+        Flat DataFrame with columns: index (the queried code), ticker (the
+        member symbol), relevance. One row per member.
 
     Raises:
         NotFoundError: If the index code does not exist.

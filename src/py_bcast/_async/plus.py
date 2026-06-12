@@ -48,7 +48,7 @@ async def abinfo(symbols: TickerList) -> pd.DataFrame:
 async def abindex_members(index: Ticker) -> pd.DataFrame:
     """Async version of ``bindex_members``. Index composition via Broadcast+.
 
-    DataFrame with columns index, symbol, relevance (one row per member).
+    DataFrame with columns index, ticker, relevance (one row per member).
     Raises NotFoundError if the index code does not exist.
     """
     return await index_members_core(index)
