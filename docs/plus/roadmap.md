@@ -20,6 +20,8 @@ Ver [`limitations.md`](./limitations.md) para blockers conhecidos.
 | `bindex_members(index)` | `_plus/reference.py` | `GET /stock/v1/indexes/{index}` — composicao com pesos |
 | `blogo(symbol)` | `_plus/reference.py` | `GET /stock/v1/logo/{symbol}` — bytes PNG do logo |
 | `bholidays()` | `_plus/reference.py` | `GET /stock/v1/calendar/tables` — catalogo de tabelas de feriados |
+| `bbrokers()` | `_plus/reference.py` | `GET /stock/v1/brokerages` — registro de corretoras (decodifica `ask_broker_id`/`bid_broker_id` de `btrades`) |
+| `bexchanges()` | `_plus/reference.py` | `GET /stock/v1/exchanges` — registro de bolsas (decodifica `exchange_id` de `binfo`) |
 | `bfunds(query)` | `_plus/funds.py` | `POST /funds/v1/search` — busca de fundos (min. 3 chars) |
 | `bfund(id)` | `_plus/funds.py` | `GET /funds/v1/{id}` — detalhe de fundo por id numerico |
 | `bsections()` | `_plus/news.py` | `GET /news/v1/sections` — 121 secoes de noticias |

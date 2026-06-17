@@ -269,6 +269,19 @@ print(df[["close", "return_3m", "return_6m", "return_12m", "return_ytd"]])
 
 ---
 
+### `binflation_history(symbol, start_date, end_date)`
+
+Accumulated-inflation **time series** for one or more inflation indices (vs. `binflation`, the latest monthly snapshot). Uses the CalculoInflacao endpoint with the synthetic AE symbols (`AEIPCA`, `AEIGPM`, `AEINPC`, ... — the same family `bmacro` accepts).
+
+```python
+from py_bcast import binflation_history
+
+df = binflation_history("AEIPCA", "20250101")
+print(df["accumulated"].iloc[-1])
+```
+
+**Returns:** a flat `DataFrame` with a `DatetimeIndex` and a `ticker` column (one block per symbol) plus `accumulated` (% since `start_date`).
+
 ## Reference Data (HTTP — aetp/output binary)
 
 ### `bcompany(cvm_code=None)`
@@ -304,6 +317,19 @@ from py_bcast import bsectors
 
 sectors = bsectors()
 ```
+
+### `bsector_members(sector_id)`
+
+Every company classified under a B3 sector — useful for sector screening (pair with `bcompany` / `bindicators` / `bstats` over the returned `cvm_code` / ticker). Uses EmpresasPorSetores (173). Takes a **top-level** `sector_id` (the `sector_id` column of `bsectors()`); subsector/segment ids return an empty frame.
+
+```python
+from py_bcast import bsector_members
+
+df = bsector_members(1)   # ver bsectors() para os ids de setor
+print(df[["cvm_code", "trade_name", "segment"]].head())
+```
+
+**Returns:** a flat `DataFrame` (RangeIndex), one row per company: `cvm_code`, `trade_name`, `corporate_name`, `cnpj`, the B3 sector/subsector/segment names and ids, `ref_year`, `ref_quarter`, `period_start`/`period_end`, `logo_url`.
 
 ### `bquote(ticker)`
 
@@ -493,6 +519,19 @@ returns an empty DataFrame with schema.
 
 ---
 
+### `bcds_indices(date=None)`
+
+Markit CDS **index** term-structure table — tradable indices (CDXEM, iTraxx, ...), distinct from the single-name curves of `bcds`. Uses MarkitIndices (92); `date=None` resolves to the most recent date the feed has data for.
+
+```python
+from py_bcast import bcds_indices
+
+df = bcds_indices()
+print(df[["name", "composite_spread"]].head())
+```
+
+**Returns:** a flat `DataFrame` (RangeIndex), one row per index series: `date`, `name`, `redcode`, `maturity`, `composite_price`, `bid_ask_price`, `composite_spread`, `bid_ask_spread`, `change_day`, `change_month`, `depth`.
+
 ## Market Statistics & Intraday Snapshot (HTTP)
 
 ### `bstats(tickers)`
@@ -613,6 +652,19 @@ Usa CalculoPoupanca (114) via `DataInicio`/`DataFim` (NAO usar `961` — HTTP 50
 
 ---
 
+### `bunit_price(symbol, start_date, end_date=None)`
+
+Daily unit-price (PU) series for fixed-income reference symbols. Complements `btreasury` (last snapshot) and `btreasury_history` (trading yields). Uses the CalculoPreco endpoint with ANBIMA daily reference ids (`<paper><maturity>.ANBIMA`, e.g. `LTN260701.ANBIMA`) or Trademate (`.TRDM`) symbols.
+
+```python
+from py_bcast import bunit_price
+
+df = bunit_price("LTN260701.ANBIMA", "20260101")
+print(df[["ticker", "unit_price"]].tail())
+```
+
+**Returns:** a flat `DataFrame` with a `DatetimeIndex` and a `ticker` column (one block per symbol). Columns: `accumulated_return` (% since start), `unit_price` (PU), `change_pct` (day-over-day).
+
 ## Investment Funds — Legacy (HTTP)
 
 ### `bfund_history(fund, start, end=None)`
@@ -650,6 +702,19 @@ Usa FundosRentabilidade (82). `return_12m` verificado como a janela de 12 meses.
 **Retorna:** `DataFrame` (RangeIndex), uma row por fundo. Colunas: `ticker`, `return_1d`, `return_1m`, `return_3m`, `return_6m`, `return_12m`, `return_18m`, `return_2y`, `return_3y`, `return_5y` (todos em %).
 
 ---
+
+### `bfund_list(query=None)`
+
+Legacy fund universe (~45k CVM funds), optionally filtered by name. The `symbol` column is the `<id>.ANBIMA` form consumed by `bfund_history` / `bfund_returns`, so this is the discovery path for those on the legacy backend. Uses BuscarFundosAutoComplete (one cached call); `query` filters client-side by a case/accent-insensitive name substring.
+
+```python
+from py_bcast import bfund_list, bfund_history
+
+funds = bfund_list("Tesouro Selic")
+hist = bfund_history(funds["symbol"].iloc[0], "20260101")
+```
+
+**Returns:** a flat `DataFrame` (RangeIndex), one row per fund: `name`, `legal_name`, `anbima_id`, `cnpj`, `symbol` (`<id>.ANBIMA`), `anbima_class`.
 
 ## Macro — Conversao de Moeda
 
@@ -732,6 +797,19 @@ for url in df["url"]:
 Usa ArquivosDemonstrativos (205).
 
 **Retorna:** `DataFrame` (RangeIndex). Colunas: `ticker`, `date`, `url`.
+
+### `bstatement_dates(ticker_or_cvm)`
+
+Dates of a company's latest financial statements (the *dates*, not the figures — legacy has no DRE/BP/FC; see [`limitations.md`](./limitations.md)). Uses DemonstrativoUltimo (164). One row per company with the most recent annual (DFP) and quarterly (ITR) statements.
+
+```python
+from py_bcast import bstatement_dates
+
+df = bstatement_dates("PETR4")
+print(df[["ticker", "quarter_period_end", "quarter_disclosed"]])
+```
+
+**Returns:** a flat `DataFrame` (RangeIndex), each row tagged with a `ticker` column. Columns: `annual_period_start`, `annual_period_end`, `annual_disclosed`, `quarter`, `quarter_period_start`, `quarter_period_end`, `quarter_disclosed`, `basis` (C/I), `last_type` (A/T), `last_disclosed`. Raises `NotFoundError` if any identifier is unknown.
 
 ### `bfirst_close(ticker)`
 

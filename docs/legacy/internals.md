@@ -17,19 +17,22 @@ Cobre: protocolo DDE, infraestrutura HTTP do ContentProxy, grupos de endpoints, 
 | Respostas HTTP | XML + binary SOH |
 | Banco de instrumentos | `%APPDATA%\Agencia Estado\Broadcast\DataFiles\aetp_17.dat` |
 
-O terminal expoe **cinco canais de dados** consumidos pela lib:
+O terminal expoe os **canais de dados** consumidos pela lib:
 
 ```mermaid
 graph LR
     subgraph "py_bcast (this library)"
         CLIENT["realtime/client.py<br/>BroadcastClient, bdp"]
         HIST["historical/<br/>bhistory, bclose, bdi, bdt, bticks, bfirst_close"]
-        MACRO["macro/indicators.py<br/>bmacro, breturn,<br/>bvolume, binflation, bstats, bsnapshot, bfx"]
+        MACRO["macro/indicators.py<br/>bmacro, breturn, bvolume,<br/>binflation, binflation_history,<br/>bstats, bsnapshot, bfx"]
         FUND["fundamental/consensus.py<br/>bconsensus"]
-        REF["fundamental/reference.py<br/>bcompany, bindices, bsectors,<br/>bquote, btickers, bshares,<br/>bindicators, bindicator_meta"]
+        REF["fundamental/reference.py<br/>bcompany, bindices, bsectors, bsector_members,<br/>bquote, btickers, bshares, bfree_float,<br/>bfund_holders, bshareholder_dates, bstatement_dates,<br/>bfilings, bindicators, bindicator_meta"]
         EVT["fundamental/events.py<br/>bcalendar, bdividends, bdy,<br/>bportfolio, bportfolios_with"]
         NEWS["news/api.py<br/>bnews, bnews_recent,<br/>bnews_multimedia"]
         INST["instruments/db.py<br/>InstrumentDB, bsearch"]
+        FIXED["fixedincome.py<br/>btreasury, btreasury_history,<br/>baccrual, bsavings, bunit_price"]
+        FUNDS["funds.py<br/>bfund_history, bfund_returns, bfund_list"]
+        CREDIT["credit/cds.py<br/>bcds, bcds_indices"]
     end
 
     subgraph "bcsys32.exe (Terminal)"
@@ -42,6 +45,7 @@ graph LR
         AEF["/aefundamental/"]
         AETP["/aetp/output/<br/>(binary SOH)"]
         AEI["/AEInstrumentos/<br/>(blocked)"]
+        MKT["/MarkitOutput2/<br/>(CDS/credito)"]
     end
 
     CLIENT -->|"DDE Request/Advise<br/>Topic=COT,ATIVO"| DDE
@@ -52,6 +56,9 @@ graph LR
     EVT -->|"HTTP GET (binary SOH)"| AETP
     NEWS -->|"HTTP GET/POST (JSON/XML)"| CMM
     INST -->|"Read + XOR decode"| DB
+    FIXED -->|"HTTP GET (xml)"| BHN
+    FUNDS -->|"HTTP GET (xml)"| BHN
+    CREDIT -->|"HTTP GET (xml)"| MKT
 ```
 
 ### Canais de Dados
@@ -66,6 +73,9 @@ graph LR
 | 6 | HTTP | `fundamental/events.py` | REST/binary SOH | Calendario, dividendos, DY, carteiras de corretoras |
 | 7 | HTTP | `news/api.py` | REST/JSON+XML | Noticias, podcasts, multimidia (sem auth) |
 | 8 | Arquivo local | `instruments/db.py` | XOR(0xAE) TSV | 623K instrumentos, 30+ exchanges |
+| 9 | HTTP | `fixedincome.py` | REST/XML | Titulos publicos, poupanca, taxa pre, preco unitario |
+| 10 | HTTP | `funds.py` | REST/XML + binary SOH | Cotas e rentabilidade de fundos, lista de fundos |
+| 11 | HTTP | `credit/cds.py` | REST/XML (MarkitOutput2) | Curvas CDS de entidade e indices de credito |
 
 ---
 

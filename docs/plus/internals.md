@@ -624,6 +624,11 @@ Tamanho tipico: 2-4KB
 }]}
 ```
 
+> **Traducao para o DataFrame de `btrades` (0.8.0):** `last` -> coluna `price`; `exchangeId`
+> (em `ask`/`bid`) e o id da **corretora** (nao da venue) -> colunas `ask_broker_id`/`bid_broker_id`
+> (`Int64`, join com `bbrokers()`); `unixTime` -> `DatetimeIndex` em fuso `America/Sao_Paulo`.
+> Ver [`api.md`](./api.md).
+
 ### 8.6 Permissoes da Conta
 
 **`POST /authentication/v1/permissions`** — 429 permissoes por produto/servico

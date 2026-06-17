@@ -72,14 +72,17 @@ Esta versao e **BREAKING** sem shims ou aliases de transicao:
 | `btreasury_history()` | `BaseHistoricaNumerica/TitulosPublicos` | Sem equivalente | Sem suporte no Plus |
 | `baccrual()` | `BaseHistoricaNumerica/CalculoTaxaPre` | Sem equivalente | Sem suporte no Plus |
 | `bsavings()` | `BaseHistoricaNumerica/CalculoPoupanca` | Sem equivalente | Sem suporte no Plus |
+| `bunit_price()` | `BaseHistoricaNumerica/CalculoPreco` | Sem equivalente | Sem suporte no Plus |
 | `bfund_history()` | `BaseHistoricaNumerica/Fundos` | Sem equivalente | Sem suporte no Plus |
 | `bfund_returns()` | `BaseHistoricaNumerica/FundosRentabilidade` | Sem equivalente | Sem suporte no Plus |
+| `bfund_list()` | `contentProxyOutput/BuscarFundosAutoComplete` | Sem equivalente | Sem suporte no Plus |
 | `bfx()` | `BaseHistoricaNumerica/ConversorMoedas` | Sem equivalente | Sem suporte no Plus |
 | `bfirst_close()` | `aetp/output/FechamentoPrimeiro` | Sem equivalente | Sem suporte no Plus |
 | `bconsensus()` | `aefundamental/consenso` | Sem equivalente | Sem suporte no Plus |
 | `bcompany()` | `aetp/output/fundamental/empresa` | Sem equivalente | Sem suporte no Plus |
 | `bindices()` | `aetp/output/ativos/indice` | `GET /stock/v1/indexes` | **Implementado via `bindexes()`** — lista de codigos de indices |
-| `bsectors()` | `aetp/output/fundamental/setor` | `GET /stock/v1/instrumentTypes` | Confirmado — tipos de instrumento |
+| `bsectors()` | `aetp/output/fundamental/setor` | `GET /stock/v1/instrumentTypes` | Confirmado; descartado como redundante — sem adapter Plus (o `bsectors` legacy cobre) |
+| `bsector_members()` | `aetp/output/fundamental/empresa/setores` | Sem equivalente | Sem suporte no Plus |
 | `bcalendar()` | `aetp/output/fundamental/calendario` | `GET /stock/v1/calendar/tables` | **Implementado via `bholidays()`** — catalogo de tabelas; datas bloqueadas (param nao descoberto) |
 | `bdividends()` | `aetp/output/fundamental/eventos/jcp-dividendos` | `POST /stock/v1/corporateevents/{symbol}` | **Implementado via `bcorpevents()`** — inclui fatores de ajuste que o legado nao tem |
 | `bdy()` | `aetp/output/fundamental/eventos/dividend-yield` | incluido em `corporateevents` | A implementar |
@@ -87,6 +90,7 @@ Esta versao e **BREAKING** sem shims ou aliases de transicao:
 | `bfund_holders()` | `aetp/output/fundamental/CarteiraTopFundos` | Sem equivalente | Sem suporte no Plus |
 | `bshareholder_dates()` | `aetp/output/fundamental/AcionistaDatas` | Sem equivalente | Sem suporte no Plus |
 | `bfilings()` | `aetp/output/fundamental/ArquivosDemonstrativos` | Sem equivalente | Sem suporte no Plus |
+| `bstatement_dates()` | `aetp/output/fundamental/demonstrativo/ultimo` | Sem equivalente | Sem suporte no Plus |
 | `bportfolio()` | `aetp/output/fundamental/empresa/carteira-recomendada` | Sem equivalente | Sem suporte no Plus |
 | `bportfolios_with()` | `aetp/output/fundamental/CarteiraRecomendadaTicker` | Sem equivalente | Sem suporte no Plus |
 | `bnews()` / `bnews_recent()` | `CentralMultimidia/` (sem auth) | `POST /news/v1/headlines` + `GET /news/v1/content/{id}` | **Implementado via `bsections()`/`bheadlines()`/`bnews_content()`** — 121 secoes, tagging rico |
@@ -145,9 +149,9 @@ Funcionalidades que existem apenas no Terminal Antigo e nao tem plano de suporte
 | `bportfolio()` / `bportfolios_with()` | `aetp/output/carteira-recomendada` | Sem equivalente no Plus |
 | `breturn()` | `RetornoDiario` | Sem endpoint de retorno diario no Plus |
 | `bvolume()` | `VolumesMedios` | Sem endpoint de volumes medios no Plus |
-| `binflation()` | `Inflacao` | Sem endpoint de indices de inflacao no Plus |
+| `binflation()` / `binflation_history()` | `Inflacao` + `CalculoInflacao` | Sem endpoint de indices de inflacao no Plus |
 | `bindicators()` | `IndicadorHistoricoDiario` | Sem endpoint de indicadores fundamentalistas no Plus |
-| `bcds()` | `MarkitOutput2/CDS` | Sem endpoint de CDS/credito no Plus |
+| `bcds()` / `bcds_indices()` | `MarkitOutput2/CDS` + `MarkitIndices` | Sem endpoint de CDS/credito no Plus |
 | `InstrumentDB` / `bsearch()` (busca local) | `aetp_17.dat` | Arquivo local do bcsys32; Plus usa `quote/symbol` para lookup pontual |
 
 ---

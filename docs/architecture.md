@@ -36,6 +36,10 @@ graph LR
             P_HTTP["_plus/_async + _sync<br/>plus_request (gerado)"]
             P_RT["_plus/realtime.py<br/>BroadcastPlusClient"]
             P_INTRA["_plus/intraday.py<br/>btrades / abtrades"]
+            P_REF["_plus/reference.py<br/>binfo, bindexes, bindex_members,<br/>blogo, bholidays, bbrokers, bexchanges"]
+            P_FUNDS["_plus/funds.py<br/>bfunds, bfund"]
+            P_NEWS["_plus/news.py<br/>bsections, bheadlines, bnews_content"]
+            P_CORP["_plus/corporate.py<br/>bcorpevents"]
         end
 
         CORE --> L_PROTO
@@ -50,6 +54,10 @@ graph LR
         CORE --> P_HTTP
         CORE --> P_RT
         CORE --> P_INTRA
+        CORE --> P_REF
+        CORE --> P_FUNDS
+        CORE --> P_NEWS
+        CORE --> P_CORP
     end
 
     L_RT -->|"DDE"| BCSYS["bcsys32.exe<br/>cp.ae.com.br:44780"]
@@ -62,6 +70,10 @@ graph LR
     P_HTTP -->|"Bearer JWT"| PLUS
     P_RT -->|"WebSocket"| PLUS
     P_INTRA -->|"Bearer JWT"| PLUS
+    P_REF -->|"Bearer JWT"| PLUS
+    P_FUNDS -->|"Bearer JWT"| PLUS
+    P_NEWS -->|"Bearer JWT"| PLUS
+    P_CORP -->|"Bearer JWT"| PLUS
 ```
 
 ---
@@ -76,7 +88,7 @@ Nenhum modulo aqui conhece protocolo Legacy ou Plus:
 | `config.py` | `Settings` dataclass com todos os parametros tunaveis. `configure(**kwargs)` atualiza em runtime; `get_settings()` retorna o singleton. Inclui campos `terminal`, `plus_login`, `plus_password`. |
 | `routing.py` | `get_active_terminal()` resolve qual backend (`"legacy"` ou `"plus"`) atender em cada chamada. Auto-detecta por env var ou processo rodando. Cache invalidado por `configure(terminal=...)`. |
 | `memory.py` | Win32 helpers compartilhados: `find_process_pid(image_name)` via `tasklist` e `scan_process_memory(pid, pattern)` com `ReadProcessMemory`. Usado pelos dois backends para extrair tokens. |
-| `exceptions.py` | Hierarquia de excecoes: `PyBcastError` -> `SessionError`, `ContentProxyError`, `ProtocolError`, `DDEError`, `BroadcastPlusError`, `BroadcastPlusAuthError`. |
+| `exceptions.py` | Hierarquia de excecoes: `PyBcastError` -> `SessionError`, `ContentProxyError`, `ProtocolError`, `DDEError`, `DDEAdviseError`, `ValidationError`, `NotFoundError`, `BroadcastPlusError`, `BroadcastPlusAuthError`. |
 | `logging.py` | `get_logger(name)` factory; NullHandler por padrao. |
 | `cache.py` | Cache de dois backends. `"memory"` usa dict TTL thread-safe; `"disk"` usa `diskcache`. |
 | `ratelimit.py` | Token-bucket rate limiter. `rate_limit()` (sync) e `rate_limit_async()` (async). |

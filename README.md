@@ -8,15 +8,15 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 - **Real-time streaming** via DDE (`bdp`, `subscribe`, `snapshot`)
 - **Historical data** via HTTP — daily close/OHLCV range (`bhistory`/`bclose`), intraday bars (`bdi`), tick-by-tick (`bdt`)
 - **Times & trades with top-of-book** (`bticks`) — TRD/QTE rows, broker ids, sessao corrente
-- **Macroeconomic series** — FX, indices, commodities, CDI (`bmacro("CDI",...)`), inflation, returns
-- **Fixed income** — Tesouro prices/yields (`btreasury`/`btreasury_history`), pre-fixado accrual (`baccrual`), poupanca (`bsavings`)
+- **Macroeconomic series** — FX, indices, commodities, CDI (`bmacro("CDI",...)`), inflation snapshot + accumulated history (`binflation`/`binflation_history`), returns
+- **Fixed income** — Tesouro prices/yields (`btreasury`/`btreasury_history`), unit price/PU (`bunit_price`), pre-fixado accrual (`baccrual`), poupanca (`bsavings`)
 - **Market stats snapshot** (`bstats`) — DY, last dividend, 52-week range, avg volumes, para qualquer simbolo B3
 - **Intraday snapshot** (`bsnapshot`) — OHLCV near-real-time sem DDE
-- **Investment funds** — historico de cotas (`bfund_history`), retornos por janela (`bfund_returns`)
+- **Investment funds** — universo de fundos (`bfund_list`), historico de cotas (`bfund_history`), retornos por janela (`bfund_returns`)
 - **Spot FX conversion** (`bfx`) — taxa atual entre quaisquer pares
-- **Fundamental data** — analyst consensus, indicators (Market Cap, Beta), company metadata, free float (`bfree_float`), top fund holders (`bfund_holders`), first close (`bfirst_close`)
+- **Fundamental data** — analyst consensus, indicators (Market Cap, Beta), company metadata, sector screening (`bsector_members`), free float (`bfree_float`), top fund holders (`bfund_holders`), statement dates (`bstatement_dates`), first close (`bfirst_close`)
 - **Corporate events** — dividends, JCP, calendar, dividend yield, broker portfolios (`bportfolio`/`bportfolios_with`), shareholder dates (`bshareholder_dates`), filings S3 links (`bfilings`)
-- **Credit** — sovereign/corporate CDS term-structure curves via Markit (`bcds`)
+- **Credit** — sovereign/corporate CDS term-structure curves + tradable CDS index term-structures via Markit (`bcds`/`bcds_indices`)
 - **Reference data** — 1020 companies, 37 indices, 38 sectors, real-time quotes
 - **News & multimedia** — full-text articles, Dow Jones wires, podcasts (no auth needed)
 - **Instrument database** — 623K+ instruments across 30+ exchanges (local `aetp_17.dat`)
@@ -194,6 +194,10 @@ wide.bcast.long()               # inverse, back to flat
 `wide()` suits time-series frames (`bhistory`, `bmacro`, `breturn`, ...) where each
 `(date, ticker)` pair is unique.
 
+For charting, `df.bcast.ohlc()` renames an OHLCV frame's `open/high/low/close[/volume]` to the
+capitalized `Open/High/Low/Close/Volume` that `mplfinance` expects (single instrument — filter by
+`ticker` first).
+
 For an object-oriented style (like yfinance's `Ticker`), `Ticker` is a thin
 facade over the `b*` functions — no new logic, just discoverability:
 
@@ -268,9 +272,10 @@ src/py_bcast/
 ├── _async/             # Async versions of all legacy HTTP data functions
 ├── realtime/client.py  # Legacy DDE: BroadcastClient, bdp (one or many tickers)
 ├── historical/         # bhistory, bclose, bdi, bdt, bticks, bfirst_close (legacy ContentProxy)
-├── fixedincome.py      # btreasury, btreasury_history, baccrual, bsavings
-├── funds.py            # bfund_history, bfund_returns
-├── macro/indicators.py # bmacro (inclui CDI), breturn, bvolume, binflation, bstats, bsnapshot, bfx
+├── fixedincome.py      # btreasury, btreasury_history, baccrual, bsavings, bunit_price
+├── funds.py            # bfund_history, bfund_returns, bfund_list
+├── macro/indicators.py # bmacro (inclui CDI), breturn, bvolume, binflation, binflation_history, bstats, bsnapshot, bfx
+├── credit/cds.py       # bcds, bcds_indices (Markit CDS / credito)
 ├── fundamental/        # bconsensus, bcompany, bindices, …, bcalendar, bdividends, …
 ├── news/api.py         # bnews, bnews_recent, bnews_multimedia
 └── instruments/db.py   # InstrumentDB + bsearch (auto-routing legacy/plus)
