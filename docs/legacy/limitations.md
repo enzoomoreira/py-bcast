@@ -305,7 +305,7 @@ To access these via DDE: `bdp("WDOM25", "ULT")` works normally.
 
 ## Binary SOH Protocol Decoder
 
-The decoder in `src/py_bcast/fundamental.py` (`_parse_binary_response()`) handles:
+The decoder in `src/py_bcast/_legacy/binary.py` (`parse_binary_response()`) handles:
 - SOH (0x01) record separator
 - NULL (0x00) field separator
 - STX (0x02) "same as previous row" compression

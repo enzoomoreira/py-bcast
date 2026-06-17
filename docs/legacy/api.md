@@ -246,7 +246,7 @@ Average volume statistics (1m/2m/3m/6m averages).
 from py_bcast import bvolume
 
 df = bvolume(["PETR4", "VALE3"])
-print(df[df["symbol"] == "PETR4.BVMF"])
+print(df[df["ticker"] == "PETR4"])
 ```
 
 **Returns:** a flat `DataFrame` (RangeIndex), one row per (ticker, averaging window), with columns: `ticker`, `avg_volume`, `avg_turnover`, `avg_trades`, `months`, `date`.

@@ -123,22 +123,23 @@ from py_bcast import btrades, configure
 
 configure(terminal="plus")
 df = btrades("PETR4", "20260525")
-print(df[["last", "size", "tendency"]].head())
+print(df[["price", "size", "tendency"]].head())
 ```
 
 **Retorna:** `pd.DataFrame` com `DatetimeIndex` em fuso `America/Sao_Paulo` e colunas:
 
 | Coluna | Descricao |
 |--------|-----------|
-| `last` | Preco do trade |
+| `ticker` | Ticker consultado (primeira coluna) |
+| `price` | Preco do trade |
 | `size` | Quantidade |
 | `tendency` | 0 = inalterado, 1 = alta, -1 = baixa |
 | `sequence` | Numero de sequencia do servidor |
 | `is_trade` | True para trade real (vs. quote) |
 | `ask_price` / `ask_size` | Melhor venda no momento do trade |
-| `ask_exchange_id` | Codigo da venue da venda |
+| `ask_broker_id` | Id da **corretora** do lado da venda (`Int64`); join com `bbrokers()` |
 | `bid_price` / `bid_size` | Melhor compra no momento do trade |
-| `bid_exchange_id` | Codigo da venue da compra |
+| `bid_broker_id` | Id da **corretora** do lado da compra (`Int64`); join com `bbrokers()` |
 
 Sem trades retorna `pd.DataFrame()` vazio. API limita a 500 trades por chamada (mais recentes); ordenado cronologicamente (oldest first) no DataFrame.
 
@@ -181,11 +182,11 @@ Lista de codigos de indice disponiveis via `GET /stock/v1/indexes`. Alimenta `bi
 from py_bcast import bindexes, configure
 
 configure(terminal="plus")
-print(bindexes()["index"].tolist())
+print(bindexes()["code"].tolist())
 # ['IBOV', 'IFIX', 'SMLL', ...]
 ```
 
-**Retorna:** `pd.DataFrame` de uma coluna `index` com os codigos disponíveis.
+**Retorna:** `pd.DataFrame` de uma coluna `code` com os codigos disponíveis.
 
 ### `bindex_members(index)`
 
@@ -201,11 +202,43 @@ print(df.sort_values("relevance", ascending=False).head())
 
 **Args:** `index` — codigo do indice (ex.: `"IBOV"`, `"IFIX"`, `"SMLL"`). Ver `bindexes()` para os codigos validos.
 
-**Retorna:** `pd.DataFrame` com colunas `index` (codigo consultado), `symbol`, `relevance` (peso de participacao). Uma linha por membro.
+**Retorna:** `pd.DataFrame` com colunas `index` (codigo consultado), `ticker`, `relevance` (peso de participacao). Uma linha por membro.
 
 **Levanta:** `NotFoundError` se o codigo de indice nao existe.
 
 O twin async `abindex_members(index)` esta disponivel em `py_bcast.async_api`.
+
+### `bbrokers()`
+
+Registro de corretoras (id -> nome curto) via `GET /stock/v1/brokerages`. Os ids estao no mesmo espaco das colunas `ask_broker_id`/`bid_broker_id` de `btrades`, entao os dois frames fazem join por id de corretora.
+
+```python
+from py_bcast import bbrokers, configure
+
+configure(terminal="plus")
+df = bbrokers()
+print(df.head())
+```
+
+**Retorna:** `pd.DataFrame` com colunas `id` (`Int64`) e `name` (nome curto). Uma linha por corretora.
+
+O twin async `abbrokers()` esta disponivel em `py_bcast.async_api`.
+
+### `bexchanges()`
+
+Registro de bolsas/venues via `GET /stock/v1/exchanges`. Os ids decodificam a coluna `exchange_id` de `binfo`.
+
+```python
+from py_bcast import bexchanges, configure
+
+configure(terminal="plus")
+df = bexchanges()
+print(df.head())
+```
+
+**Retorna:** `pd.DataFrame` com colunas `id` (`Int64`), `name` e `delay` (atraso do feed em minutos, `Int64`; 0 = tempo real). Uma linha por bolsa.
+
+O twin async `abexchanges()` esta disponivel em `py_bcast.async_api`.
 
 ### `blogo(symbol)`
 

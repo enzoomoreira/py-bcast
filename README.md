@@ -154,7 +154,7 @@ print(bholidays()[["id", "name"]])
 
 # Times & trades intraday
 trades = btrades("PETR4", "20260525")
-print(trades[["last", "size", "tendency"]].head())
+print(trades[["price", "size", "tendency"]].head())
 
 # Instrument search via API
 df = bsearch("PETR", max_results=5)
@@ -226,7 +226,7 @@ petr.indicators("EBITDA", "20260101", "20260520")  # -> bindicators
 
 ```
 src/py_bcast/
-├── __init__.py         # Public API (85 exported symbols + async_api namespace)
+├── __init__.py         # Public API (93 exported symbols + async_api namespace)
 ├── _core/              # Backend-agnostic infrastructure (both backends)
 │   ├── config.py       # Settings dataclass + configure() (incl. terminal=, plus_login=, plus_password=)
 │   ├── routing.py      # get_active_terminal() — picks legacy vs plus per call
@@ -249,9 +249,9 @@ src/py_bcast/
 │   ├── columns.py      # Column schemas + rename maps
 │   ├── spec.py         # EndpointSpec / ParamBind declarative endpoint descriptors
 │   ├── endpoints.py    # EndpointSpec catalog (one spec per migrated endpoint)
-│   ├── output.py       # DataFrame finalization (finalize_frame, empty_bdh_frame)
+│   ├── output.py       # DataFrame finalization (finalize_frame, empty_history_frame)
 │   ├── multi.py        # vectorize / vectorize_async multi-ticker fan-out
-│   ├── _async/         # I/O layer SOURCE (async-first): transport, executor, resolve, quote, bdh
+│   ├── _async/         # I/O layer SOURCE (async-first): transport, executor, resolve, quote, historical
 │   └── _sync/          # I/O layer GENERATED from _async/ by scripts/gen_sync.py — do not edit
 ├── _plus/              # Broadcast+ backend
 │   ├── session.py      # JWT auth chain: env → cache → refresh → memory scan → ECDH login

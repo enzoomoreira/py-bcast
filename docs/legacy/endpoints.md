@@ -135,7 +135,7 @@ Todos retornam XML com `<RESPONSE><STATUS>success</STATUS>...<TICKS>`.
 | 77 | **TitulosPublicos** | Implementado | Historico OTC de taxas — `btreasury_history(symbol, start, end)` | `305`=`LTNF28.TRDM` (NAO bare `LTN`), `961`=start; OHLC sao TAXAS, negociacao esparsa |
 | 82 | **FundosRentabilidade** | Implementado | Retornos por janela — `bfund_returns(fund)` | `305`=ticker ou `<id>.ANBIMA`; ret_anual = janela de 12 meses |
 | 114 | **CalculoPoupanca** | Implementado | Poupanca acumulada — `bsavings(start, end)` | `DataInicio`/`DataFim` (NAO `961` — `961` -> HTTP 500) |
-| 135 | **CalculoPreco** | Confirmado | Preco unitario renda fixa (popula via `.ANBIMA`) | `305`=`LTN260701.ANBIMA` (NAO bare `LTN`), `961`=start |
+| 135 | **CalculoPreco** | Implementado | Preco unitario (PU) + retorno acumulado de RF — `bunit_price(symbol, start, end)` | `305`=`LTN260701.ANBIMA`/.TRDM (NAO bare `LTN`), `961`=start, `1789`=end |
 | 136 | **CalculoTaxaPre** | Implementado | Accrual de taxa pre — `baccrual(rate, start, end)` | `13539`=taxa anual em % (nao notional — CRACKADO: o servidor capitaliza em du/252); verificado exato: 100% a.a. em 15 du = 2**(15/252)-1 = 4.21% |
 | 141 | **TitulosPublicosUltimos** | Implementado | Ultimo preco de titulos — `btreasury(symbols)` | `10113`=`LTN260701.ANBIMA` (NAO bare `LTN`); multi via join; retorna ticker bare, date, rate, unit_price |
 | 207 | **VolumesMediosSemMesAno** | Vazio/Casca | `STATUS=success` porem `<TICKS>` sempre vazio (dataset vazio no servidor) | `10113`=ticker, `12078`=dias |
@@ -187,7 +187,7 @@ parametros corretos (verificado 2026-06-02, dados reais):
 |---|----------|--------|-------|--------------|
 | 41 | **TimesTrades** | Implementado | Times-and-trades com book de topo — `bticks(ticker, start, end)` | `305`=ticker, `10071`/`10072`=`YYYYMMDDHHMMSS` **em UTC**; TRD rows: price/size/seq_num/bid_participant/ask_participant; QTE rows: bid/ask price+size; retenção: somente sessao corrente (dias anteriores retornam vazio) |
 | 131 | **ConversorMoedas** | Implementado | Conversao spot — `bfx(from_currency, to_currency, amount)` | `Instrumento`=de, `Instrumento2`=para, `Valor`=quantia; par invalido -> NotFoundError ("Simbolo invalido"); data e inerte (sempre spot) |
-| 145 | **CalculoInflacao** | Confirmado | Serie de inflacao (22 ticks `DAT`/`ACUM`) | `305`=`AEIPCA` (NAO bare `IPCA`), `961`=start |
+| 145 | **CalculoInflacao** | Implementado | Serie de inflacao acumulada (% desde o start) — `binflation_history(symbol, start, end)` | `305`=`AEIPCA` (NAO bare `IPCA`), `961`=start, `1789`=end |
 | 204 | **FechamentoPrimeiro** | Implementado | Primeiro fechamento historico — `bfirst_close(ticker)` | `Instrumento`=ticker B3 bare (ex.: `PETR4`, NAO `.BVMF`) |
 
 > - **41 TimesTrades**: o "empty ticks para B3" da varredura de 2025 era o **erro de fuso** — a
@@ -279,9 +279,9 @@ Todos usam o mesmo protocolo binary SOH do `bconsensus()`.
 
 | ID | Endpoint | Status | Dados | Size |
 |---|----------|--------|-------|------|
-| 164 | **DemonstrativoUltimo** | Confirmado | Datas do ultimo balanco/ITR | 394B |
+| 164 | **DemonstrativoUltimo** | Implementado | Datas do ultimo DFP (anual) e ITR (trimestral) — `bstatement_dates(ticker_or_cvm)` | 394B |
 | 172 | **SetorSubsetorSegmento** | Implementado | Classificacao setorial B3 (42 setores) | 1.4KB |
-| 173 | **EmpresasPorSetores** | Confirmado | Todas empresas de um setor | 14.5KB |
+| 173 | **EmpresasPorSetores** | Implementado | Empresas sob um setor B3 — `bsector_members(sector_id)` (use o id de setor top-level) | 14.5KB |
 | 179 | **EmpresaMetadado** | Implementado | Metadados de TODAS as empresas | 101KB |
 | 180 | **EmpresaDados** | Implementado | Empresa: CNPJ, nome, setor, IPO date | 1.2KB |
 | 183 | **EmpresaAcoesUnits** | Implementado | Classes de acoes com free float e composicao de units — `bfree_float(ticker_or_cvm)` | 348B |
@@ -443,7 +443,7 @@ SOH validos. Verifique caso a caso antes de presumir bloqueio.
 | 61, 64-67, 73, 100, 115, 121-123, 127-130, 134 | Demais Fundos CVM | Bloqueado (HTTP 500, nao re-testados individualmente) |
 | 132 | FundosTabelaRentabilidade | `HTTP 200` `in_88000` "sem registros" — e BaseHistoricaNumerica (`nao-cp`), nao um 500 |
 | 120 | **ClasseAnbima** | **Confirmado** — `HTTP 200`, 146B, binary SOH, 11 linhas (classes Anbima: Acoes, FIP, Multimercados, OffShore, ...) |
-| 116 | **BuscarFundosAutoComplete** | **Confirmado** — `HTTP 200`, ~1MB+ binary SOH, 11 campos, >31 linhas (autocomplete de fundos) |
+| 116 | **BuscarFundosAutoComplete** | **Implementado** — universo legacy de fundos via `bfund_list()` (~45k linhas, filtro por nome client-side); `HTTP 200`, ~1MB+ binary SOH |
 
 > **120 e 116 eram falso-negativos** (catalogados "500"). Hoje retornam `HTTP 200` com SOH valido
 > e zero tokens de erro. A varredura de 2025 generalizou um 500 observado em outros endpoints do
@@ -460,10 +460,10 @@ de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` unif
 | ID | Endpoint | Status | Params Chave / Notas |
 |---|----------|--------|----------------------|
 | 91 | **MarkitListaTipoCDS** | Confirmado | sem params (2 tipos de CDS, 268B XML) |
-| 90 | **MarkitListaDatas** | Confirmado | `13336`=`C` (260 linhas); `13336=BR` -> erro "TipoListaDatas invalido" |
-| 92 | **MarkitIndices** | Confirmado | `10047`=data `YYYY-MM-DD` (394 linhas, 135KB); `10047=BR` -> "Data invalida" |
-| 93 | **MarkitListaCDS** | Confirmado | `10047`=data `YYYY-MM-DD` (58 linhas) |
-| 94 | **MarkitCDS** | Confirmado | curva de termo CDS de 1 entidade (SPREAD 6M-10Y + VAR/BID_ASK + recovery/rating). Params: `10047`=data, `13339`=S/C, `13349`=IDCDS, `13350`=TIER, `13351`=DOCCLAUSE — a tripla (IDCDS,TIER,DOCCLAUSE) deve ser coerente com o 93 (ex.: BRASIL usa `CR14`, nao `CR`) |
+| 90 | **MarkitListaDatas** | Implementado | resolve a data corrente para `bcds`/`bcds_indices`. `13336`=`C` (260 linhas); `13336=BR` -> erro "TipoListaDatas invalido" |
+| 92 | **MarkitIndices** | Implementado | Termo dos indices CDS (CDXEM, iTraxx...) — `bcds_indices()`. `10047`=data `YYYY-MM-DD` (394 linhas, 135KB); `10047=BR` -> "Data invalida" |
+| 93 | **MarkitListaCDS** | Implementado | lista de entidades CDS (resolve a tripla IDCDS/TIER/DOCCLAUSE para `bcds()`). `10047`=data `YYYY-MM-DD` (58 linhas) |
+| 94 | **MarkitCDS** | Implementado | curva de termo CDS de 1 entidade — `bcds(entity, date, ...)` (SPREAD 6M-10Y + VAR/BID_ASK + recovery/rating). Params: `10047`=data, `13339`=S/C, `13349`=IDCDS, `13350`=TIER, `13351`=DOCCLAUSE — a tripla (IDCDS,TIER,DOCCLAUSE) deve ser coerente com o 93 (ex.: BRASIL usa `CR14`, nao `CR`) |
 
 > **Correcao da generalizacao**: o erro de 2025 (`api_error`) era o servidor rejeitando o
 > placeholder `BR`. **90 NAO usa `10047`** — usa `13336` (tipo de lista de datas; `C` valido).
@@ -507,9 +507,9 @@ de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` unif
 | Protocolo | Status | Notas |
 |----------|--------|-------|
 | DDE (Service=BC) | Funcional | Real-time + snapshot |
-| HTTP BaseHistoricaNumerica | Funcional | ~18 endpoints, 9 implementados |
+| HTTP BaseHistoricaNumerica | Funcional | ~23 implementados (historico, macro, renda fixa, fundos, FII, T&T) |
 | HTTP aefundamental | Parcial | Consensus + binary parser |
-| HTTP aetp/output | **~40 funcionais, ~22 implementados** | Binary SOH, fonte mais rica |
+| HTTP aetp/output | **~40 funcionais, ~24 implementados** | Binary SOH, fonte mais rica |
 | HTTP IntegracaoTabelas | Parcial | 4 endpoints de commodities/formulas |
 | HTTP AEInstrumentos | 100% bloqueado | `PROPRIETARY` — error 88007 (comprovado em 3 variacoes de `TipoResposta`) |
 | HTTP AEContent | 100% bloqueado | `PROPRIETARY` — error 88007 (News); CentralMultimidia (ASP.NET) e separado e funcional |
@@ -529,8 +529,8 @@ de uma data/tipo valido). Os params diferem por endpoint (NAO ha um `10047` unif
 
 | Status | Count | Descricao |
 |--------|-------|-----------|
-| Implementado na lib | **~42 funcoes** | bdp, bhistory, bclose, bdi, bdt, bticks, bmacro, breturn, bvolume, binflation, bstats, bsnapshot, bfirst_close, bfx, btreasury, btreasury_history, baccrual, bsavings, bfund_history, bfund_returns, bfree_float, bfund_holders, bshareholder_dates, bfilings, bportfolios_with, bconsensus, bcompany, bindices, bsectors, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolio, bcds, bsearch, InstrumentDB |
-| Funcional, nao implementado | **~20** | Endpoints com dados reais nao cobertos por adapter (metadados ANBIMA, ClasseAnbima, MarkitListas, IntegracaoTabelas, etc.). **Sem demonstracoes financeiras** — ver abaixo |
+| Implementado na lib | **~48 funcoes** | bdp, bhistory, bclose, bdi, bdt, bticks, bmacro, breturn, bvolume, binflation, binflation_history, bstats, bsnapshot, bfirst_close, bfx, btreasury, btreasury_history, baccrual, bsavings, bunit_price, bfund_history, bfund_returns, bfund_list, bfree_float, bfund_holders, bshareholder_dates, bstatement_dates, bfilings, bportfolios_with, bconsensus, bcompany, bindices, bsectors, bsector_members, bquote, btickers, bshares, bindicators, bindicator_meta, bcalendar, bdividends, bdy, bportfolio, bcds, bcds_indices, bsearch, InstrumentDB (+ bnews/bnews_recent/bnews_multimedia via CentralMultimidia) |
+| Funcional, nao implementado | **~18** | Endpoints com dados reais sem adapter: FundosListaTipo 158/159, ClasseAnbima 120, IntegracaoTabelas 105-111, catalogos de filings 175-177/185, aefundamental 45/46/48/58/60/69. **Sem demonstracoes financeiras** — ver abaixo |
 | Vazio/Casca | **~5** | Vivos mas sem dado utilizavel: 154, 207, 208, 212 (e 102-104 parciais) |
 | Bloqueado/Quebrado | ~68 | Ver categorias abaixo |
 | Fora de escopo | ~8 | Contribuicao, admin, banners |
