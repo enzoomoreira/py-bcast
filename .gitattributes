@@ -1,0 +1,4 @@
+# Force LF in the working tree on all platforms so the generated _sync trees
+# compare byte-identically (scripts/gen_sync.py --check) on Windows CI runners,
+# which default to autocrlf=true.
+* text=auto eol=lf
