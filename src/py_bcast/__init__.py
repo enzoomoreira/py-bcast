@@ -233,4 +233,4 @@ __all__ = [
     "async_api",
 ]
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"

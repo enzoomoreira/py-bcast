@@ -1,6 +1,6 @@
 [project]
 name = "py-bcast"
-version = "0.8.0"
+version = "0.8.1"
 description = "Python client for AE Broadcast market data terminal"
 readme = "README.md"
 license = "MIT"
