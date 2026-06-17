@@ -2,6 +2,11 @@
 
 Python client for **AE Broadcast** (Agência Estado) market data terminal — a Bloomberg `blpapi`/`xbbg`-like interface. Suporta os dois terminais em paralelo: **Antigo** (`bcsys32.exe`, DDE + ContentProxy) e **Novo** (`Broadcast+.exe`, JWT + WebSocket).
 
+> [!IMPORTANT]
+> **Projeto não-oficial e independente.** `py-bcast` não é afiliado, patrocinado nem endossado pela Agência Estado, pelo Grupo Estado ou por qualquer provedor de dados. "Broadcast" e "AE Broadcast" são marcas de seus respectivos titulares, citadas aqui apenas de forma nominativa para identificar o terminal com o qual a biblioteca interopera.
+>
+> A biblioteca **não redistribui dados de mercado**: ela conecta-se a um terminal Broadcast já licenciado e em execução na sua própria máquina. Você é o único responsável por usar este software em conformidade com o contrato de licença e os termos de uso do seu terminal. Use por sua conta e risco.
+
 ## Features
 
 **Terminal Antigo (`bcsys32.exe`)**
@@ -312,3 +317,9 @@ docs/
 - [Compatibility](docs/compatibility.md) — Legacy vs Plus feature mapping
 - **Terminal Antigo:** [API](docs/legacy/api.md) | [Endpoints](docs/legacy/endpoints.md) | [Internals](docs/legacy/internals.md) | [Limitations](docs/legacy/limitations.md) | [Roadmap](docs/legacy/roadmap.md)
 - **Terminal Novo:** [API](docs/plus/api.md) | [Endpoints](docs/plus/endpoints.md) | [Internals](docs/plus/internals.md) | [Limitations](docs/plus/limitations.md) | [Roadmap](docs/plus/roadmap.md)
+
+## License
+
+[MIT](LICENSE) © py-bcast contributors
+
+A licença cobre apenas o código-fonte desta biblioteca. Ela não concede nenhum direito sobre o serviço Broadcast, seus dados ou suas marcas.
