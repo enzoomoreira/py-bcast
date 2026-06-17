@@ -291,7 +291,7 @@ For older dates with no tick retention, fall back to `bdi()` for intraday detail
 
 - `bcsys32.exe` must be running on the same machine
 - Only works on Windows (DDE is a Windows-only protocol)
-- The `pywin32` package must be installed (`pip install pywin32`)
+- Requires `pywin32` (installed automatically as a dependency of `py-bcast`)
 
 ---
 

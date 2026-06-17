@@ -1,5 +1,10 @@
 # py-bcast
 
+[![PyPI](https://img.shields.io/pypi/v/py-bcast)](https://pypi.org/project/py-bcast/)
+[![Python](https://img.shields.io/pypi/pyversions/py-bcast)](https://pypi.org/project/py-bcast/)
+[![License: MIT](https://img.shields.io/pypi/l/py-bcast)](LICENSE)
+[![CI](https://github.com/enzoomoreira/py-bcast/actions/workflows/ci.yml/badge.svg)](https://github.com/enzoomoreira/py-bcast/actions/workflows/ci.yml)
+
 Python client for **AE Broadcast** (Agência Estado) market data terminal — a Bloomberg `blpapi`/`xbbg`-like interface. Suporta os dois terminais em paralelo: **Antigo** (`bcsys32.exe`, DDE + ContentProxy) e **Novo** (`Broadcast+.exe`, JWT + WebSocket).
 
 > [!IMPORTANT]
@@ -59,11 +64,21 @@ Python client for **AE Broadcast** (Agência Estado) market data terminal — a 
 ## Installation
 
 ```bash
-pip install -e .
+pip install py-bcast
 ```
 
 Todas as dependências (incluindo `pywin32`, necessário para DDE) são instaladas
-automaticamente.
+automaticamente. A biblioteca só funciona em Windows.
+
+### Desenvolvimento
+
+Para contribuir ou rodar a partir de um clone do repositório:
+
+```bash
+git clone https://github.com/enzoomoreira/py-bcast
+cd py-bcast
+uv sync          # instala runtime + dev (pytest, ruff, unasync)
+```
 
 ## Quick Start
 
