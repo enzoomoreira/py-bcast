@@ -1,4 +1,4 @@
-# Broadcast+ Field Reference
+# Broadcast Field Reference (Terminal Antigo)
 
 **Source**: `camposbc.tab` — complete field mapping: BC_ID ↔ AETP_ID ↔ DDE_KEY
 

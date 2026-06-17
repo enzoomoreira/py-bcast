@@ -262,10 +262,10 @@ Snapshot of inflation indices with monthly and accumulated periods.
 from py_bcast import binflation
 
 df = binflation()  # ~17 indices (IPCA, IGP-M, INPC, etc.)
-print(df[["close", "return_3m", "return_6m", "return_12m", "return_ytd"]])
+print(df[["ticker", "return_3m", "return_6m", "return_12m", "return_ytd"]])
 ```
 
-**Returns:** `DataFrame` with columns: `close`, `return_3m`, `return_6m`, `return_12m`, `return_ytd`.
+**Returns:** a flat `DataFrame` (RangeIndex) with columns: `ticker` (index name, e.g. "IPCA"), `mes0`..`mes11` (monthly values), `return_3m`, `return_6m`, `return_12m`, `return_ytd`.
 
 ---
 
